@@ -1,0 +1,29 @@
+# Environment variables and secrets
+.env
+.env.local
+.env.development
+.env.production
+
+# Node.js dependencies
+node_modules/
+
+# Build folders
+dist/
+build/
+
+# Log files
+*.log
+
+# VS Code personal settings
+.vscode/
+
+# Windows files
+Thumbs.db
+Desktop.ini
+
+# macOS files
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
