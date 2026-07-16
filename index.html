@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zeeda Energy Qatar Operations Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section class="login-screen" id="auth-loading-screen">
+      <div class="login-card auth-loading-card">
+        <div class="brand-mark large" aria-label="Zeeda Energy">
+          <strong>ZEEDA</strong>
+          <span>ENERGY</span>
+        </div>
+        <h1>Checking session...</h1>
+        <p>Verifying your access before loading the operations platform.</p>
+      </div>
+    </section>
+
+    <section class="login-screen hidden" id="login-screen">
+      <div class="login-card">
+        <div class="brand-mark large" aria-label="Zeeda Energy">
+          <strong>ZEEDA</strong>
+          <span>ENERGY</span>
+        </div>
+        <h1>Qatar Operations Platform</h1>
+        <div class="dev-credentials" id="dev-credentials"></div>
+        <form id="login-form" class="login-form" novalidate>
+          <div class="error-message" id="login-error" aria-live="polite"></div>
+          <label><span>Email</span><input id="login-email" type="email" autocomplete="email" /></label>
+          <label><span>Password</span><input id="login-password" type="password" autocomplete="current-password" /></label>
+          <label class="check-row"><input id="remember-me" type="checkbox" /> <span>Remember me</span></label>
+          <button class="primary-button" type="submit" data-loading-text="Signing in...">Sign in</button>
+          <a href="#" class="forgot-link">Forgot password?</a>
+        </form>
+      </div>
+    </section>
+
+    <section class="login-screen hidden" id="change-password-screen">
+      <div class="login-card">
+        <div class="brand-mark large" aria-label="Zeeda Energy">
+          <strong>ZEEDA</strong>
+          <span>ENERGY</span>
+        </div>
+        <h1>Create New Password</h1>
+        <form id="change-password-form" class="login-form" novalidate>
+          <div class="error-message" id="change-password-error" aria-live="polite"></div>
+          <label><span>Temporary/current password</span><input id="current-temp-password" type="password" autocomplete="current-password" /></label>
+          <label><span>New password</span><input id="new-password" type="password" autocomplete="new-password" /></label>
+          <label><span>Confirm new password</span><input id="confirm-new-password" type="password" autocomplete="new-password" /></label>
+          <button class="primary-button" type="submit">Change Password</button>
+          <button class="secondary-button" id="change-password-logout" type="button">Logout</button>
+        </form>
+      </div>
+    </section>
+
+    <div class="app-shell hidden" id="app-shell" aria-hidden="true">
+      <header class="app-header">
+        <a class="brand-lockup" href="#home" data-route="home">
+          <div class="brand-mark"><strong>ZEEDA</strong><span>ENERGY</span></div>
+          <em>Qatar Operations</em>
+        </a>
+        <nav class="main-tabs" aria-label="Main navigation">
+          <button class="active" data-route="home" type="button">Homepage</button>
+          <button data-route="sites" type="button">Sites</button>
+          <button data-route="contacts" type="button">Contacts</button>
+          <button data-route="settings" type="button">Settings</button>
+        </nav>
+        <div class="profile-menu">
+          <button id="profile-button" type="button"><span id="current-user">Admin</span></button>
+          <div class="profile-dropdown hidden" id="profile-dropdown">
+            <button type="button" data-modal="profile">Profile</button>
+            <button type="button" id="logout-button">Logout</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="main-area">
+        <section class="page active" id="home">
+          <div class="hero-row">
+            <div>
+              <h1>Qatar Operations</h1>
+              <p>EV Charging Operations Dashboard</p>
+            </div>
+            <div class="hero-tools">
+              <input type="search" placeholder="Search sites, chargers, reports" />
+            </div>
+          </div>
+
+          <section class="kpi-grid" aria-label="KPI cards">
+            <article class="kpi-card"><span>Total Sites</span><strong id="kpi-sites">3</strong><small>Current sites</small></article>
+            <article class="kpi-card"><span>Total Chargers</span><strong id="kpi-chargers">--</strong><small>Pending Data</small></article>
+            <article class="kpi-card"><span>Open Faults</span><strong id="kpi-faults">--</strong><small>Pending Data</small></article>
+            <article class="kpi-card"><span>Site Visits</span><strong id="kpi-visits">--</strong><small>Pending Data</small></article>
+            <article class="kpi-card"><span>Total Uploaded Files</span><strong id="kpi-documents">--</strong><small>Valid linked files</small></article>
+          </section>
+
+          <section class="dashboard-grid" aria-label="Operational charts">
+            <article class="panel dashboard-card">
+              <div class="panel-head compact">
+                <h2>Fault Status</h2>
+                <select id="fault-status-site-filter" aria-label="Filter fault status by site">
+                  <option value="">All Sites</option>
+                </select>
+              </div>
+              <div id="fault-status-chart" class="chart-body"></div>
+            </article>
+            <article class="panel dashboard-card">
+              <div class="panel-head compact">
+                <h2>Charger Status Distribution</h2>
+                <select id="charger-status-site-filter" aria-label="Filter charger status by site">
+                  <option value="">All Sites</option>
+                </select>
+              </div>
+              <div id="charger-status-chart" class="chart-body"></div>
+            </article>
+            <article class="panel dashboard-card">
+              <div class="panel-head compact">
+                <h2>Fault Trend</h2>
+                <select id="fault-trend-range" aria-label="Filter fault trend by date range">
+                  <option value="7">Last 7 Days</option>
+                  <option value="30" selected>Last 30 Days</option>
+                  <option value="90">Last 3 Months</option>
+                </select>
+              </div>
+              <div id="fault-trend-chart" class="chart-body"></div>
+            </article>
+            <article class="panel dashboard-card">
+              <div class="panel-head compact">
+                <h2>Site Visit Activity</h2>
+                <select id="visit-activity-mode" aria-label="Group site visit activity">
+                  <option value="status">By Status</option>
+                  <option value="site">By Site</option>
+                </select>
+              </div>
+              <div id="visit-activity-chart" class="chart-body"></div>
+            </article>
+            <article class="panel dashboard-card wide">
+              <div class="panel-head compact"><h2>Records by Site</h2></div>
+              <div id="records-by-site-chart" class="chart-body"></div>
+            </article>
+          </section>
+
+          <section class="quick-actions-panel" aria-label="Quick actions">
+            <button class="secondary-button" data-modal="siteVisit" type="button">Add Site Visit</button>
+            <button class="secondary-button" data-modal="fault" type="button">Report Fault</button>
+            <button class="primary-button" data-modal="document" type="button">Upload Charger Document</button>
+          </section>
+
+          <section class="panel recent-panel">
+            <div class="panel-head">
+              <h2>Recent Activity</h2>
+            </div>
+            <div class="activity-list" id="activity-list">
+              <div><span>Operational records</span><strong>To Be Updated</strong></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" id="sites">
+          <div class="page-title-row">
+            <div><p class="eyebrow">Operational Sites</p><h1>Sites</h1></div>
+            <div class="site-header-tools">
+              <input type="search" placeholder="Search sites" />
+              <select><option>Filter by status</option><option>Pending Data</option><option>Healthy</option><option>Warning</option><option>Critical</option></select>
+              <button class="primary-button" data-modal="site" data-mode="create" type="button">+ Add New Site</button>
+            </div>
+          </div>
+          <div class="site-grid" id="site-list"></div>
+          <article class="profile-shell hidden" id="site-profile"></article>
+          <article class="profile-shell hidden" id="charger-profile"></article>
+        </section>
+
+        <section class="page" id="contacts">
+          <div class="page-title-row">
+            <div><p class="eyebrow">Directory</p><h1>Contacts</h1></div>
+            <button class="primary-button" data-modal="contact" type="button">Add Contact</button>
+          </div>
+          <div class="toolbar"><input type="search" placeholder="Search contacts" /><select><option>Filter by role</option></select><select><option>Filter by related site</option></select></div>
+          <div class="contact-grid">
+            <article class="contact-card"><h2>Name</h2><p>Role</p><dl><dt>Company / Department</dt><dd>--</dd><dt>Phone</dt><dd>--</dd><dt>Email</dt><dd>--</dd><dt>Related Site</dt><dd>--</dd><dt>Notes</dt><dd>--</dd></dl><div class="card-actions"><button data-modal="contact">Edit</button><button data-modal="confirmDelete">Delete</button></div></article>
+            <article class="contact-card"><h2>Name</h2><p>Role</p><dl><dt>Company / Department</dt><dd>--</dd><dt>Phone</dt><dd>--</dd><dt>Email</dt><dd>--</dd><dt>Related Site</dt><dd>--</dd><dt>Notes</dt><dd>--</dd></dl><div class="card-actions"><button data-modal="contact">Edit</button><button data-modal="confirmDelete">Delete</button></div></article>
+          </div>
+        </section>
+
+        <section class="page" id="settings">
+          <div class="page-title-row"><div><p class="eyebrow">Administration</p><h1>Settings</h1></div></div>
+          <div class="settings-layout">
+            <aside class="settings-menu" id="settings-menu"></aside>
+            <section class="settings-panel panel" id="settings-panel"></section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-backdrop hidden" id="modal-backdrop" role="dialog" aria-modal="true">
+      <div class="modal">
+        <div class="modal-head"><div><p class="eyebrow" id="modal-eyebrow">Action</p><h2 id="modal-title">Form</h2></div><button class="icon-button" id="modal-close" type="button">Close</button></div>
+        <form id="modal-form" class="modal-form" novalidate></form>
+      </div>
+    </div>
+
+    <script src="js/state.js"></script>
+    <script src="js/auth-router.js"></script>
+    <script src="js/home-page.js"></script>
+    <script src="js/sites-page.js"></script>
+    <script src="js/contacts-page.js"></script>
+    <script src="js/modals.js"></script>
+    <script src="js/settings-page.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

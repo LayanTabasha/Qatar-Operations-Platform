@@ -1,0 +1,155 @@
+// Main bootstrap only.
+// Page-specific code lives in:
+// - js/home-page.js
+// - js/sites-page.js
+// - js/settings-page.js
+// Modal/form code lives in js/modals.js.
+// Shared data/helpers live in js/state.js.
+
+document.getElementById("login-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector("button[type='submit']");
+  button.classList.add("is-loading");
+  button.textContent = button.dataset.loadingText;
+  setTimeout(() => {
+    button.classList.remove("is-loading");
+    button.textContent = "Sign in";
+    signIn(document.getElementById("login-email").value.trim(), document.getElementById("login-password").value);
+  }, 300);
+});
+
+document.getElementById("change-password-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  changeOwnPassword(
+    document.getElementById("current-temp-password").value,
+    document.getElementById("new-password").value,
+    document.getElementById("confirm-new-password").value,
+  );
+});
+document.getElementById("change-password-logout").addEventListener("click", logout);
+
+document.querySelectorAll("[data-route]").forEach((item) => item.addEventListener("click", () => setRoute(item.dataset.route)));
+
+document.addEventListener("click", (event) => {
+  const passwordButton = event.target.closest("#settings-change-password-button");
+  if (passwordButton) return;
+
+  const modalButton = event.target.closest("[data-modal]");
+  if (modalButton?.dataset.siteContext) state.currentSiteName = modalButton.dataset.siteContext;
+  if (modalButton?.dataset.modal === "profile") {
+    document.getElementById("profile-dropdown").classList.add("hidden");
+    setRoute("settings");
+    renderSettings("Profile");
+    return;
+  }
+  if (modalButton) openModal(modalButton.dataset.modal, modalButton.dataset.mode || "edit");
+
+  const previewButton = event.target.closest("[data-file-preview]");
+  if (previewButton) {
+    event.preventDefault();
+    openFilePreview(previewButton.dataset.filePreview);
+  }
+
+  const previewAction = event.target.closest("[data-preview-action]");
+  if (previewAction) {
+    event.preventDefault();
+    handlePreviewAction(previewAction.dataset.previewAction);
+  }
+
+  const downloadButton = event.target.closest("[data-file-download]");
+  if (downloadButton) {
+    event.preventDefault();
+    downloadFile(downloadButton.dataset.fileDownload);
+  }
+
+  const siteButton = event.target.closest(".open-site");
+  if (siteButton) openSite(siteButton.dataset.site);
+
+  const chargerButton = event.target.closest(".open-charger");
+  if (chargerButton) openCharger(chargerButton.dataset.site, chargerButton.dataset.charger);
+
+  const signOutButton = event.target.closest("#settings-sign-out-button");
+  if (signOutButton) logout();
+
+  const sessionButton = event.target.closest("#settings-view-session-button");
+  if (sessionButton) {
+    const note = document.getElementById("settings-session-note");
+    const user = getCurrentUserRecord();
+    if (note) note.textContent = `Active session for ${user?.email || state.currentUserEmail}. Last login: ${user?.lastLogin || "Not Available Yet"}.`;
+  }
+
+  const replaceSiteImageButton = event.target.closest("#replace-site-image");
+  if (replaceSiteImageButton) {
+    event.preventDefault();
+    document.getElementById("upload-site-image")?.click();
+  }
+
+  const removeSiteImageButton = event.target.closest("#remove-site-image");
+  if (removeSiteImageButton) {
+    event.preventDefault();
+    removeSiteImageSelection();
+  }
+});
+
+document.getElementById("profile-button").addEventListener("click", () => document.getElementById("profile-dropdown").classList.toggle("hidden"));
+document.getElementById("logout-button").addEventListener("click", logout);
+document.getElementById("modal-close").addEventListener("click", closeModal);
+document.getElementById("modal-form").addEventListener("submit", handleModalSubmit);
+document.getElementById("modal-form").addEventListener("change", (event) => {
+  if (event.target.id === "upload-site-image") handleSiteImageSelection();
+  if (event.target.id === "site" || event.target.id === "related-site") refreshChargerSelect();
+  if (event.target.id === "fault-code") renderFaultCodeDetails("fault-code");
+});
+document.addEventListener("change", (event) => {
+  const faultStatus = event.target.closest("[data-fault-status]");
+  if (!faultStatus) return;
+  const fault = state.faults.find((item) => item.id === faultStatus.dataset.faultStatus);
+  if (!fault) return;
+  const previousStatus = fault.status;
+  fault.status = faultStatus.value;
+  fault.updatedAt = new Date().toISOString();
+  addActivity({
+    actionType: "fault_status_changed",
+    entityType: "fault",
+    entityId: fault.faultId || fault.id,
+    description: `${fault.faultId || "Fault"} for ${fault.chargerName || "selected charger"} at ${fault.siteName} changed from ${previousStatus} to ${fault.status}`,
+    siteName: fault.siteName,
+    chargerName: fault.chargerName,
+  });
+  renderCounts();
+  renderActivity();
+  saveState();
+});
+document.getElementById("modal-backdrop").addEventListener("click", (event) => {
+  if (event.target.id === "modal-backdrop" || event.target.id === "cancel-modal") closeModal();
+});
+document.getElementById("settings-menu").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-setting]");
+  if (button) renderSettings(button.dataset.setting);
+});
+document.getElementById("settings-panel").addEventListener("submit", (event) => {
+  if (event.target.id !== "settings-password-form") return;
+  event.preventDefault();
+  changeSettingsPassword();
+});
+["fault-status-site-filter", "charger-status-site-filter", "fault-trend-range", "visit-activity-mode"].forEach((id) => {
+  document.getElementById(id)?.addEventListener("change", renderDashboardCharts);
+});
+window.addEventListener("hashchange", () => {
+  if (state.authenticated) setRoute(window.location.hash.replace("#", "") || "home");
+});
+
+async function bootstrapApp() {
+  loadStoredState();
+  await loadUsers();
+  buildSites();
+  renderCounts();
+  renderActivity();
+  const restored = await restoreStoredSession();
+  if (!restored) showLoginScreen();
+}
+
+bootstrapApp();
+setInterval(() => {
+  if (state.authenticated) renderActivity();
+}, 60000);

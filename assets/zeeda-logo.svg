@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 92" role="img" aria-labelledby="title desc">
+  <title id="title">Zeeda Energy</title>
+  <desc id="desc">Clean Zeeda Energy text mark</desc>
+  <rect width="260" height="92" fill="none"/>
+  <g fill="#edf6ff" font-family="Arial, Helvetica, sans-serif" font-weight="800">
+    <text x="6" y="42" font-size="42" letter-spacing="4">ZEEDA</text>
+    <text x="10" y="77" font-size="25" letter-spacing="14">ENERGY</text>
+  </g>
+  <path d="M205 25h21l21 31h-18l-13-19-13 19h-18l20-31z" fill="#63b7ff"/>
+</svg>
