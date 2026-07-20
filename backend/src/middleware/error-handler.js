@@ -2,8 +2,9 @@ import { env } from "../config/env.js";
 import { logger } from "../config/logger.js";
 
 export function errorHandler(err, req, res, _next) {
-  const statusCode = err.statusCode || 500;
-  const code = err.code || "INTERNAL_SERVER_ERROR";
+  const isValidationError = err.name === "ZodError";
+  const statusCode = isValidationError ? 400 : err.statusCode || 500;
+  const code = isValidationError ? "VALIDATION_ERROR" : err.code || "INTERNAL_SERVER_ERROR";
   const message = statusCode === 500 ? "Internal server error" : err.message;
 
   const logMetadata = { err, requestId: req.id, statusCode };

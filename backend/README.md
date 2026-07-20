@@ -38,6 +38,18 @@ src/modules/health
 
 Future features may have their own route, controller, service, validation, and repository files, but only when that feature actually needs them. Avoid creating empty placeholder modules.
 
+The authentication feature lives in:
+
+```text
+src/modules/auth
+```
+
+The first user-management endpoints live in:
+
+```text
+src/modules/users
+```
+
 ## Roles
 
 The platform role model is intentionally simple:
@@ -46,7 +58,7 @@ The platform role model is intentionally simple:
 - `operator`: full operational access, but cannot manage users or roles.
 - `viewer`: read-only access.
 
-Authorization middleware is not implemented yet. That will be added in the authentication phase.
+Authorization middleware now exists for authentication-protected backend routes, but operational modules such as sites, faults, documents, and reports have not been connected to it yet.
 
 ## Prerequisites
 
@@ -130,3 +142,37 @@ npm.cmd run seed
 ```
 
 Always run migrations before seeds. Do not run seeds against production unless that is explicitly intended and approved.
+
+## Authentication Setup
+
+Authentication uses a signed JWT stored in an HTTP-only cookie. The token is not stored in browser `localStorage` and is not stored in PostgreSQL.
+
+Set these values in `.env` before running the backend:
+
+```text
+JWT_SECRET=replace-with-a-long-random-secret
+JWT_EXPIRES_IN=8h
+AUTH_COOKIE_NAME=qatar_ops_token
+COOKIE_SECURE=false
+COOKIE_SAME_SITE=lax
+```
+
+Use `COOKIE_SECURE=true` only when the API is served over HTTPS.
+
+## Creating the First Admin
+
+The backend does not include a default admin password. To create the first admin manually, set these temporary environment values in `.env`:
+
+```text
+ADMIN_NAME=
+ADMIN_EMAIL=
+ADMIN_PASSWORD=
+```
+
+Then run:
+
+```bash
+npm.cmd run create-admin
+```
+
+These admin values are only used by the manual create-admin command. Never commit a real `.env` file or a real password.

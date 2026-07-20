@@ -64,5 +64,6 @@ describe("database schema files", () => {
   it("has migrate and seed npm scripts", () => {
     expect(packageJson.scripts.migrate).toBe("node src/db/migrate.js");
     expect(packageJson.scripts.seed).toBe("node src/db/seed.js");
+    expect(packageJson.scripts["create-admin"]).toBe("node src/db/create-admin.js");
   });
 });

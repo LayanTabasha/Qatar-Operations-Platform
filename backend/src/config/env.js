@@ -22,6 +22,14 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
+  JWT_SECRET: z.string().min(32, "Must be at least 32 characters long"),
+  JWT_EXPIRES_IN: z.string().default("8h"),
+  AUTH_COOKIE_NAME: z.string().min(1).default("qatar_ops_token"),
+  COOKIE_SECURE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  COOKIE_SAME_SITE: z.enum(["lax", "strict", "none"]).default("lax"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

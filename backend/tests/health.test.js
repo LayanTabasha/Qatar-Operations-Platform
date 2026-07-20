@@ -11,6 +11,11 @@ beforeAll(async () => {
   process.env.FRONTEND_ORIGIN = "http://localhost:5500";
   process.env.LOG_LEVEL = "silent";
   process.env.TRUST_PROXY = "false";
+  process.env.JWT_SECRET = "test-secret-value-that-is-long-enough-for-validation";
+  process.env.JWT_EXPIRES_IN = "8h";
+  process.env.AUTH_COOKIE_NAME = "qatar_ops_token";
+  process.env.COOKIE_SECURE = "false";
+  process.env.COOKIE_SAME_SITE = "lax";
 
   ({ app } = await import("../src/app.js"));
 });
