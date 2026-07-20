@@ -6,7 +6,7 @@ The current root website is still a plain HTML, CSS, and JavaScript frontend. Th
 
 ## Current Phase
 
-Phase 2 adds the database foundation on top of the Phase 1 backend base:
+Phase 3 adds authentication and authorization on top of the Phase 1 and Phase 2 backend foundation:
 
 - Express application setup
 - Environment validation
@@ -17,8 +17,11 @@ Phase 2 adds the database foundation on top of the Phase 1 backend base:
 - Basic automated tests
 - SQL schema migrations
 - Repeat-safe development seed files
+- HTTP-only cookie authentication
+- Role authorization middleware
+- Admin-only user creation and listing
 
-Business API modules are not implemented yet. The database schema now defines the main tables, but there are still no authentication, users, sites, chargers, uploads, or reports API endpoints in this phase.
+Operational API modules are not implemented yet. The database schema defines the main tables, and authentication plus admin user-management endpoints now exist, but there are still no sites, chargers, uploads, reports, documents, or faults API endpoints in this phase.
 
 ## Backend Structure
 
@@ -60,6 +63,18 @@ The platform role model is intentionally simple:
 
 Authorization middleware now exists for authentication-protected backend routes, but operational modules such as sites, faults, documents, and reports have not been connected to it yet.
 
+## API Routes
+
+Current backend routes are mounted under `/api/v1`:
+
+- `GET /health`: basic API health check.
+- `GET /health/database`: database connectivity health check.
+- `POST /auth/login`: validates email and password, then sets an HTTP-only auth cookie.
+- `POST /auth/logout`: clears the auth cookie.
+- `GET /auth/me`: reloads and returns the current authenticated user.
+- `GET /users`: admin-only user list.
+- `POST /users`: admin-only user creation.
+
 ## Prerequisites
 
 - Node.js
@@ -82,7 +97,7 @@ Copy the example environment file:
 cp .env.example .env
 ```
 
-Then update `.env` with real local values. Do not commit `.env`.
+Then update `.env` with real local values. Never commit `.env`.
 
 For local PostgreSQL, create the database first:
 
@@ -159,6 +174,8 @@ COOKIE_SAME_SITE=lax
 
 Use `COOKIE_SECURE=true` only when the API is served over HTTPS.
 
+The existing root frontend testing login is separate from this backend authentication until the frontend is connected to these API routes. This backend does not depend on the old frontend login or static test credentials.
+
 ## Creating the First Admin
 
 The backend does not include a default admin password. To create the first admin manually, set these temporary environment values in `.env`:
@@ -172,6 +189,15 @@ ADMIN_PASSWORD=
 Then run:
 
 ```bash
+npm.cmd run create-admin
+```
+
+PowerShell example with placeholders:
+
+```powershell
+$env:ADMIN_NAME="Admin User"
+$env:ADMIN_EMAIL="admin@zeedaenergy.com"
+$env:ADMIN_PASSWORD="Use-A-Strong-Local-Password-Here1!"
 npm.cmd run create-admin
 ```
 

@@ -203,4 +203,26 @@ describe("user management routes", () => {
 
     expect(response.body.users[0].password_hash).toBeUndefined();
   });
+
+  it("returns 409 for duplicate user email addresses", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+    usersRepositoryMocks.findRoleByName.mockResolvedValue({
+      id: "22222222-2222-4222-8222-222222222222",
+      name: "viewer",
+    });
+    usersRepositoryMocks.createUser.mockRejectedValue({ code: "23505" });
+
+    const response = await request(app)
+      .post("/api/v1/users")
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .send({
+        full_name: "Viewer User",
+        email: "viewer@example.com",
+        password: "StrongPassword1!",
+        role: "viewer",
+      })
+      .expect(409);
+
+    expect(response.body.error.code).toBe("EMAIL_ALREADY_EXISTS");
+  });
 });
