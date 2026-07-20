@@ -41,6 +41,13 @@ describe("database schema files", () => {
     });
   });
 
+  it("uses active and archived site statuses only", () => {
+    const sitesMigration = fs.readFileSync(path.join(migrationsDir, "003_create_sites.sql"), "utf8").toLowerCase();
+
+    expect(sitesMigration).toContain("'archived'");
+    expect(sitesMigration).not.toContain("'inactive'");
+  });
+
   it("has seed files", () => {
     expect(sqlFilesIn(seedsDir)).toEqual(["001_roles.sql", "002_sample_sites.sql"]);
   });

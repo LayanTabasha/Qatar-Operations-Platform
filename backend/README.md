@@ -53,6 +53,12 @@ The first user-management endpoints live in:
 src/modules/users
 ```
 
+The Sites feature lives in:
+
+```text
+src/modules/sites
+```
+
 ## Roles
 
 The platform role model is intentionally simple:
@@ -74,6 +80,13 @@ Current backend routes are mounted under `/api/v1`:
 - `GET /auth/me`: reloads and returns the current authenticated user.
 - `GET /users`: admin-only user list.
 - `POST /users`: admin-only user creation.
+- `GET /sites`: authenticated site list.
+- `GET /sites/:id`: authenticated site detail.
+- `POST /sites`: admin/operator site creation.
+- `PATCH /sites/:id`: admin/operator site update.
+- `PATCH /sites/:id/status`: admin/operator archive or restore.
+
+There is no permanent site deletion endpoint.
 
 ## Prerequisites
 
@@ -157,6 +170,69 @@ npm.cmd run seed
 ```
 
 Always run migrations before seeds. Do not run seeds against production unless that is explicitly intended and approved.
+
+## Sites API
+
+Sites use a soft-archive model:
+
+- `active` sites appear in the normal site list.
+- `archived` sites are hidden from the default list, but their chargers, faults, visits, documents, reports, and activity history are preserved.
+- Archived sites can be restored by setting their status back to `active`.
+
+`GET /api/v1/sites` returns active sites by default. Supported query parameters:
+
+```text
+status=active|archived
+search=text
+sort=name|created_at|updated_at
+order=asc|desc
+```
+
+Permissions:
+
+- `admin`: can list, view, create, update, archive, and restore sites.
+- `operator`: can list, view, create, update, archive, and restore sites.
+- `viewer`: can list and view sites only.
+
+Create example:
+
+```json
+{
+  "name": "Msheireb",
+  "code": "MSHEIREB",
+  "location": "Doha, Qatar",
+  "address": "Optional address",
+  "description": "Optional description",
+  "image_path": "sites/msheireb/cover.webp"
+}
+```
+
+Update example:
+
+```json
+{
+  "name": "Msheireb Downtown",
+  "location": "Doha"
+}
+```
+
+Archive example:
+
+```json
+{
+  "status": "archived"
+}
+```
+
+Restore example:
+
+```json
+{
+  "status": "active"
+}
+```
+
+`image_path` is metadata only. Image upload and file storage are not implemented in the Sites API yet.
 
 ## Authentication Setup
 

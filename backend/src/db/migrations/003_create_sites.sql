@@ -9,7 +9,7 @@ CREATE TABLE sites (
   status text NOT NULL DEFAULT 'active',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT sites_status_check CHECK (status IN ('active', 'inactive'))
+  CONSTRAINT sites_status_check CHECK (status IN ('active', 'archived'))
 );
 
 CREATE TRIGGER sites_set_updated_at
