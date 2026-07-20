@@ -1,5 +1,7 @@
 # Environment variables and secrets
 .env
+.env.*
+!.env.example
 .env.local
 .env.development
 .env.production
@@ -13,6 +15,11 @@ build/
 
 # Log files
 *.log
+logs/
+
+# Local uploads and test coverage
+uploads/
+coverage/
 
 # VS Code personal settings
 .vscode/
