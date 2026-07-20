@@ -5,6 +5,7 @@ import packageJson from "../package.json" with { type: "json" };
 
 const migrationsDir = path.resolve("src/db/migrations");
 const seedsDir = path.resolve("src/db/seeds");
+const modulesDir = path.resolve("src/modules");
 
 function sqlFilesIn(directory) {
   return fs.readdirSync(directory).filter((filename) => filename.endsWith(".sql")).sort();
@@ -42,6 +43,22 @@ describe("database schema files", () => {
 
   it("has seed files", () => {
     expect(sqlFilesIn(seedsDir)).toEqual(["001_roles.sql", "002_sample_sites.sql"]);
+  });
+
+  it("has the simplified role seed", () => {
+    const rolesSeed = fs.readFileSync(path.join(seedsDir, "001_roles.sql"), "utf8").toLowerCase();
+
+    expect(rolesSeed).toContain("'admin'");
+    expect(rolesSeed).toContain("'operator'");
+    expect(rolesSeed).toContain("'viewer'");
+    expect(rolesSeed).not.toContain("'manager'");
+  });
+
+  it("keeps health files inside the health module only", () => {
+    expect(fs.existsSync(path.join(modulesDir, "health", "health.controller.js"))).toBe(true);
+    expect(fs.existsSync(path.join(modulesDir, "health", "health.routes.js"))).toBe(true);
+    expect(fs.existsSync(path.resolve("src/controllers/health.controller.js"))).toBe(false);
+    expect(fs.existsSync(path.resolve("src/routes/health.routes.js"))).toBe(false);
   });
 
   it("has migrate and seed npm scripts", () => {

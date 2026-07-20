@@ -20,6 +20,34 @@ Phase 2 adds the database foundation on top of the Phase 1 backend base:
 
 Business API modules are not implemented yet. The database schema now defines the main tables, but there are still no authentication, users, sites, chargers, uploads, or reports API endpoints in this phase.
 
+## Backend Structure
+
+Shared infrastructure stays in the shared folders:
+
+- `src/config` contains environment, database, CORS, and logging setup.
+- `src/middleware` contains reusable Express middleware such as request IDs, rate limiting, 404 handling, and error handling.
+- `src/db` contains migration and seed runners plus SQL files.
+- `src/routes/index.js` is the central API router for `/api/v1`.
+- `src/utils` contains small helpers that can be reused by any feature.
+
+Feature-specific code lives in `src/modules`. The current health feature is in:
+
+```text
+src/modules/health
+```
+
+Future features may have their own route, controller, service, validation, and repository files, but only when that feature actually needs them. Avoid creating empty placeholder modules.
+
+## Roles
+
+The platform role model is intentionally simple:
+
+- `admin`: full access, including user management.
+- `operator`: full operational access, but cannot manage users or roles.
+- `viewer`: read-only access.
+
+Authorization middleware is not implemented yet. That will be added in the authentication phase.
+
 ## Prerequisites
 
 - Node.js

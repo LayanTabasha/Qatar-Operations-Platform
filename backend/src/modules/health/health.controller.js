@@ -1,5 +1,5 @@
-import { testDatabaseConnection } from "../config/database.js";
-import { asyncHandler } from "../utils/async-handler.js";
+import { testDatabaseConnection } from "../../config/database.js";
+import { asyncHandler } from "../../utils/async-handler.js";
 
 export function getHealth(_req, res) {
   res.json({
