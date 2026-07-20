@@ -1,0 +1,66 @@
+import { z } from "zod";
+
+const optionalText = (maxLength) =>
+  z
+    .string()
+    .trim()
+    .max(maxLength)
+    .transform((value) => (value === "" ? null : value))
+    .nullable()
+    .optional();
+
+const chargerCode = z
+  .string()
+  .trim()
+  .min(2)
+  .max(50)
+  .regex(/^[A-Za-z0-9_-]+$/, "Code may contain only letters, numbers, hyphens, and underscores")
+  .transform((value) => value.toUpperCase());
+
+export const chargerIdParamsSchema = z.object({
+  id: z.string().uuid(),
+});
+
+export const listChargersQuerySchema = z.object({
+  site_id: z.string().uuid().optional(),
+  status: z.enum(["active", "maintenance", "faulted", "archived"]).optional(),
+  type: z.enum(["AC", "DC"]).optional(),
+  search: z.string().trim().max(200).optional(),
+  sort: z.enum(["name", "created_at", "updated_at"]).default("name"),
+  order: z.enum(["asc", "desc"]).default("asc"),
+  limit: z.coerce.number().int().positive().max(100).default(100),
+});
+
+export const createChargerSchema = z
+  .object({
+    site_id: z.string().uuid(),
+    name: z.string().trim().min(2).max(100),
+    code: chargerCode,
+    manufacturer: optionalText(100),
+    model: optionalText(100),
+    serial_number: optionalText(100),
+    type: z.enum(["AC", "DC"]),
+    power_kw: z.coerce.number().min(0).max(10000),
+    firmware_version: optionalText(100),
+    description: optionalText(2000),
+    image_path: optionalText(1000),
+  })
+  .strict();
+
+export const updateChargerSchema = createChargerSchema
+  .omit({ site_id: true })
+  .partial()
+  .superRefine((value, ctx) => {
+    if (Object.keys(value).length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "At least one update field is required",
+      });
+    }
+  });
+
+export const updateChargerStatusSchema = z
+  .object({
+    status: z.enum(["active", "maintenance", "faulted", "archived"]),
+  })
+  .strict();

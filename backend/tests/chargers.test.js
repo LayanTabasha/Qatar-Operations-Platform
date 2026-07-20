@@ -1,0 +1,246 @@
+import request from "supertest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const authRepositoryMocks = vi.hoisted(() => ({
+  findSafeUserById: vi.fn(),
+}));
+
+const chargersRepositoryMocks = vi.hoisted(() => ({
+  listChargers: vi.fn(),
+  findChargerById: vi.fn(),
+  insertCharger: vi.fn(),
+  updateChargerById: vi.fn(),
+  updateChargerStatusById: vi.fn(),
+}));
+
+vi.mock("../src/modules/auth/auth.repository.js", () => ({
+  findUserWithPasswordByEmail: vi.fn(),
+  findSafeUserById: authRepositoryMocks.findSafeUserById,
+  updateLastLoginAt: vi.fn(),
+}));
+
+vi.mock("../src/modules/chargers/chargers.repository.js", () => chargersRepositoryMocks);
+
+let app;
+let jwt;
+
+const chargerId = "44444444-4444-4444-8444-444444444444";
+const siteId = "33333333-3333-4333-8333-333333333333";
+const adminUser = {
+  id: "11111111-1111-4111-8111-111111111111",
+  full_name: "Admin User",
+  email: "admin@example.com",
+  role: "admin",
+  is_active: true,
+};
+const operatorUser = { ...adminUser, role: "operator" };
+const viewerUser = { ...adminUser, role: "viewer" };
+const chargerSummary = {
+  id: chargerId,
+  site_id: siteId,
+  site_name: "Msheireb",
+  name: "DC Charger 01",
+  code: "DC_01",
+  manufacturer: "Example Manufacturer",
+  model: "Model X",
+  serial_number: "SN-001",
+  type: "DC",
+  power_kw: "120.00",
+  firmware_version: null,
+  description: null,
+  image_path: null,
+  status: "active",
+  open_fault_count: 0,
+  last_site_visit: null,
+  created_at: "2026-07-20T09:00:00.000Z",
+  updated_at: "2026-07-20T09:00:00.000Z",
+};
+
+beforeAll(async () => {
+  process.env.NODE_ENV = "test";
+  process.env.PORT = "3000";
+  process.env.DATABASE_URL = "postgresql://username:password@localhost:5432/qatar_operations";
+  process.env.DATABASE_SSL = "false";
+  process.env.FRONTEND_ORIGIN = "http://localhost:5500";
+  process.env.LOG_LEVEL = "silent";
+  process.env.TRUST_PROXY = "false";
+  process.env.JWT_SECRET = "test-secret-value-that-is-long-enough-for-validation";
+  process.env.JWT_EXPIRES_IN = "8h";
+  process.env.AUTH_COOKIE_NAME = "qatar_ops_token";
+  process.env.COOKIE_SECURE = "false";
+  process.env.COOKIE_SAME_SITE = "lax";
+
+  ({ app } = await import("../src/app.js"));
+  jwt = await import("jsonwebtoken");
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  chargersRepositoryMocks.listChargers.mockResolvedValue([chargerSummary]);
+  chargersRepositoryMocks.findChargerById.mockResolvedValue(chargerSummary);
+  chargersRepositoryMocks.insertCharger.mockResolvedValue(chargerSummary);
+  chargersRepositoryMocks.updateChargerById.mockResolvedValue(chargerSummary);
+  chargersRepositoryMocks.updateChargerStatusById.mockResolvedValue(chargerSummary);
+});
+
+function authCookie(user) {
+  const token = jwt.default.sign({ sub: user.id, role: user.role }, process.env.JWT_SECRET, {
+    expiresIn: "8h",
+  });
+
+  authRepositoryMocks.findSafeUserById.mockResolvedValue(user);
+  return [`qatar_ops_token=${token}`];
+}
+
+function validChargerBody(overrides = {}) {
+  return {
+    site_id: siteId,
+    name: "DC Charger 01",
+    code: "dc_01",
+    manufacturer: "Example Manufacturer",
+    model: "Model X",
+    serial_number: "SN-001",
+    type: "DC",
+    power_kw: 120,
+    firmware_version: "1.0.0",
+    description: "Main charger",
+    image_path: "chargers/dc-01.webp",
+    ...overrides,
+  };
+}
+
+describe("chargers routes", () => {
+  it("returns 401 for unauthenticated charger requests", async () => {
+    await request(app).get("/api/v1/chargers").expect(401);
+  });
+
+  it("allows viewers to list chargers", async () => {
+    const response = await request(app).get("/api/v1/chargers").set("Cookie", authCookie(viewerUser)).expect(200);
+
+    expect(response.body.chargers[0]).toMatchObject({
+      open_fault_count: 0,
+      last_site_visit: null,
+    });
+  });
+
+  it("allows viewers to view one charger", async () => {
+    const response = await request(app)
+      .get(`/api/v1/chargers/${chargerId}`)
+      .set("Cookie", authCookie(viewerUser))
+      .expect(200);
+
+    expect(response.body.charger.id).toBe(chargerId);
+  });
+
+  it("rejects viewers when creating a charger", async () => {
+    await request(app)
+      .post("/api/v1/chargers")
+      .set("Cookie", authCookie(viewerUser))
+      .send(validChargerBody())
+      .expect(403);
+  });
+
+  it("rejects viewers when editing a charger", async () => {
+    await request(app)
+      .patch(`/api/v1/chargers/${chargerId}`)
+      .set("Cookie", authCookie(viewerUser))
+      .send({ name: "Updated Charger" })
+      .expect(403);
+  });
+
+  it("rejects viewers when changing charger status", async () => {
+    await request(app)
+      .patch(`/api/v1/chargers/${chargerId}/status`)
+      .set("Cookie", authCookie(viewerUser))
+      .send({ status: "archived" })
+      .expect(403);
+  });
+
+  it("allows operators to create a charger and normalizes the code", async () => {
+    await request(app)
+      .post("/api/v1/chargers")
+      .set("Cookie", authCookie(operatorUser))
+      .send(validChargerBody())
+      .expect(201);
+
+    expect(chargersRepositoryMocks.insertCharger).toHaveBeenCalledWith(expect.objectContaining({ code: "DC_01" }));
+  });
+
+  it("allows admins to update a charger", async () => {
+    await request(app)
+      .patch(`/api/v1/chargers/${chargerId}`)
+      .set("Cookie", authCookie(adminUser))
+      .send({ name: "Updated Charger" })
+      .expect(200);
+  });
+
+  it("accepts supported query filters", async () => {
+    await request(app)
+      .get(`/api/v1/chargers?site_id=${siteId}&status=maintenance&type=AC&search=model&sort=updated_at&order=desc`)
+      .set("Cookie", authCookie(viewerUser))
+      .expect(200);
+
+    expect(chargersRepositoryMocks.listChargers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        site_id: siteId,
+        status: "maintenance",
+        type: "AC",
+        search: "model",
+        sort: "updated_at",
+        order: "desc",
+      }),
+    );
+  });
+
+  it("rejects inactive as a charger status", async () => {
+    await request(app).get("/api/v1/chargers?status=inactive").set("Cookie", authCookie(viewerUser)).expect(400);
+  });
+
+  it("rejects invalid charger types", async () => {
+    await request(app).get("/api/v1/chargers?type=FAST").set("Cookie", authCookie(viewerUser)).expect(400);
+  });
+
+  it("returns validation error for invalid UUIDs", async () => {
+    await request(app).get("/api/v1/chargers/not-a-uuid").set("Cookie", authCookie(viewerUser)).expect(400);
+  });
+
+  it("returns 409 for duplicate charger codes", async () => {
+    chargersRepositoryMocks.insertCharger.mockRejectedValue({ code: "23505" });
+
+    const response = await request(app)
+      .post("/api/v1/chargers")
+      .set("Cookie", authCookie(operatorUser))
+      .send(validChargerBody({ code: "duplicate" }))
+      .expect(409);
+
+    expect(response.body.error.code).toBe("CHARGER_CODE_ALREADY_EXISTS");
+  });
+
+  it("returns 404 when a charger is not found", async () => {
+    chargersRepositoryMocks.findChargerById.mockResolvedValue(null);
+
+    await request(app).get(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(viewerUser)).expect(404);
+  });
+
+  it("rejects empty PATCH bodies", async () => {
+    await request(app).patch(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(operatorUser)).send({}).expect(400);
+  });
+
+  it("accepts only current statuses in the status endpoint", async () => {
+    await request(app)
+      .patch(`/api/v1/chargers/${chargerId}/status`)
+      .set("Cookie", authCookie(operatorUser))
+      .send({ status: "faulted" })
+      .expect(200);
+
+    await request(app)
+      .patch(`/api/v1/chargers/${chargerId}/status`)
+      .set("Cookie", authCookie(operatorUser))
+      .send({ status: "inactive" })
+      .expect(400);
+  });
+
+  it("does not expose a DELETE route", async () => {
+    await request(app).delete(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(adminUser)).expect(404);
+  });
+});

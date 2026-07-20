@@ -59,6 +59,12 @@ The Sites feature lives in:
 src/modules/sites
 ```
 
+The Chargers feature lives in:
+
+```text
+src/modules/chargers
+```
+
 ## Roles
 
 The platform role model is intentionally simple:
@@ -85,8 +91,13 @@ Current backend routes are mounted under `/api/v1`:
 - `POST /sites`: admin/operator site creation.
 - `PATCH /sites/:id`: admin/operator site update.
 - `PATCH /sites/:id/status`: admin/operator archive or restore.
+- `GET /chargers`: authenticated charger list.
+- `GET /chargers/:id`: authenticated charger detail.
+- `POST /chargers`: admin/operator charger creation.
+- `PATCH /chargers/:id`: admin/operator charger update.
+- `PATCH /chargers/:id/status`: admin/operator charger status change.
 
-There is no permanent site deletion endpoint.
+There are no permanent site or charger deletion endpoints.
 
 ## Prerequisites
 
@@ -233,6 +244,73 @@ Restore example:
 ```
 
 `image_path` is metadata only. Image upload and file storage are not implemented in the Sites API yet.
+
+## Chargers API
+
+Chargers use these status values:
+
+- `active`
+- `maintenance`
+- `faulted`
+- `archived`
+
+`inactive` is not a valid charger status.
+
+Supported `GET /api/v1/chargers` query parameters:
+
+```text
+site_id=uuid
+status=active|maintenance|faulted|archived
+type=AC|DC
+search=text
+sort=name|created_at|updated_at
+order=asc|desc
+```
+
+Search checks charger name, charger code, model, and manufacturer. Default sorting is `name` ascending.
+
+Permissions:
+
+- `admin`: can list, view, create, update, archive, and restore chargers.
+- `operator`: can list, view, create, update, archive, and restore chargers.
+- `viewer`: can list and view chargers only.
+
+Create example:
+
+```json
+{
+  "site_id": "33333333-3333-4333-8333-333333333333",
+  "name": "DC Charger 01",
+  "code": "DC_01",
+  "manufacturer": "Example Manufacturer",
+  "model": "Model X",
+  "serial_number": "SN-001",
+  "type": "DC",
+  "power_kw": 120,
+  "firmware_version": "1.0.0",
+  "description": "Main DC charger",
+  "image_path": "chargers/dc-01.webp"
+}
+```
+
+Update example:
+
+```json
+{
+  "firmware_version": "1.0.1",
+  "description": "Firmware updated"
+}
+```
+
+Status change example:
+
+```json
+{
+  "status": "maintenance"
+}
+```
+
+`image_path` is metadata only. Charger image upload and file storage are not implemented yet.
 
 ## Authentication Setup
 

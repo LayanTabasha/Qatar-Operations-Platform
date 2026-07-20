@@ -48,6 +48,18 @@ describe("database schema files", () => {
     expect(sitesMigration).not.toContain("'inactive'");
   });
 
+  it("uses the current charger statuses and field names", () => {
+    const chargersMigration = fs.readFileSync(path.join(migrationsDir, "004_create_chargers.sql"), "utf8").toLowerCase();
+
+    expect(chargersMigration).toContain("'archived'");
+    expect(chargersMigration).toContain("'maintenance'");
+    expect(chargersMigration).toContain("'faulted'");
+    expect(chargersMigration).toContain("power_kw");
+    expect(chargersMigration).toContain("firmware_version");
+    expect(chargersMigration).not.toContain("'inactive'");
+    expect(chargersMigration).not.toContain("rated_power_kw");
+  });
+
   it("has seed files", () => {
     expect(sqlFilesIn(seedsDir)).toEqual(["001_roles.sql", "002_sample_sites.sql"]);
   });
