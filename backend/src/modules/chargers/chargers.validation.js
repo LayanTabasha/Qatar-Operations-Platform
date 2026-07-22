@@ -17,6 +17,11 @@ const chargerCode = z
   .regex(/^[A-Za-z0-9_-]+$/, "Code may contain only letters, numbers, hyphens, and underscores")
   .transform((value) => value.toUpperCase());
 
+const chargerType = z.preprocess(
+  (value) => (typeof value === "string" ? value.trim().toUpperCase() : value),
+  z.enum(["AC", "DC"]),
+);
+
 export const chargerIdParamsSchema = z.object({
   id: z.string().uuid(),
 });
@@ -24,9 +29,9 @@ export const chargerIdParamsSchema = z.object({
 export const listChargersQuerySchema = z.object({
   site_id: z.string().uuid().optional(),
   status: z.enum(["active", "maintenance", "faulted", "archived"]).optional(),
-  type: z.enum(["AC", "DC"]).optional(),
+  type: chargerType.optional(),
   search: z.string().trim().max(200).optional(),
-  sort: z.enum(["name", "created_at", "updated_at"]).default("name"),
+  sort: z.enum(["name", "code", "created_at", "updated_at", "power_kw"]).default("name"),
   order: z.enum(["asc", "desc"]).default("asc"),
   limit: z.coerce.number().int().positive().max(100).default(100),
 });
@@ -39,8 +44,8 @@ export const createChargerSchema = z
     manufacturer: optionalText(100),
     model: optionalText(100),
     serial_number: optionalText(100),
-    type: z.enum(["AC", "DC"]),
-    power_kw: z.coerce.number().min(0).max(10000),
+    type: chargerType,
+    power_kw: z.coerce.number().min(0).max(10000).default(0),
     firmware_version: optionalText(100),
     description: optionalText(2000),
     image_path: optionalText(1000),
@@ -48,7 +53,6 @@ export const createChargerSchema = z
   .strict();
 
 export const updateChargerSchema = createChargerSchema
-  .omit({ site_id: true })
   .partial()
   .superRefine((value, ctx) => {
     if (Object.keys(value).length === 0) {

@@ -249,12 +249,14 @@ Restore example:
 
 Chargers use these status values:
 
-- `active`
-- `maintenance`
-- `faulted`
-- `archived`
+- `active`: available operational charger.
+- `maintenance`: charger is under maintenance.
+- `faulted`: charger currently has an operational issue.
+- `archived`: hidden from the normal charger list while preserving history.
 
 `inactive` is not a valid charger status.
+
+`GET /api/v1/chargers` excludes archived chargers by default. Use `status=archived` to view archived chargers.
 
 Supported `GET /api/v1/chargers` query parameters:
 
@@ -263,17 +265,19 @@ site_id=uuid
 status=active|maintenance|faulted|archived
 type=AC|DC
 search=text
-sort=name|created_at|updated_at
+sort=name|code|created_at|updated_at|power_kw
 order=asc|desc
 ```
 
-Search checks charger name, charger code, model, and manufacturer. Default sorting is `name` ascending.
+Search checks charger name, charger code, model, manufacturer, and serial number. Default sorting is `name` ascending.
 
 Permissions:
 
 - `admin`: can list, view, create, update, archive, and restore chargers.
 - `operator`: can list, view, create, update, archive, and restore chargers.
 - `viewer`: can list and view chargers only.
+
+Every charger belongs to one site. A new charger cannot be created under an archived site, and an archived charger cannot be restored while its parent site is archived.
 
 Create example:
 
@@ -310,7 +314,23 @@ Status change example:
 }
 ```
 
-`image_path` is metadata only. Charger image upload and file storage are not implemented yet.
+Archive example:
+
+```json
+{
+  "status": "archived"
+}
+```
+
+Restore example:
+
+```json
+{
+  "status": "active"
+}
+```
+
+There is no permanent charger delete endpoint. `image_path` is metadata only. Charger file and image upload are not implemented yet.
 
 ## Authentication Setup
 

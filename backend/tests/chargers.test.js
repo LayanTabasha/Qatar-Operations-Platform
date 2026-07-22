@@ -1,5 +1,7 @@
 import request from "supertest";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 
 const authRepositoryMocks = vi.hoisted(() => ({
   findSafeUserById: vi.fn(),
@@ -13,6 +15,10 @@ const chargersRepositoryMocks = vi.hoisted(() => ({
   updateChargerStatusById: vi.fn(),
 }));
 
+const sitesRepositoryMocks = vi.hoisted(() => ({
+  findSiteById: vi.fn(),
+}));
+
 vi.mock("../src/modules/auth/auth.repository.js", () => ({
   findUserWithPasswordByEmail: vi.fn(),
   findSafeUserById: authRepositoryMocks.findSafeUserById,
@@ -20,6 +26,7 @@ vi.mock("../src/modules/auth/auth.repository.js", () => ({
 }));
 
 vi.mock("../src/modules/chargers/chargers.repository.js", () => chargersRepositoryMocks);
+vi.mock("../src/modules/sites/sites.repository.js", () => sitesRepositoryMocks);
 
 let app;
 let jwt;
@@ -55,6 +62,12 @@ const chargerSummary = {
   created_at: "2026-07-20T09:00:00.000Z",
   updated_at: "2026-07-20T09:00:00.000Z",
 };
+const activeSite = {
+  id: siteId,
+  name: "Msheireb",
+  code: "MSHEIREB",
+  status: "active",
+};
 
 beforeAll(async () => {
   process.env.NODE_ENV = "test";
@@ -81,6 +94,7 @@ beforeEach(() => {
   chargersRepositoryMocks.insertCharger.mockResolvedValue(chargerSummary);
   chargersRepositoryMocks.updateChargerById.mockResolvedValue(chargerSummary);
   chargersRepositoryMocks.updateChargerStatusById.mockResolvedValue(chargerSummary);
+  sitesRepositoryMocks.findSiteById.mockResolvedValue(activeSite);
 });
 
 function authCookie(user) {
@@ -192,6 +206,31 @@ describe("chargers routes", () => {
     );
   });
 
+  it("excludes archived chargers by default", async () => {
+    await request(app).get("/api/v1/chargers").set("Cookie", authCookie(viewerUser)).expect(200);
+
+    expect(chargersRepositoryMocks.listChargers).toHaveBeenCalledWith(
+      expect.not.objectContaining({ status: "archived" }),
+    );
+  });
+
+  it("repository excludes archived chargers when no status filter is provided", () => {
+    const repository = fs.readFileSync(path.resolve("src/modules/chargers/chargers.repository.js"), "utf8");
+
+    expect(repository).toContain("chargers.status <> 'archived'");
+  });
+
+  it("accepts archived, maintenance, and faulted filters", async () => {
+    await request(app).get("/api/v1/chargers?status=archived").set("Cookie", authCookie(viewerUser)).expect(200);
+    await request(app).get("/api/v1/chargers?status=maintenance").set("Cookie", authCookie(viewerUser)).expect(200);
+    await request(app).get("/api/v1/chargers?status=faulted").set("Cookie", authCookie(viewerUser)).expect(200);
+  });
+
+  it("accepts AC and DC filters", async () => {
+    await request(app).get("/api/v1/chargers?type=AC").set("Cookie", authCookie(viewerUser)).expect(200);
+    await request(app).get("/api/v1/chargers?type=DC").set("Cookie", authCookie(viewerUser)).expect(200);
+  });
+
   it("rejects inactive as a charger status", async () => {
     await request(app).get("/api/v1/chargers?status=inactive").set("Cookie", authCookie(viewerUser)).expect(400);
   });
@@ -202,6 +241,20 @@ describe("chargers routes", () => {
 
   it("returns validation error for invalid UUIDs", async () => {
     await request(app).get("/api/v1/chargers/not-a-uuid").set("Cookie", authCookie(viewerUser)).expect(400);
+  });
+
+  it("rejects invalid site_id filters", async () => {
+    await request(app).get("/api/v1/chargers?site_id=bad-site-id").set("Cookie", authCookie(viewerUser)).expect(400);
+  });
+
+  it("normalizes lowercase charger types to uppercase", async () => {
+    await request(app)
+      .post("/api/v1/chargers")
+      .set("Cookie", authCookie(operatorUser))
+      .send(validChargerBody({ type: "ac" }))
+      .expect(201);
+
+    expect(chargersRepositoryMocks.insertCharger).toHaveBeenCalledWith(expect.objectContaining({ type: "AC" }));
   });
 
   it("returns 409 for duplicate charger codes", async () => {
@@ -222,8 +275,40 @@ describe("chargers routes", () => {
     await request(app).get(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(viewerUser)).expect(404);
   });
 
+  it("returns 404 when the parent site is missing", async () => {
+    sitesRepositoryMocks.findSiteById.mockResolvedValue(null);
+
+    const response = await request(app)
+      .post("/api/v1/chargers")
+      .set("Cookie", authCookie(operatorUser))
+      .send(validChargerBody())
+      .expect(404);
+
+    expect(response.body.error.code).toBe("SITE_NOT_FOUND");
+  });
+
+  it("prevents creation under an archived parent site", async () => {
+    sitesRepositoryMocks.findSiteById.mockResolvedValue({ ...activeSite, status: "archived" });
+
+    const response = await request(app)
+      .post("/api/v1/chargers")
+      .set("Cookie", authCookie(operatorUser))
+      .send(validChargerBody())
+      .expect(409);
+
+    expect(response.body.error.code).toBe("ARCHIVED_SITE_CONFLICT");
+  });
+
   it("rejects empty PATCH bodies", async () => {
     await request(app).patch(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(operatorUser)).send({}).expect(400);
+  });
+
+  it("does not allow normal PATCH to change status", async () => {
+    await request(app)
+      .patch(`/api/v1/chargers/${chargerId}`)
+      .set("Cookie", authCookie(operatorUser))
+      .send({ status: "archived" })
+      .expect(400);
   });
 
   it("accepts only current statuses in the status endpoint", async () => {
@@ -238,6 +323,18 @@ describe("chargers routes", () => {
       .set("Cookie", authCookie(operatorUser))
       .send({ status: "inactive" })
       .expect(400);
+  });
+
+  it("does not restore a charger when the parent site is archived", async () => {
+    sitesRepositoryMocks.findSiteById.mockResolvedValue({ ...activeSite, status: "archived" });
+
+    const response = await request(app)
+      .patch(`/api/v1/chargers/${chargerId}/status`)
+      .set("Cookie", authCookie(operatorUser))
+      .send({ status: "active" })
+      .expect(409);
+
+    expect(response.body.error.code).toBe("ARCHIVED_SITE_CONFLICT");
   });
 
   it("does not expose a DELETE route", async () => {

@@ -2,8 +2,10 @@ import { query } from "../../config/database.js";
 
 const sortColumns = {
   name: "chargers.name",
+  code: "chargers.code",
   created_at: "chargers.created_at",
   updated_at: "chargers.updated_at",
+  power_kw: "chargers.power_kw",
 };
 
 const chargerSummarySelect = `
@@ -54,6 +56,8 @@ export async function listChargers({ site_id, status, type, search, sort, order,
   if (status) {
     values.push(status);
     filters.push(`chargers.status = $${values.length}`);
+  } else {
+    filters.push("chargers.status <> 'archived'");
   }
 
   if (type) {
@@ -68,6 +72,7 @@ export async function listChargers({ site_id, status, type, search, sort, order,
       OR chargers.code ILIKE $${values.length}
       OR chargers.model ILIKE $${values.length}
       OR chargers.manufacturer ILIKE $${values.length}
+      OR chargers.serial_number ILIKE $${values.length}
     )`);
   }
 
