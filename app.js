@@ -6,16 +6,17 @@
 // Modal/form code lives in js/modals.js.
 // Shared data/helpers live in js/state.js.
 
-document.getElementById("login-form").addEventListener("submit", (event) => {
+document.getElementById("login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const button = event.currentTarget.querySelector("button[type='submit']");
   button.classList.add("is-loading");
   button.textContent = button.dataset.loadingText;
-  setTimeout(() => {
+  try {
+    await signIn(document.getElementById("login-email").value.trim(), document.getElementById("login-password").value);
+  } finally {
     button.classList.remove("is-loading");
     button.textContent = "Sign in";
-    signIn(document.getElementById("login-email").value.trim(), document.getElementById("login-password").value);
-  }, 300);
+  }
 });
 
 document.getElementById("change-password-form").addEventListener("submit", (event) => {
@@ -67,6 +68,9 @@ document.addEventListener("click", (event) => {
 
   const chargerButton = event.target.closest(".open-charger");
   if (chargerButton) openCharger(chargerButton.dataset.site, chargerButton.dataset.charger);
+
+  const retryOperationalDataButton = event.target.closest("#retry-operational-data");
+  if (retryOperationalDataButton) loadOperationalData();
 
   const signOutButton = event.target.closest("#settings-sign-out-button");
   if (signOutButton) logout();
@@ -141,11 +145,11 @@ window.addEventListener("hashchange", () => {
 
 async function bootstrapApp() {
   loadStoredState();
-  await loadUsers();
+  renderDevCredentials();
   buildSites();
   renderCounts();
   renderActivity();
-  const restored = await restoreStoredSession();
+  const restored = await restoreAuthenticatedSession();
   if (!restored) showLoginScreen();
 }
 

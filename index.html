@@ -28,12 +28,10 @@
           <span>ENERGY</span>
         </div>
         <h1>Qatar Operations Platform</h1>
-        <div class="dev-credentials" id="dev-credentials"></div>
         <form id="login-form" class="login-form" novalidate>
           <div class="error-message" id="login-error" aria-live="polite"></div>
           <label><span>Email</span><input id="login-email" type="email" autocomplete="email" /></label>
           <label><span>Password</span><input id="login-password" type="password" autocomplete="current-password" /></label>
-          <label class="check-row"><input id="remember-me" type="checkbox" /> <span>Remember me</span></label>
           <button class="primary-button" type="submit" data-loading-text="Signing in...">Sign in</button>
           <a href="#" class="forgot-link">Forgot password?</a>
         </form>
@@ -196,6 +194,7 @@
     </div>
 
     <script src="js/state.js"></script>
+    <script src="js/api-client.js"></script>
     <script src="js/auth-router.js"></script>
     <script src="js/home-page.js"></script>
     <script src="js/sites-page.js"></script>

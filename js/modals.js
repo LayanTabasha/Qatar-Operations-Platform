@@ -6,8 +6,12 @@ let removeExistingSiteImage = false;
 function openModal(type, mode = "edit") {
   const config = modalConfigs[type];
   if (!config) return;
-  if (!isAdmin() && ["user", "site", "charger", "deleteCharger", "faultCode"].includes(type)) {
+  if (!isAdmin() && ["user", "faultCode"].includes(type)) {
     alert("Access denied. This action requires administrator permission.");
+    return;
+  }
+  if (!canManageOperations() && ["site", "charger", "deleteCharger"].includes(type)) {
+    alert("Access denied. This action requires operations permission.");
     return;
   }
   if (state.currentUserRole === "Viewer" && ["siteVisit", "visitReport", "fault", "document", "weeklyReport", "guide", "contact", "confirmDelete"].includes(type)) {
@@ -24,11 +28,12 @@ function openModal(type, mode = "edit") {
   form.dataset.mode = mode;
   form.dataset.site = state.currentSiteName || "";
   form.dataset.charger = state.currentChargerId || "";
-  const deleteNote = type === "deleteCharger" ? `<p class="modal-note">This removes the current charger from the selected site in this prototype. Type REMOVE to confirm.</p>` : "";
-  const saveLabel = type === "deleteCharger" ? "Remove Charger" : "Save";
+  const deleteNote = type === "deleteCharger" ? `<p class="modal-note">This archives the current charger. Type REMOVE to confirm.</p>` : "";
+  const saveLabel = type === "deleteCharger" ? "Archive Charger" : "Save";
   const saveClass = type === "deleteCharger" ? "danger-button" : "primary-button";
   form.innerHTML = `<div class="modal-error" id="modal-error"></div>${deleteNote}${config.fields.map(([label, kind], index) => fieldMarkup(label, kind, index < 2)).join("")}<div class="modal-actions"><button class="secondary-button" type="button" id="cancel-modal">Cancel</button><button class="${saveClass}" type="submit" data-loading-text="Saving...">${saveLabel}</button></div>`;
   if (mode !== "create") prefillModal(type);
+  if (mode === "create" && type === "charger") setFieldValue("site", state.currentSiteName);
   document.getElementById("modal-backdrop").classList.remove("hidden");
   resetModalScroll();
 }
@@ -424,6 +429,39 @@ function validateVisitTimes() {
   return true;
 }
 
+function backendCodeFromName(name, fallback = "RECORD") {
+  const code = String(name || fallback)
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 50);
+  return code.length >= 2 ? code : `${code || fallback}_1`;
+}
+
+function backendSiteStatus(status) {
+  return String(status || "").toLowerCase() === "archived" ? "archived" : "active";
+}
+
+function backendChargerStatus(status) {
+  const normalized = String(status || "").toLowerCase();
+  if (["maintenance", "faulted", "archived"].includes(normalized)) return normalized;
+  if (["warning", "critical"].includes(normalized)) return "faulted";
+  return "active";
+}
+
+function parsePowerKw(value) {
+  const match = String(value || "").match(/\d+(\.\d+)?/);
+  return match ? Number(match[0]) : 0;
+}
+
+function userFriendlyApiError(error) {
+  if (error?.status === 409) return "A record with the same code or name already exists.";
+  if (error?.status === 400) return error.message || "Please check the form values and try again.";
+  if (error?.status === 403) return "You do not have permission to save this record.";
+  return error?.message || "The backend could not save this record.";
+}
+
 async function simulateUpdate(type, mode = "edit") {
   let activity = null;
   if (type === "site") {
@@ -433,64 +471,74 @@ async function simulateUpdate(type, mode = "edit") {
     const status = document.getElementById("status")?.value || "Pending Data";
     const description = document.getElementById("description")?.value.trim();
     const notes = document.getElementById("notes")?.value.trim();
-    const image = pendingModalImage;
+    if (!name) throw new Error("Site name is required.");
     const existing = mode !== "create" ? getSite(state.currentSiteName) : null;
-    if (existing && state.currentSiteName) {
-      existing.name = name || existing.name;
-      existing.location = location || "To Be Updated";
-      existing.client = client || "Not Available Yet";
-      existing.status = status;
-      existing.description = description || "";
-      existing.notes = notes || "";
-      if (removeExistingSiteImage) existing.image = "";
-      if (image) existing.image = image;
-      state.currentSiteName = existing.name;
-      activity = { actionType: "site_updated", entityType: "site", entityId: existing.name, description: `${existing.name} site information updated`, siteName: existing.name };
-    } else if (name && !state.sites.some((item) => item.name.toLowerCase() === name.toLowerCase())) {
-      state.sites.push({ name, location: location || "To Be Updated", client: client || "Not Available Yet", status, description: description || "", notes: notes || "", image, chargers: [] });
-      document.getElementById("kpi-sites").textContent = state.sites.length;
-      state.currentSiteName = name;
-      activity = { actionType: "site_added", entityType: "site", entityId: name, description: `${name} site added`, siteName: name };
+    const payload = {
+      name,
+      code: existing?.code || backendCodeFromName(name),
+      location: location || null,
+      address: client || null,
+      description: [description, notes].filter(Boolean).join("\n\n") || null,
+    };
+    try {
+      const response = existing?.id
+        ? await SitesApi.update(existing.id, payload)
+        : await SitesApi.create(payload);
+      if (backendSiteStatus(status) !== (response.site?.status || "active")) {
+        await SitesApi.updateStatus(response.site.id, backendSiteStatus(status));
+      }
+      state.currentSiteName = response.site?.name || name;
+      await loadOperationalData();
+      if (state.currentSiteName) openSite(state.currentSiteName);
+      activity = { actionType: existing ? "site_updated" : "site_added", entityType: "site", entityId: state.currentSiteName, description: `${state.currentSiteName} site ${existing ? "information updated" : "added"}`, siteName: state.currentSiteName };
+    } catch (error) {
+      throw new Error(userFriendlyApiError(error));
     }
-    buildSites();
-    if (state.currentSiteName) openSite(state.currentSiteName);
   }
   if (type === "charger") {
     const siteName = document.getElementById("site")?.value || state.currentSiteName || state.sites[0]?.name;
     const site = getSite(siteName);
-    if (!site) return;
-    const image = await readFileAsDataUrl("upload-charger-image");
-    const chargerId = mode !== "create" && state.currentChargerId ? state.currentChargerId : `charger-${Date.now()}`;
-    let charger = site.chargers.find((item) => item.id === chargerId);
-    const isNewCharger = !charger;
-    if (!charger) {
-      charger = { id: chargerId };
-      site.chargers.push(charger);
-    }
-    charger.name = document.getElementById("charger-name")?.value.trim() || "Charger Name";
-    charger.type = document.getElementById("charger-type")?.value || "Not Available Yet";
-    charger.operator = document.getElementById("operator")?.value.trim() || "";
-    charger.administrator = document.getElementById("administrator")?.value.trim() || "";
-    charger.manufacturer = document.getElementById("manufacturer")?.value.trim() || "";
-    charger.model = document.getElementById("model")?.value.trim() || "";
-    charger.serialNumber = document.getElementById("serial-number")?.value.trim() || "";
-    charger.capacity = document.getElementById("capacity")?.value.trim() || "";
-    charger.installationDate = document.getElementById("installation-date")?.value || "";
-    charger.status = document.getElementById("status")?.value || "Pending Data";
-    charger.notes = document.getElementById("notes")?.value.trim() || "";
-    if (image) charger.image = image;
-    state.currentSiteName = site.name;
-    state.currentChargerId = charger.id;
-    activity = {
-      actionType: isNewCharger ? "charger_added" : "charger_updated",
-      entityType: "charger",
-      entityId: charger.id,
-      description: `${charger.name} ${isNewCharger ? "added to" : "information updated in"} ${site.name}`,
-      siteName: site.name,
-      chargerName: charger.name,
+    if (!site?.id) throw new Error("Choose a valid site before saving this charger.");
+    const name = document.getElementById("charger-name")?.value.trim();
+    const chargerType = document.getElementById("charger-type")?.value;
+    if (!name) throw new Error("Charger name is required.");
+    if (!["AC", "DC"].includes(chargerType)) throw new Error("Charger type must be AC or DC for the backend MVP.");
+    const existing = mode !== "create" ? getCharger(state.currentSiteName, state.currentChargerId) : null;
+    const payload = {
+      site_id: site.id,
+      name,
+      code: existing?.code || backendCodeFromName(name),
+      manufacturer: document.getElementById("manufacturer")?.value.trim() || null,
+      model: document.getElementById("model")?.value.trim() || null,
+      serial_number: document.getElementById("serial-number")?.value.trim() || null,
+      type: chargerType,
+      power_kw: parsePowerKw(document.getElementById("capacity")?.value),
+      firmware_version: null,
+      description: document.getElementById("notes")?.value.trim() || null,
     };
-    buildSites();
-    refreshOpenProfiles();
+    try {
+      const response = existing?.id
+        ? await ChargersApi.update(existing.id, payload)
+        : await ChargersApi.create(payload);
+      const requestedStatus = backendChargerStatus(document.getElementById("status")?.value);
+      if (requestedStatus !== (response.charger?.status || "active")) {
+        await ChargersApi.updateStatus(response.charger.id, requestedStatus);
+      }
+      state.currentSiteName = response.charger?.site_name || site.name;
+      state.currentChargerId = response.charger?.id || existing?.id || "";
+      await loadOperationalData();
+      refreshOpenProfiles();
+      activity = {
+        actionType: existing ? "charger_updated" : "charger_added",
+        entityType: "charger",
+        entityId: state.currentChargerId,
+        description: `${name} ${existing ? "information updated in" : "added to"} ${state.currentSiteName}`,
+        siteName: state.currentSiteName,
+        chargerName: name,
+      };
+    } catch (error) {
+      throw new Error(userFriendlyApiError(error));
+    }
   }
   if (type === "deleteCharger") {
     const confirmation = document.getElementById("type-remove-to-confirm")?.value.trim();
@@ -499,12 +547,21 @@ async function simulateUpdate(type, mode = "edit") {
     const charger = getCharger();
     const chargerName = charger?.name || "Charger";
     const chargerId = charger?.id || state.currentChargerId;
-    removeCurrentCharger();
+    if (!chargerId) throw new Error("No charger is selected.");
+    try {
+      await ChargersApi.updateStatus(chargerId, "archived");
+      state.currentChargerId = "";
+      await loadOperationalData();
+      document.getElementById("charger-profile").classList.add("hidden");
+      if (state.currentSiteName) openSite(state.currentSiteName, "Chargers");
+    } catch (error) {
+      throw new Error(userFriendlyApiError(error));
+    }
     addActivity({
-      actionType: "charger_removed",
+      actionType: "charger_archived",
       entityType: "charger",
       entityId: chargerId,
-      description: `${chargerName} removed from ${siteName}`,
+      description: `${chargerName} archived from ${siteName}`,
       siteName,
       chargerName,
     });
@@ -529,7 +586,6 @@ async function simulateUpdate(type, mode = "edit") {
       id: `user-${Date.now()}`,
       name: fullName,
       email,
-      passwordHash: await hashPassword(temporaryPassword),
       role,
       department,
       status,

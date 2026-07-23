@@ -1,0 +1,6 @@
+{
+  "watch": ["src"],
+  "ext": "js,json",
+  "ignore": ["node_modules", "tests", "coverage", "*.log", ".env"],
+  "signal": "SIGUSR2"
+}

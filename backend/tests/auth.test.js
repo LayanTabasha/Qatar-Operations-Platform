@@ -184,7 +184,7 @@ describe("user management routes", () => {
       .send({
         full_name: "Manager User",
         email: "manager@example.com",
-        password: "StrongPassword1!",
+        password: "StrongPassword1",
         role: "manager",
       })
       .expect(400);
@@ -218,7 +218,7 @@ describe("user management routes", () => {
       .send({
         full_name: "Viewer User",
         email: "viewer@example.com",
-        password: "StrongPassword1!",
+        password: "StrongPassword1",
         role: "viewer",
       })
       .expect(409);

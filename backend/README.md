@@ -180,6 +180,12 @@ Run seeds manually with:
 npm.cmd run seed
 ```
 
+Run only the required roles seed with:
+
+```bash
+npm.cmd run seed:roles
+```
+
 Always run migrations before seeds. Do not run seeds against production unless that is explicitly intended and approved.
 
 ## Sites API
@@ -360,10 +366,12 @@ ADMIN_EMAIL=
 ADMIN_PASSWORD=
 ```
 
-Then run:
+Then run the migration, repeat-safe roles seed, and repeat-safe admin seed commands:
 
 ```bash
-npm.cmd run create-admin
+npm.cmd run migrate
+npm.cmd run seed:roles
+npm.cmd run seed:admin
 ```
 
 PowerShell example with placeholders:
@@ -371,8 +379,12 @@ PowerShell example with placeholders:
 ```powershell
 $env:ADMIN_NAME="Admin User"
 $env:ADMIN_EMAIL="admin@zeedaenergy.com"
-$env:ADMIN_PASSWORD="Use-A-Strong-Local-Password-Here1!"
-npm.cmd run create-admin
+$env:ADMIN_PASSWORD="UseAStrongLocalPasswordHere1"
+npm.cmd run migrate
+npm.cmd run seed:roles
+npm.cmd run seed:admin
 ```
 
-These admin values are only used by the manual create-admin command. Never commit a real `.env` file or a real password.
+The password must be at least 12 characters and include uppercase letters, lowercase letters, and a number. A symbol is not required for the current internal MVP.
+
+These admin values are only used by the manual admin seed command. It reports whether the admin was created or already existed. Never commit a real `.env` file or a real password.

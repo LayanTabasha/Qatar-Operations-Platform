@@ -10,6 +10,7 @@ import { errorHandler } from "./middleware/error-handler.js";
 import { notFound } from "./middleware/not-found.js";
 import { apiRateLimit } from "./middleware/rate-limit.js";
 import { requestId } from "./middleware/request-id.js";
+import { getHealth } from "./modules/health/health.controller.js";
 import { apiRouter } from "./routes/index.js";
 
 export const app = express();
@@ -30,6 +31,7 @@ app.use(
 );
 app.use(apiRateLimit);
 
+app.get("/api/health", getHealth);
 app.use("/api/v1", apiRouter);
 
 app.use(notFound);

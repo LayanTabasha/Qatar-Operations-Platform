@@ -32,7 +32,27 @@ const envSchema = z.object({
   COOKIE_SAME_SITE: z.enum(["lax", "strict", "none"]).default("lax"),
 });
 
-const parsedEnv = envSchema.safeParse(process.env);
+const productionEnvSchema = envSchema.superRefine((value, ctx) => {
+  if (value.NODE_ENV !== "production") return;
+
+  if (!value.COOKIE_SECURE) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["COOKIE_SECURE"],
+      message: "Must be true in production so auth cookies are sent only over HTTPS",
+    });
+  }
+
+  if (!value.TRUST_PROXY) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["TRUST_PROXY"],
+      message: "Must be true in production when Express runs behind Nginx",
+    });
+  }
+});
+
+const parsedEnv = productionEnvSchema.safeParse(process.env);
 
 if (!parsedEnv.success) {
   const details = parsedEnv.error.issues

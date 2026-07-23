@@ -61,7 +61,7 @@ describe("database schema files", () => {
   });
 
   it("has seed files", () => {
-    expect(sqlFilesIn(seedsDir)).toEqual(["001_roles.sql", "002_sample_sites.sql"]);
+    expect(sqlFilesIn(seedsDir)).toEqual(["001_roles.sql", "002_sample_sites.sql", "003_sample_chargers.sql"]);
   });
 
   it("has the simplified role seed", () => {
@@ -70,6 +70,7 @@ describe("database schema files", () => {
     expect(rolesSeed).toContain("'admin'");
     expect(rolesSeed).toContain("'operator'");
     expect(rolesSeed).toContain("'viewer'");
+    expect(rolesSeed).toContain("on conflict (name) do update");
     expect(rolesSeed).not.toContain("'manager'");
   });
 
@@ -82,7 +83,18 @@ describe("database schema files", () => {
 
   it("has migrate and seed npm scripts", () => {
     expect(packageJson.scripts.migrate).toBe("node src/db/migrate.js");
+    expect(packageJson.scripts["seed:roles"]).toBe("node src/db/seed-roles.js");
     expect(packageJson.scripts.seed).toBe("node src/db/seed.js");
     expect(packageJson.scripts["create-admin"]).toBe("node src/db/create-admin.js");
+    expect(packageJson.scripts["test:auth-local"]).toBe("node src/scripts/verify-auth-local.js");
+  });
+
+  it("has repeat-safe sample charger seed data", () => {
+    const chargerSeed = fs.readFileSync(path.join(seedsDir, "003_sample_chargers.sql"), "utf8").toLowerCase();
+
+    ["'mow-dc-01'", "'msh-dc-01'", "'msh-dc-02'", "'msh-ac-01'", "'alm-ac-01'"].forEach((code) => {
+      expect(chargerSeed).toContain(code);
+    });
+    expect(chargerSeed).toContain("on conflict (code) do update");
   });
 });

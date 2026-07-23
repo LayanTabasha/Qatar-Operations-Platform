@@ -1,5 +1,19 @@
 function buildSites() {
-  document.getElementById("site-list").innerHTML = state.sites.map((site) => `
+  const siteList = document.getElementById("site-list");
+  if (state.backendLoading) {
+    siteList.innerHTML = `<div class="empty-state"><h2>Loading sites...</h2><p>Fetching sites and chargers from the Qatar Operations backend.</p></div>`;
+    return;
+  }
+  if (state.backendError) {
+    siteList.innerHTML = `<div class="empty-state"><h2>Could not load sites</h2><p>${state.backendError}</p><button class="primary-button" id="retry-operational-data" type="button">Retry</button></div>`;
+    return;
+  }
+  if (!state.sites.length) {
+    siteList.innerHTML = `<div class="empty-state"><h2>No sites found</h2><p>No active site records are available from the backend yet.</p></div>`;
+    return;
+  }
+
+  siteList.innerHTML = state.sites.map((site) => `
     <article class="site-card">
       ${imageBlock(site.image, site.name)}
       <div class="site-content">
@@ -7,9 +21,9 @@ function buildSites() {
         <div class="data-list">
           ${placeholder("Location", site.location || "To Be Updated")}
           ${placeholder("Site Status", site.status || "Pending Data")}
-          ${placeholder("Number of Chargers", site.chargers?.length ? String(site.chargers.length) : "Not Available Yet")}
-          ${placeholder("Open Faults", String(state.faults.filter((fault) => fault.siteName === site.name && ["Open", "In Progress"].includes(fault.status)).length))}
-          ${placeholder("Last Visit", latestVisitForSite(site.name))}
+          ${placeholder("Number of Chargers", valueOrPlaceholder(String(site.chargerCount ?? site.chargers?.length ?? "")))}
+          ${placeholder("Open Faults", String(site.openFaultCount ?? state.faults.filter((fault) => fault.siteName === site.name && ["Open", "In Progress"].includes(fault.status)).length))}
+          ${placeholder("Last Visit", site.lastSiteVisit ? formatDate(site.lastSiteVisit) : latestVisitForSite(site.name))}
         </div>
         <div class="card-actions split-actions">
           <button class="secondary-button" data-modal="site" data-mode="edit" data-site-context="${site.name}" type="button">Edit</button>
@@ -17,6 +31,118 @@ function buildSites() {
         </div>
       </div>
     </article>`).join("");
+}
+
+function statusLabel(status) {
+  const labels = {
+    active: "Active",
+    archived: "Archived",
+    maintenance: "Maintenance",
+    faulted: "Faulted",
+  };
+  return labels[status] || valueOrPlaceholder(status);
+}
+
+function mapBackendCharger(charger) {
+  const powerValue = charger.power_kw === null || charger.power_kw === undefined ? "" : Number(charger.power_kw);
+  const formattedPower = Number.isFinite(powerValue) ? (Number.isInteger(powerValue) ? String(powerValue) : powerValue.toFixed(1)) : "";
+  return {
+    id: charger.id,
+    siteId: charger.site_id,
+    siteName: charger.site_name,
+    name: charger.name,
+    code: charger.code,
+    type: charger.type,
+    manufacturer: charger.manufacturer || "",
+    model: charger.model || "",
+    serialNumber: charger.serial_number || "",
+    capacity: formattedPower ? `${formattedPower} kW` : "",
+    powerKw: charger.power_kw,
+    firmwareVersion: charger.firmware_version || "",
+    description: charger.description || "",
+    image: charger.image_path || "",
+    status: statusLabel(charger.status),
+    backendStatus: charger.status,
+    openFaultCount: charger.open_fault_count ?? 0,
+    lastSiteVisit: charger.last_site_visit,
+    createdAt: charger.created_at,
+    updatedAt: charger.updated_at,
+  };
+}
+
+function chargerDisplayRank(type) {
+  if (type === "DC") return 0;
+  if (type === "AC") return 1;
+  return 2;
+}
+
+function compareChargersForDisplay(a, b) {
+  const siteCompare = String(a.siteName || "").localeCompare(String(b.siteName || ""), undefined, { sensitivity: "base" });
+  if (siteCompare !== 0) return siteCompare;
+
+  const typeCompare = chargerDisplayRank(a.type) - chargerDisplayRank(b.type);
+  if (typeCompare !== 0) return typeCompare;
+
+  const codeA = a.code || a.name || "";
+  const codeB = b.code || b.name || "";
+  const codeCompare = String(codeA).localeCompare(String(codeB), undefined, { numeric: true, sensitivity: "base" });
+  if (codeCompare !== 0) return codeCompare;
+
+  return String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true, sensitivity: "base" });
+}
+
+function mapBackendSite(site, chargers) {
+  const siteChargers = chargers
+    .filter((charger) => charger.siteId === site.id || charger.siteName === site.name)
+    .sort(compareChargersForDisplay);
+  return {
+    id: site.id,
+    name: site.name,
+    code: site.code,
+    location: site.location || site.address || "To Be Updated",
+    address: site.address || "",
+    client: site.address || "Not Available Yet",
+    status: statusLabel(site.status),
+    backendStatus: site.status,
+    description: site.description || "",
+    notes: "",
+    image: site.image_path || "",
+    chargers: siteChargers,
+    chargerCount: site.charger_count ?? siteChargers.length,
+    openFaultCount: site.open_fault_count ?? 0,
+    lastSiteVisit: site.last_site_visit,
+    createdAt: site.created_at,
+    updatedAt: site.updated_at,
+  };
+}
+
+async function loadOperationalData() {
+  state.backendLoading = true;
+  state.backendError = "";
+  buildSites();
+
+  try {
+    const [sitesResponse, chargersResponse] = await Promise.all([
+      SitesApi.list({ status: "active", limit: 100 }),
+      ChargersApi.list({ limit: 100 }),
+    ]);
+    const chargers = (chargersResponse.chargers || []).map(mapBackendCharger).sort(compareChargersForDisplay);
+    state.sites = (sitesResponse.sites || []).map((site) => mapBackendSite(site, chargers));
+    state.counts.chargers = chargers.length || null;
+    state.counts.faults = state.sites.reduce((total, site) => total + (Number(site.openFaultCount) || 0), 0) || null;
+    state.backendLoading = false;
+    buildSites();
+    renderCounts();
+    renderDashboardCharts();
+    refreshOpenProfiles();
+    return true;
+  } catch (err) {
+    state.backendLoading = false;
+    state.backendError = err.message || "The backend could not be reached.";
+    buildSites();
+    renderCounts();
+    return false;
+  }
 }
 
 function latestVisitForSite(siteName) {

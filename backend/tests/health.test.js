@@ -27,7 +27,17 @@ describe("health routes", () => {
     expect(response.body).toEqual({
       success: true,
       status: "ok",
-      service: "qatar-operations-api",
+      service: "Qatar Operations API",
+    });
+  });
+
+  it("returns the public API health status at /api/health", async () => {
+    const response = await request(app).get("/api/health").expect(200);
+
+    expect(response.body).toEqual({
+      success: true,
+      status: "ok",
+      service: "Qatar Operations API",
     });
   });
 

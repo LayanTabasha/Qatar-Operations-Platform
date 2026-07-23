@@ -5,7 +5,7 @@ export function getHealth(_req, res) {
   res.json({
     success: true,
     status: "ok",
-    service: "qatar-operations-api",
+    service: "Qatar Operations API",
   });
 }
 

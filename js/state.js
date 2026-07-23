@@ -1,26 +1,24 @@
-const AUTH_EMAIL = "admin@zeedaenergy.com";
-const AUTH_PASSWORD_HASH = "5245532f21c8425e6436e74cbd80d44d6ce33d48d3d04529461c42359b7d24e9";
 const sites = ["Musheireb", "Mowasalat", "Al Mana"];
 const routes = ["home", "sites", "contacts", "settings"];
 const STORAGE_KEY = "zeeda-qatar-ops-state";
 const USERS_KEY = "zeeda-qatar-ops-users";
-const DEV_TEMP_PASSWORD_KEY = "zeeda-qatar-ops-dev-temp-password";
-const AUTH_SESSION_KEY = "zeeda-qatar-ops-auth-session";
 const VIEW_CONTEXT_KEY = "zeeda-qatar-ops-view-context";
-const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
-const REMEMBER_SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
 const state = {
   authenticated: false,
-  currentUser: "Admin",
+  authUser: null,
+  currentUser: "",
   currentUserEmail: "",
   currentUserRole: "",
+  currentUserRoleKey: "",
   mustChangePassword: false,
   users: [],
   currentSiteName: "",
   currentChargerId: "",
   currentSiteTab: "Overview",
   currentChargerTab: "Overview",
+  backendLoading: false,
+  backendError: "",
   sites: sites.map((name) => ({ name, location: "To Be Updated", status: "Pending Data", client: "Not Available Yet", notes: "", image: "", chargers: [] })),
   uploads: [],
   faults: [],
@@ -31,8 +29,8 @@ const state = {
 };
 
 const modalConfigs = {
-  site: { title: "Site Details", fields: [["Site name", "text"], ["Location", "text"], ["Client / organization", "text"], ["Status", "select:Pending Data,Healthy,Warning,Critical"], ["Description", "textarea"], ["Notes", "textarea"], ["Upload site image", "file"]] },
-  charger: { title: "Charger Details", fields: [["Charger name", "text"], ["Charger type", "select:AC,DC,Robotic Arm"], ["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Operator", "text"], ["Administrator", "text"], ["Manufacturer", "text"], ["Model", "text"], ["Serial number", "text"], ["Capacity", "text"], ["Installation date", "date"], ["Status", "select:Pending Data,Available,Warning,Critical"], ["Notes", "textarea"], ["Upload charger image", "file"]] },
+  site: { title: "Site Details", fields: [["Site name", "text"], ["Location", "text"], ["Client / organization", "text"], ["Status", "select:Active,Archived"], ["Description", "textarea"], ["Notes", "textarea"], ["Upload site image", "file"]] },
+  charger: { title: "Charger Details", fields: [["Charger name", "text"], ["Charger type", "select:AC,DC"], ["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Operator", "text"], ["Administrator", "text"], ["Manufacturer", "text"], ["Model", "text"], ["Serial number", "text"], ["Capacity", "text"], ["Installation date", "date"], ["Status", "select:Active,Maintenance,Faulted,Archived"], ["Notes", "textarea"], ["Upload charger image", "file"]] },
   siteVisit: { title: "Add Site Visit", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Visit date", "date"], ["Visit status", "select:Scheduled,Completed,Cancelled,Follow-Up Required"], ["Time in", "time"], ["Time out", "time"], ["Visit type", "text"], ["Engineer name", "text"], ["Technician name", "text"], ["Purpose", "textarea"], ["Work completed", "textarea"], ["Findings", "textarea"], ["Notes", "textarea"], ["Site Visit Report upload", "file"]] },
   visitReport: { title: "Upload Site Visit Report", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Visit date", "date"], ["Report title", "text"], ["File upload", "file"], ["Notes", "textarea"]] },
   fault: { title: "Report Fault", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Generated Fault ID", "fault-id"], ["Fault Code", "fault-code-select"], ["Fault details", "fault-code-details"], ["Fault status", "select:Open,In Progress,Resolved,Closed"], ["Date reported", "date"], ["Time reported", "time"], ["Description", "textarea"], ["Photo evidence", "image-file"], ["Comments", "textarea"]] },
@@ -68,7 +66,6 @@ function loadStoredState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
     let migrated = false;
-    if (Array.isArray(saved.sites)) state.sites = saved.sites;
     if (saved.counts) state.counts = { ...state.counts, ...saved.counts };
     if (Array.isArray(saved.recent)) state.recent = normalizeActivityLog(saved.recent);
     if (Array.isArray(saved.uploads)) state.uploads = saved.uploads.map(normalizeUploadRecord);
@@ -82,122 +79,41 @@ function loadStoredState() {
   }
 }
 
-async function hashPassword(password) {
-  const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
-  return Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-function generateTemporaryPassword() {
-  const existing = localStorage.getItem(DEV_TEMP_PASSWORD_KEY);
-  if (existing) return existing;
-  const temp = `Temp-${Math.random().toString(36).slice(2, 6).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-  localStorage.setItem(DEV_TEMP_PASSWORD_KEY, temp);
-  return temp;
-}
-
-async function loadUsers() {
-  const savedUsers = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
-  if (Array.isArray(savedUsers) && savedUsers.length) {
-    const normalizedChanged = savedUsers.some((user) => !user.department || !user.lastPasswordChange || !user.status);
-    state.users = savedUsers.map((user) => normalizeUser(user));
-    let changed = false;
-    if (!state.users.some((user) => user.email === AUTH_EMAIL)) {
-      state.users.push({
-        id: "user-admin",
-        name: "Admin",
-        email: AUTH_EMAIL,
-        passwordHash: AUTH_PASSWORD_HASH,
-        role: "Administrator",
-        status: "Active",
-        department: "Administration",
-        mustChangePassword: false,
-        lastLogin: "Not Available Yet",
-        lastPasswordChange: "Not Available Yet",
-        createdAt: new Date().toISOString().slice(0, 10),
-        createdBy: "System",
-      });
-      changed = true;
-    }
-    if (!state.users.some((user) => user.email === "operations.user@zeeda.local")) {
-      const tempPassword = generateTemporaryPassword();
-      state.users.push({
-        id: "user-operations-test",
-        name: "Test Operations User",
-        email: "operations.user@zeeda.local",
-        passwordHash: await hashPassword(tempPassword),
-        role: "Operations Staff",
-        status: "Active",
-        department: "Operations",
-        mustChangePassword: true,
-        lastLogin: "Not Available Yet",
-        lastPasswordChange: "Not Available Yet",
-        createdAt: new Date().toISOString().slice(0, 10),
-        createdBy: "System",
-      });
-      changed = true;
-    }
-    if (changed || normalizedChanged) saveUsers();
-    renderDevCredentials();
-    return;
+function loadUsers() {
+  try {
+    const savedUsers = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
+    state.users = Array.isArray(savedUsers) ? savedUsers.map((user) => normalizeUser(user)) : [];
+  } catch {
+    localStorage.removeItem(USERS_KEY);
+    state.users = [];
   }
-
-  const tempPassword = generateTemporaryPassword();
-  state.users = [
-    {
-      id: "user-admin",
-      name: "Admin",
-      email: AUTH_EMAIL,
-      passwordHash: AUTH_PASSWORD_HASH,
-      role: "Administrator",
-      status: "Active",
-      department: "Administration",
-      mustChangePassword: false,
-      lastLogin: "Not Available Yet",
-      lastPasswordChange: "Not Available Yet",
-      createdAt: new Date().toISOString().slice(0, 10),
-      createdBy: "System",
-    },
-    {
-      id: "user-operations-test",
-      name: "Test Operations User",
-      email: "operations.user@zeeda.local",
-      passwordHash: await hashPassword(tempPassword),
-      role: "Operations Staff",
-      status: "Active",
-      department: "Operations",
-      mustChangePassword: true,
-      lastLogin: "Not Available Yet",
-      lastPasswordChange: "Not Available Yet",
-      createdAt: new Date().toISOString().slice(0, 10),
-      createdBy: "System",
-    },
-  ];
-  saveUsers();
-  renderDevCredentials();
 }
 
 function saveUsers() {
-  localStorage.setItem(USERS_KEY, JSON.stringify(state.users));
+  const safeUsers = state.users.map(({ passwordHash, ...user }) => user);
+  localStorage.setItem(USERS_KEY, JSON.stringify(safeUsers));
 }
 
 function renderDevCredentials() {
   const panel = document.getElementById("dev-credentials");
   if (!panel) return;
-  const tempPassword = localStorage.getItem(DEV_TEMP_PASSWORD_KEY) || generateTemporaryPassword();
-  panel.innerHTML = `<strong>Development test user</strong><span>Email: operations.user@zeeda.local</span><span>Temporary password: ${tempPassword}</span>`;
+  panel.innerHTML = "";
 }
 
 function getCurrentUserRecord() {
-  return state.users.find((user) => user.email === state.currentUserEmail);
+  return state.authUser || state.users.find((user) => user.email === state.currentUserEmail);
 }
 
 function isAdmin() {
-  return state.currentUserRole === "Administrator";
+  return state.currentUserRoleKey === "admin" || state.currentUserRole === "Administrator";
+}
+
+function canManageOperations() {
+  return ["admin", "operator"].includes(state.currentUserRoleKey) || ["Administrator", "Operations Staff"].includes(state.currentUserRole);
 }
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
-    sites: state.sites,
     uploads: state.uploads,
     faults: state.faults,
     visits: state.visits,
