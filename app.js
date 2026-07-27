@@ -37,6 +37,7 @@ document.addEventListener("click", (event) => {
 
   const modalButton = event.target.closest("[data-modal]");
   if (modalButton?.dataset.siteContext) state.currentSiteName = modalButton.dataset.siteContext;
+  if (modalButton?.dataset.modal === "siteVisit") state.currentVisitId = modalButton.dataset.visitId || "";
   if (modalButton?.dataset.modal === "profile") {
     document.getElementById("profile-dropdown").classList.add("hidden");
     setRoute("settings");
@@ -69,6 +70,18 @@ document.addEventListener("click", (event) => {
   const chargerButton = event.target.closest(".open-charger");
   if (chargerButton) openCharger(chargerButton.dataset.site, chargerButton.dataset.charger);
 
+  const restoreChargerButton = event.target.closest("[data-charger-restore]");
+  if (restoreChargerButton) restoreArchivedCharger(restoreChargerButton.dataset.chargerRestore);
+
+  const deleteChargerButton = event.target.closest("[data-charger-delete]");
+  if (deleteChargerButton) {
+    permanentlyDeleteArchivedCharger(
+      deleteChargerButton.dataset.chargerDelete,
+      deleteChargerButton.dataset.chargerName,
+      deleteChargerButton.dataset.chargerCode,
+    );
+  }
+
   const retryOperationalDataButton = event.target.closest("#retry-operational-data");
   if (retryOperationalDataButton) loadOperationalData();
 
@@ -81,6 +94,9 @@ document.addEventListener("click", (event) => {
     const user = getCurrentUserRecord();
     if (note) note.textContent = `Active session for ${user?.email || state.currentUserEmail}. Last login: ${user?.lastLogin || "Not Available Yet"}.`;
   }
+
+  const visitDetailButton = event.target.closest("[data-visit-detail]");
+  if (visitDetailButton) openSiteVisitDetail(visitDetailButton.dataset.visitDetail);
 
   const editUserButton = event.target.closest("[data-user-edit]");
   if (editUserButton) editManagedUser(editUserButton.dataset.userEdit);
@@ -96,6 +112,19 @@ document.addEventListener("click", (event) => {
   if (resetUserButton) {
     resetManagedUserPassword(resetUserButton.dataset.userReset).catch((err) => {
       alert(err.message || "Password could not be reset.");
+    });
+  }
+
+  const dtcSearchButton = event.target.closest("#dtc-search-button");
+  if (dtcSearchButton) searchDtcCatalogue();
+
+  const editDtcButton = event.target.closest("[data-dtc-edit]");
+  if (editDtcButton) editDtcRecord(editDtcButton.dataset.dtcEdit);
+
+  const statusDtcButton = event.target.closest("[data-dtc-status]");
+  if (statusDtcButton) {
+    changeDtcStatus(statusDtcButton.dataset.dtcStatus, statusDtcButton.dataset.active === "true").catch((err) => {
+      alert(err.message || "DTC status could not be changed.");
     });
   }
 
@@ -123,6 +152,9 @@ document.getElementById("modal-form").addEventListener("change", (event) => {
   if (event.target.id === "upload-site-image") handleSiteImageSelection();
   if (event.target.id === "site" || event.target.id === "related-site") refreshChargerSelect();
   if (event.target.id === "fault-code") renderFaultCodeDetails("fault-code");
+});
+document.getElementById("settings-panel").addEventListener("change", (event) => {
+  if (event.target.id === "dtc-import-file") importDtcCatalogue(event.target.files?.[0]);
 });
 document.addEventListener("change", (event) => {
   const faultStatus = event.target.closest("[data-fault-status]");

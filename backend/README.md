@@ -2,7 +2,7 @@
 
 This folder contains the backend foundation for the Qatar Operations Platform.
 
-The current root website is a plain HTML, CSS, and JavaScript frontend connected to this backend for authentication, sites, chargers, and Admin-only user management.
+The current root website is a plain HTML, CSS, and JavaScript frontend connected to this backend for authentication, sites, chargers, Site Visits, DTC catalogue records, and Admin-only user management.
 
 ## Current Phase
 
@@ -21,7 +21,7 @@ Phase 3 adds authentication and authorization on top of the Phase 1 and Phase 2 
 - Role authorization middleware
 - Admin-only user creation and listing
 
-Sites, chargers, authentication, and Admin-only user-management endpoints are implemented. Uploads, reports, documents, and faults still need future backend modules.
+Sites, chargers, Site Visits, DTC catalogue records, authentication, and Admin-only user-management endpoints are implemented. Uploads, reports, documents, and full fault record persistence still need future backend modules.
 
 ## Backend Structure
 
@@ -65,6 +65,12 @@ The Chargers feature lives in:
 src/modules/chargers
 ```
 
+The DTC fault catalogue feature lives in:
+
+```text
+src/modules/dtc
+```
+
 ## Roles
 
 The platform role model is intentionally simple:
@@ -100,8 +106,60 @@ Current backend routes are mounted under `/api/v1`:
 - `POST /chargers`: admin/operations_staff charger creation.
 - `PATCH /chargers/:id`: admin/operations_staff charger update.
 - `PATCH /chargers/:id/status`: admin/operations_staff charger status change.
+- `PATCH /chargers/:id/archive`: admin/operations_staff charger archive.
+- `PATCH /chargers/:id/restore`: admin/operations_staff charger restore.
+- `DELETE /chargers/:id`: admin-only soft delete for already archived chargers.
+- `GET /dtc`: authenticated DTC catalogue search.
+- `GET /dtc/:id`: authenticated DTC catalogue detail.
+- `POST /dtc`: admin-only DTC record creation.
+- `PATCH /dtc/:id`: admin-only DTC record update.
+- `PATCH /dtc/:id/status`: admin-only DTC activate/deactivate.
+- `POST /dtc/import`: admin-only `.xlsx` DTC workbook import using multipart field `file`.
 
-There are no permanent site or charger deletion endpoints.
+There are no permanent site deletion endpoints. Charger delete is implemented as a soft delete for archived chargers only, so historical fault and document links are protected.
+
+## DTC Catalogue API
+
+The DTC catalogue imports structured data from the manufacturer Excel workbook instead of keeping the workbook only as a downloadable file.
+
+Supported search parameters:
+
+```text
+code=P0301
+query=over-current
+charger_model=ZD
+category=Yes
+severity=2012
+status=active|inactive|all
+sort=dtc_code|fault_title|category|charger_model|updated_at
+order=asc|desc
+limit=50
+offset=0
+```
+
+The importer validates:
+
+- file extension must be `.xlsx`;
+- workbook must contain a sheet named `DTC`;
+- the DTC sheet must include `ECU`, `DTC1`, `FTB1`, and `DTC Description`;
+- blank and formatted tail rows are skipped;
+- DTC codes are trimmed and normalized for search;
+- duplicate records in the same DTC/FTB/model/component scope are rejected;
+- import writes run inside one database transaction.
+
+Mapped workbook columns:
+
+- `ECU` -> `component`
+- `DTC1` -> `dtc_code`
+- `FTB1` -> `ftb_code`
+- `DTC Description` -> `fault_title` and `description`
+- `Failure Criteria (Test Result NOK)` -> `possible_causes`
+- `Repair Action` -> `recommended_actions`
+- `HV Shutdown` -> `severity`
+- `Gun Status Unavailable/Fault` -> `category`
+- cover sheet project/version -> `charger_model` and `source_version`
+
+Extra manufacturer fields, such as CAN messages and monitor data, are stored in `manufacturer_data`.
 
 ## Prerequisites
 

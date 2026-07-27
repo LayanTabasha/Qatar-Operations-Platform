@@ -15,11 +15,13 @@ const state = {
   users: [],
   currentSiteName: "",
   currentChargerId: "",
+  currentVisitId: "",
   currentSiteTab: "Overview",
   currentChargerTab: "Overview",
   backendLoading: false,
   backendError: "",
   sites: sites.map((name) => ({ name, location: "To Be Updated", status: "Pending Data", client: "Not Available Yet", notes: "", image: "", chargers: [] })),
+  archivedChargers: [],
   uploads: [],
   faults: [],
   visits: [],
@@ -31,7 +33,7 @@ const state = {
 const modalConfigs = {
   site: { title: "Site Details", fields: [["Site name", "text"], ["Location", "text"], ["Client / organization", "text"], ["Status", "select:Active,Archived"], ["Description", "textarea"], ["Notes", "textarea"], ["Upload site image", "file"]] },
   charger: { title: "Charger Details", fields: [["Charger name", "text"], ["Charger type", "select:AC,DC"], ["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Operator", "text"], ["Administrator", "text"], ["Manufacturer", "text"], ["Model", "text"], ["Serial number", "text"], ["Capacity", "text"], ["Installation date", "date"], ["Status", "select:Active,Maintenance,Faulted,Archived"], ["Notes", "textarea"], ["Upload charger image", "file"]] },
-  siteVisit: { title: "Add Site Visit", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Visit date", "date"], ["Visit status", "select:Scheduled,Completed,Cancelled,Follow-Up Required"], ["Time in", "time"], ["Time out", "time"], ["Visit type", "text"], ["Engineer name", "text"], ["Technician name", "text"], ["Purpose", "textarea"], ["Work completed", "textarea"], ["Findings", "textarea"], ["Notes", "textarea"], ["Site Visit Report upload", "file"]] },
+  siteVisit: { title: "Add Site Visit", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Visit date", "date"], ["Visit status", "select:Scheduled,Ongoing,Completed,Cancelled,Follow-Up Required"], ["Time in", "time"], ["Time out", "time"], ["Visit type", "text"], ["Engineer name", "text"], ["Technician name", "text"], ["Purpose", "textarea"], ["Work completed", "textarea"], ["Findings", "textarea"], ["Notes", "textarea"], ["Site Visit Report upload", "file"]] },
   visitReport: { title: "Upload Site Visit Report", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Visit date", "date"], ["Report title", "text"], ["File upload", "file"], ["Notes", "textarea"]] },
   fault: { title: "Report Fault", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Generated Fault ID", "fault-id"], ["Fault Code", "fault-code-select"], ["Fault details", "fault-code-details"], ["Fault status", "select:Open,In Progress,Resolved,Closed"], ["Date reported", "date"], ["Time reported", "time"], ["Description", "textarea"], ["Photo evidence", "image-file"], ["Comments", "textarea"]] },
   document: { title: "Upload Charger Document", fields: [["Related site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Document title", "text"], ["Document category", "select:Specification,Warranty,Installation,Commissioning,Electrical Drawing,Certificate,Manual,Asset Record,Inspection Certificate,Other"], ["Description", "textarea"], ["File upload", "file"]] },
@@ -146,6 +148,20 @@ function formatDateTime(value) {
   const parsed = parseDateValue(value);
   if (Number.isNaN(parsed.getTime())) return value || "Not Available Yet";
   return `${String(parsed.getDate()).padStart(2, "0")}/${String(parsed.getMonth() + 1).padStart(2, "0")}/${parsed.getFullYear()} at ${String(parsed.getHours()).padStart(2, "0")}:${String(parsed.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatMediumDate(value) {
+  if (!value || value === "Not Available Yet" || value === "To Be Updated") return value || "Not Available Yet";
+  const parsed = parseDateValue(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(parsed);
+}
+
+function formatMediumDateTime(value) {
+  if (!value || value === "Not Available Yet" || value === "To Be Updated") return value || "Not Available Yet";
+  const parsed = parseDateValue(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return `${formatMediumDate(value)} at ${String(parsed.getHours()).padStart(2, "0")}:${String(parsed.getMinutes()).padStart(2, "0")}`;
 }
 
 function parseDateValue(value) {
@@ -264,12 +280,19 @@ function categoryForUpload(file) {
 function normalizeFaultCatalogueRecord(record) {
   return {
     id: record.id || `fault-code-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    faultCode: record.faultCode || record.fault_code || "",
-    faultName: record.faultName || record.fault_name || "",
-    meaning: record.meaning || "",
+    faultCode: record.faultCode || record.fault_code || record.dtc_code || "",
+    ftbCode: record.ftbCode || record.ftb_code || "",
+    faultName: record.faultName || record.fault_name || record.fault_title || "",
+    meaning: record.meaning || record.description || "",
+    possibleCauses: record.possibleCauses || record.possible_causes || "",
     severity: record.severity || "Not Classified",
-    recommendedAction: record.recommendedAction || record.recommended_action || "",
-    active: record.active !== false,
+    category: record.category || "",
+    chargerModel: record.chargerModel || record.charger_model || "",
+    component: record.component || "",
+    sourceVersion: record.sourceVersion || record.source_version || "",
+    sourceSheet: record.sourceSheet || record.source_sheet || "",
+    recommendedAction: record.recommendedAction || record.recommended_action || record.recommended_actions || "",
+    active: record.active !== false && record.is_active !== false,
     createdAt: record.createdAt || record.created_at || new Date().toISOString(),
     updatedAt: record.updatedAt || record.updated_at || new Date().toISOString(),
   };
@@ -281,9 +304,10 @@ function normalizeVisitRecord(visit) {
     : state.uploads.filter((file) => file.siteVisitId === visit.id).map((file) => file.id);
   return {
     ...visit,
-    timeIn: visit.timeIn || "",
-    timeOut: visit.timeOut || "",
-    duration: visit.duration || calculateDurationFromTimes(visit.timeIn, visit.timeOut),
+    visitDate: visit.visitDate || visit.visit_date || visit.createdAt || visit.created_at || "",
+    timeIn: visit.timeIn || visit.time_in || "",
+    timeOut: visit.timeOut || visit.time_out || "",
+    duration: visit.duration || calculateDurationFromTimes(visit.timeIn || visit.time_in, visit.timeOut || visit.time_out),
     attachments,
     updatedAt: visit.updatedAt || visit.createdAt || new Date().toISOString(),
   };

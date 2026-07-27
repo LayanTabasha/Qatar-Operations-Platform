@@ -133,6 +133,18 @@ const ChargersApi = {
       body: { status },
     });
   },
+
+  archive(id) {
+    return apiRequest(`/chargers/${id}/archive`, { method: "PATCH" });
+  },
+
+  restore(id) {
+    return apiRequest(`/chargers/${id}/restore`, { method: "PATCH" });
+  },
+
+  deleteArchived(id) {
+    return apiRequest(`/chargers/${id}`, { method: "DELETE" });
+  },
 };
 
 const UsersApi = {
@@ -165,6 +177,63 @@ const UsersApi = {
     return apiRequest(`/users/${id}/reset-password`, {
       method: "POST",
       body: { password },
+    });
+  },
+};
+
+const SiteVisitsApi = {
+  list(params = {}) {
+    return apiRequest(`/site-visits${buildQueryString(params)}`, { method: "GET" });
+  },
+
+  create(siteVisit) {
+    return apiRequest("/site-visits", {
+      method: "POST",
+      body: siteVisit,
+    });
+  },
+
+  update(id, siteVisit) {
+    return apiRequest(`/site-visits/${id}`, {
+      method: "PATCH",
+      body: siteVisit,
+    });
+  },
+};
+
+const DtcApi = {
+  list(params = {}) {
+    return apiRequest(`/dtc${buildQueryString(params)}`, { method: "GET" });
+  },
+
+  create(record) {
+    return apiRequest("/dtc", {
+      method: "POST",
+      body: record,
+    });
+  },
+
+  update(id, record) {
+    return apiRequest(`/dtc/${id}`, {
+      method: "PATCH",
+      body: record,
+    });
+  },
+
+  updateStatus(id, isActive) {
+    return apiRequest(`/dtc/${id}/status`, {
+      method: "PATCH",
+      body: { is_active: isActive },
+    });
+  },
+
+  importWorkbook(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    return apiRequest("/dtc/import", {
+      method: "POST",
+      body: formData,
     });
   },
 };

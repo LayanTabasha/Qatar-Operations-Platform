@@ -73,6 +73,11 @@ function mapBackendCharger(charger) {
     lastSiteVisit: charger.last_site_visit,
     createdAt: charger.created_at,
     updatedAt: charger.updated_at,
+    previousStatus: statusLabel(charger.previous_status),
+    archivedAt: charger.archived_at,
+    archivedBy: charger.archived_by_name || "",
+    restoredAt: charger.restored_at,
+    restoredBy: charger.restored_by_name || "",
   };
 }
 
@@ -128,12 +133,18 @@ async function loadOperationalData() {
   buildSites();
 
   try {
-    const [sitesResponse, chargersResponse] = await Promise.all([
+    const [sitesResponse, chargersResponse, archivedChargersResponse, siteVisitsResponse, dtcResponse] = await Promise.all([
       SitesApi.list({ status: "active", limit: 100 }),
-      ChargersApi.list({ limit: 100 }),
+      ChargersApi.list({ status: "active", limit: 100 }),
+      ChargersApi.list({ status: "archived", limit: 100 }),
+      SiteVisitsApi.list({ limit: 100 }),
+      DtcApi.list({ status: "all", limit: 100 }),
     ]);
     const chargers = (chargersResponse.chargers || []).map(mapBackendCharger).sort(compareChargersForDisplay);
+    state.archivedChargers = (archivedChargersResponse.chargers || []).map(mapBackendCharger).sort(compareChargersForDisplay);
     state.sites = (sitesResponse.sites || []).map((site) => mapBackendSite(site, chargers));
+    state.visits = (siteVisitsResponse.site_visits || []).map(mapBackendSiteVisit);
+    state.faultCatalogue = (dtcResponse.dtc_records || []).map(normalizeFaultCatalogueRecord);
     state.counts.chargers = chargers.length || null;
     state.counts.faults = state.sites.reduce((total, site) => total + (Number(site.openFaultCount) || 0), 0) || null;
     state.backendLoading = false;
@@ -149,6 +160,53 @@ async function loadOperationalData() {
     renderCounts();
     return false;
   }
+}
+
+function mapBackendSiteVisit(visit) {
+  return {
+    id: visit.id,
+    siteId: visit.site_id,
+    siteName: visit.site_name,
+    chargerId: visit.charger_id || "",
+    chargerName: visit.charger_name || "",
+    visitDate: visit.visit_date,
+    status: siteVisitStatusLabel(visit.status || (visit.follow_up_required ? "follow_up_required" : "completed")),
+    backendStatus: visit.status || (visit.follow_up_required ? "follow_up_required" : "completed"),
+    timeIn: visit.time_in || "",
+    timeOut: visit.time_out || "",
+    duration: calculateVisitDuration(visit.time_in || "", visit.time_out || ""),
+    purpose: visit.purpose || "",
+    notes: visit.observations || "",
+    workCompleted: visit.actions_taken || "",
+    attachments: [],
+    createdBy: visit.visited_by || "",
+    recordedOn: visit.created_at || "",
+    recordedBy: visit.recorded_by_name || "",
+    lastModified: visit.updated_at || "",
+    lastModifiedBy: visit.last_modified_by_name || "",
+    createdAt: visit.created_at,
+    updatedAt: visit.updated_at,
+  };
+}
+
+function siteVisitStatusLabel(status) {
+  return {
+    scheduled: "Scheduled",
+    ongoing: "Ongoing",
+    completed: "Completed",
+    cancelled: "Cancelled",
+    follow_up_required: "Follow-Up Required",
+  }[status] || valueOrPlaceholder(status);
+}
+
+function backendSiteVisitStatus(status) {
+  return {
+    Scheduled: "scheduled",
+    Ongoing: "ongoing",
+    Completed: "completed",
+    Cancelled: "cancelled",
+    "Follow-Up Required": "follow_up_required",
+  }[status] || "completed";
 }
 
 function latestVisitForSite(siteName) {
@@ -217,17 +275,18 @@ function faultPhotosMarkup(fault) {
 
 function visitRecordRows() {
   const records = state.visits.filter((visit) => (!state.currentSiteName || visit.siteName === state.currentSiteName) && (!state.currentChargerId || visit.chargerId === state.currentChargerId));
-  if (!records.length) return `<tr><td colspan="9">No site visits entered yet.</td></tr>`;
+  if (!records.length) return `<tr><td colspan="10">No site visits entered yet.</td></tr>`;
   return records.map((visit) => `<tr>
-    <td>${formatDate(visit.visitDate)}</td>
+    <td>${formatMediumDate(visit.visitDate)}</td>
+    <td>${visit.timeIn ? visit.timeIn : "Not Available Yet"}</td>
+    <td>${visit.timeOut ? visit.timeOut : "Not Available Yet"}</td>
     <td>${valueOrPlaceholder(visit.siteName)}</td>
-    <td>${valueOrPlaceholder(visit.chargerName)}</td>
-    <td>${valueOrPlaceholder(visit.status)}</td>
-    <td>${valueOrPlaceholder(visit.timeIn)}</td>
-    <td>${valueOrPlaceholder(visit.timeOut)}</td>
-    <td>${valueOrPlaceholder(visit.duration)}</td>
+    <td>${valueOrPlaceholder(visit.createdBy)}</td>
     <td>${valueOrPlaceholder(visit.purpose)}</td>
-    <td>${visitAttachmentsMarkup(visit)}</td>
+    <td>${valueOrPlaceholder(visit.status)}</td>
+    <td>${formatMediumDate(visit.recordedOn)}</td>
+    <td>${valueOrPlaceholder(visit.recordedBy)}</td>
+    <td><div class="file-actions"><button class="secondary-button" data-visit-detail="${visit.id}" type="button">View</button>${canManageOperations() ? `<button class="secondary-button" data-modal="siteVisit" data-mode="edit" data-visit-id="${visit.id}" type="button">Edit</button>` : ""}</div></td>
   </tr>`).join("");
 }
 
@@ -237,6 +296,27 @@ function visitAttachmentsMarkup(visit) {
   return `<div class="attached-files">${files.map((file) => `<div class="attached-file"><span>${valueOrPlaceholder(file.name)}</span>${fileActionButtons(file, file.category === "Site Visit Report" ? "site visit report" : "site visit attachment")}</div>`).join("")}</div>`;
 }
 
+function archivedChargerRows(siteName) {
+  const archivedChargers = state.archivedChargers.filter((charger) => charger.siteName === siteName);
+  if (!archivedChargers.length) return `<tr><td colspan="8">No archived chargers for this site.</td></tr>`;
+  return archivedChargers.map((charger) => `<tr>
+    <td>${valueOrPlaceholder(charger.name)}</td>
+    <td>${valueOrPlaceholder(charger.code)}</td>
+    <td>${valueOrPlaceholder(charger.siteName)}</td>
+    <td>${valueOrPlaceholder(charger.type)}</td>
+    <td>${valueOrPlaceholder(charger.previousStatus)}</td>
+    <td>${formatMediumDate(charger.archivedAt)}</td>
+    <td>${valueOrPlaceholder(charger.archivedBy)}</td>
+    <td><div class="file-actions"><button class="secondary-button" data-charger-restore="${charger.id}" type="button">Restore</button>${isAdmin() ? `<button class="danger-button" data-charger-delete="${charger.id}" data-charger-name="${charger.name}" data-charger-code="${charger.code}" type="button">Permanently Delete</button>` : ""}</div></td>
+  </tr>`).join("");
+}
+
+function archivedChargersSection(siteName) {
+  const archivedCount = state.archivedChargers.filter((charger) => charger.siteName === siteName).length;
+  return `<div class="module-header"><div><h2>Archived Chargers</h2><p>Archived Chargers: ${archivedCount}</p></div></div>
+    <div class="table-wrap"><table><thead><tr><th>Charger Name</th><th>Code</th><th>Site</th><th>Type</th><th>Previous Status</th><th>Archived Date</th><th>Archived By</th><th>Actions</th></tr></thead><tbody>${archivedChargerRows(siteName)}</tbody></table></div>`;
+}
+
 function recordsModule(title, actions, columns, filters, note = "") {
   const uploadActions = actions.filter(([label]) => !/preview|download/i.test(label));
   const isFaults = title === "Faults";
@@ -244,7 +324,7 @@ function recordsModule(title, actions, columns, filters, note = "") {
   const headers = isFaults
     ? ["Fault ID", "Reported", "Site", "Charger", "Fault Code", "Fault Name", "Severity", "Status", "Fault Photos"]
     : isVisits
-      ? ["Date", "Site", "Charger", "Status", "Time in", "Time out", "Duration", "Purpose", "Attached report"]
+      ? ["Visit Date", "Time In", "Time Out", "Site", "Engineer", "Purpose", "Status", "Recorded On", "Recorded By", "Actions"]
       : title === "Weekly Reports"
         ? ["Report Title", "Week", "Charger", "File name", "Uploaded", "Uploaded by", "Actions"]
         : title === "Troubleshooting"
@@ -266,10 +346,11 @@ function siteTab(tab, site) {
   }
   if (tab === "Chargers") {
     const chargers = siteRecord?.chargers?.length ? siteRecord.chargers : [];
+    const archivedSection = archivedChargersSection(site);
     if (!chargers.length) {
-      return `<div class="empty-state"><h2>No chargers added yet</h2><p>Use Add Charger to create editable charger records for ${site}.</p><button class="primary-button" data-modal="charger" data-mode="create" type="button">Add Charger</button></div>`;
+      return `<div class="empty-state"><h2>No active chargers added yet</h2><p>Use Add Charger to create editable charger records for ${site}.</p><button class="primary-button" data-modal="charger" data-mode="create" type="button">Add Charger</button></div>${archivedSection}`;
     }
-    return `<div class="charger-grid">${chargers.map((charger) => `<article class="charger-card">${imageBlock(charger.image, valueOrPlaceholder(charger.name), "charger-photo")}<h2>${valueOrPlaceholder(charger.name)}</h2><div class="data-list">${placeholder("Charger Type", valueOrPlaceholder(charger.type))}${placeholder("Status", valueOrPlaceholder(charger.status))}${placeholder("Manufacturer", valueOrPlaceholder(charger.manufacturer))}${placeholder("Capacity", valueOrPlaceholder(charger.capacity))}${placeholder("Operator", valueOrPlaceholder(charger.operator))}${placeholder("Administrator", valueOrPlaceholder(charger.administrator))}${placeholder("Model", valueOrPlaceholder(charger.model))}${placeholder("Serial Number", valueOrPlaceholder(charger.serialNumber))}${placeholder("Installation Date", formatDate(charger.installationDate))}${placeholder("Faults")}${placeholder("Last Visit")}</div><button class="primary-button open-charger" data-site="${site}" data-charger="${charger.id}" type="button">Open Charger</button></article>`).join("")}</div>`;
+    return `<div class="charger-grid">${chargers.map((charger) => `<article class="charger-card">${imageBlock(charger.image, valueOrPlaceholder(charger.name), "charger-photo")}<h2>${valueOrPlaceholder(charger.name)}</h2><div class="data-list">${placeholder("Charger Type", valueOrPlaceholder(charger.type))}${placeholder("Status", valueOrPlaceholder(charger.status))}${placeholder("Manufacturer", valueOrPlaceholder(charger.manufacturer))}${placeholder("Capacity", valueOrPlaceholder(charger.capacity))}${placeholder("Operator", valueOrPlaceholder(charger.operator))}${placeholder("Administrator", valueOrPlaceholder(charger.administrator))}${placeholder("Model", valueOrPlaceholder(charger.model))}${placeholder("Serial Number", valueOrPlaceholder(charger.serialNumber))}${placeholder("Installation Date", formatDate(charger.installationDate))}${placeholder("Faults")}${placeholder("Last Visit")}</div><button class="primary-button open-charger" data-site="${site}" data-charger="${charger.id}" type="button">Open Charger</button></article>`).join("")}</div>${archivedSection}`;
   }
   if (tab === "Site Visits") return recordsModule("Site Visits", [["Add new site visit", "siteVisit"], ["Upload visit report", "visitReport"]], ["Date", "Time in", "Time out", "Site", "Charger", "Purpose", "Notes", "Report file"], ["Search visits", "Filter by charger", "Filter by date"]);
   if (tab === "Faults") return recordsModule("Faults", [["Report fault", "fault"]], ["Fault ID", "Date", "Site", "Charger", "Fault Code", "Fault Name", "Severity", "Status", "Photos"], ["Search by Fault ID", "Filter by charger", "Filter by fault code", "Filter by status"], "Fault records support photo evidence only. General documents and reports belong in their own modules.");
@@ -357,6 +438,32 @@ function removeCurrentCharger() {
     openSite(state.currentSiteName);
     const tabButton = Array.from(document.querySelectorAll("#site-profile .subtabs button")).find((button) => button.dataset.tab === siteTabBeforeDelete);
     if (tabButton) tabButton.click();
+  }
+}
+
+async function restoreArchivedCharger(chargerId) {
+  try {
+    await ChargersApi.restore(chargerId);
+    await loadOperationalData();
+    if (state.currentSiteName) openSite(state.currentSiteName, "Chargers");
+  } catch (err) {
+    alert(err.message || "The charger could not be restored.");
+  }
+}
+
+async function permanentlyDeleteArchivedCharger(chargerId, chargerName, chargerCode) {
+  if (!isAdmin()) {
+    alert("Only Administrator accounts can permanently delete archived chargers.");
+    return;
+  }
+  const confirmation = window.prompt(`Permanently delete this charger? This action cannot be undone.\n\nType ${chargerCode || chargerName} to confirm.`);
+  if (confirmation !== (chargerCode || chargerName)) return;
+  try {
+    await ChargersApi.deleteArchived(chargerId);
+    await loadOperationalData();
+    if (state.currentSiteName) openSite(state.currentSiteName, "Chargers");
+  } catch (err) {
+    alert(err.message || "The archived charger could not be permanently deleted.");
   }
 }
 

@@ -11,6 +11,9 @@ const chargersRepositoryMocks = vi.hoisted(() => ({
   listChargers: vi.fn(),
   findChargerById: vi.fn(),
   insertCharger: vi.fn(),
+  archiveChargerById: vi.fn(),
+  restoreChargerById: vi.fn(),
+  softDeleteArchivedChargerById: vi.fn(),
   updateChargerById: vi.fn(),
   updateChargerStatusById: vi.fn(),
 }));
@@ -57,6 +60,13 @@ const chargerSummary = {
   description: null,
   image_path: null,
   status: "active",
+  previous_status: null,
+  archived_at: null,
+  archived_by_name: null,
+  restored_at: null,
+  restored_by_name: null,
+  deleted_at: null,
+  deleted_by_name: null,
   open_fault_count: 0,
   last_site_visit: null,
   created_at: "2026-07-20T09:00:00.000Z",
@@ -92,6 +102,9 @@ beforeEach(() => {
   chargersRepositoryMocks.listChargers.mockResolvedValue([chargerSummary]);
   chargersRepositoryMocks.findChargerById.mockResolvedValue(chargerSummary);
   chargersRepositoryMocks.insertCharger.mockResolvedValue(chargerSummary);
+  chargersRepositoryMocks.archiveChargerById.mockResolvedValue({ ...chargerSummary, status: "archived", previous_status: "active" });
+  chargersRepositoryMocks.restoreChargerById.mockResolvedValue({ ...chargerSummary, status: "active" });
+  chargersRepositoryMocks.softDeleteArchivedChargerById.mockResolvedValue({ ...chargerSummary, status: "archived", deleted_at: "2026-07-27T09:00:00.000Z" });
   chargersRepositoryMocks.updateChargerById.mockResolvedValue(chargerSummary);
   chargersRepositoryMocks.updateChargerStatusById.mockResolvedValue(chargerSummary);
   sitesRepositoryMocks.findSiteById.mockResolvedValue(activeSite);
@@ -206,18 +219,17 @@ describe("chargers routes", () => {
     );
   });
 
-  it("excludes archived chargers by default", async () => {
+  it("lists active chargers by default", async () => {
     await request(app).get("/api/v1/chargers").set("Cookie", authCookie(viewerUser)).expect(200);
 
-    expect(chargersRepositoryMocks.listChargers).toHaveBeenCalledWith(
-      expect.not.objectContaining({ status: "archived" }),
-    );
+    expect(chargersRepositoryMocks.listChargers.mock.calls[0][0].status).toBeUndefined();
   });
 
-  it("repository excludes archived chargers when no status filter is provided", () => {
+  it("repository defaults to active non-deleted chargers when no status filter is provided", () => {
     const repository = fs.readFileSync(path.resolve("src/modules/chargers/chargers.repository.js"), "utf8");
 
-    expect(repository).toContain("chargers.status <> 'archived'");
+    expect(repository).toContain("chargers.deleted_at IS NULL");
+    expect(repository).toContain("chargers.status = 'active'");
   });
 
   it("accepts archived, maintenance, and faulted filters", async () => {
@@ -337,7 +349,38 @@ describe("chargers routes", () => {
     expect(response.body.error.code).toBe("ARCHIVED_SITE_CONFLICT");
   });
 
-  it("does not expose a DELETE route", async () => {
-    await request(app).delete(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(adminUser)).expect(404);
+  it("archives a charger with audit information", async () => {
+    await request(app).patch(`/api/v1/chargers/${chargerId}/archive`).set("Cookie", authCookie(operatorUser)).expect(200);
+
+    expect(chargersRepositoryMocks.archiveChargerById).toHaveBeenCalledWith(chargerId, operatorUser.id, "active");
+  });
+
+  it("restores an archived charger to active", async () => {
+    chargersRepositoryMocks.findChargerById.mockResolvedValue({ ...chargerSummary, status: "archived", previous_status: "active" });
+
+    await request(app).patch(`/api/v1/chargers/${chargerId}/restore`).set("Cookie", authCookie(operatorUser)).expect(200);
+
+    expect(chargersRepositoryMocks.restoreChargerById).toHaveBeenCalledWith(chargerId, operatorUser.id);
+  });
+
+  it("rejects permanent delete for operations staff and viewers", async () => {
+    chargersRepositoryMocks.findChargerById.mockResolvedValue({ ...chargerSummary, status: "archived" });
+
+    await request(app).delete(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(operatorUser)).expect(403);
+    await request(app).delete(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(viewerUser)).expect(403);
+  });
+
+  it("soft-deletes archived chargers for admins only", async () => {
+    chargersRepositoryMocks.findChargerById.mockResolvedValue({ ...chargerSummary, status: "archived" });
+
+    await request(app).delete(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(adminUser)).expect(200);
+
+    expect(chargersRepositoryMocks.softDeleteArchivedChargerById).toHaveBeenCalledWith(chargerId, adminUser.id);
+  });
+
+  it("does not permanently delete active chargers", async () => {
+    const response = await request(app).delete(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(adminUser)).expect(409);
+
+    expect(response.body.error.code).toBe("CHARGER_NOT_ARCHIVED");
   });
 });

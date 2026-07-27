@@ -1,5 +1,14 @@
 import { asyncHandler } from "../../utils/async-handler.js";
-import { createCharger, getCharger, getChargers, updateCharger, updateChargerStatus } from "./chargers.service.js";
+import {
+  archiveCharger,
+  createCharger,
+  deleteArchivedCharger,
+  getCharger,
+  getChargers,
+  restoreCharger,
+  updateCharger,
+  updateChargerStatus,
+} from "./chargers.service.js";
 import {
   chargerIdParamsSchema,
   createChargerSchema,
@@ -52,7 +61,48 @@ export const updateChargerRecord = asyncHandler(async (req, res) => {
 export const updateChargerStatusRecord = asyncHandler(async (req, res) => {
   const { id } = chargerIdParamsSchema.parse(req.params);
   const { status } = updateChargerStatusSchema.parse(req.body);
-  const charger = await updateChargerStatus(id, status);
+  let charger;
+
+  if (status === "archived") {
+    charger = await archiveCharger(id, req.user.id);
+  } else if (status === "active") {
+    const existingCharger = await getCharger(id);
+    charger = existingCharger.status === "archived"
+      ? await restoreCharger(id, req.user.id)
+      : await updateChargerStatus(id, status);
+  } else {
+    charger = await updateChargerStatus(id, status);
+  }
+
+  res.json({
+    success: true,
+    charger,
+  });
+});
+
+export const archiveChargerRecord = asyncHandler(async (req, res) => {
+  const { id } = chargerIdParamsSchema.parse(req.params);
+  const charger = await archiveCharger(id, req.user.id);
+
+  res.json({
+    success: true,
+    charger,
+  });
+});
+
+export const restoreChargerRecord = asyncHandler(async (req, res) => {
+  const { id } = chargerIdParamsSchema.parse(req.params);
+  const charger = await restoreCharger(id, req.user.id);
+
+  res.json({
+    success: true,
+    charger,
+  });
+});
+
+export const deleteChargerRecord = asyncHandler(async (req, res) => {
+  const { id } = chargerIdParamsSchema.parse(req.params);
+  const charger = await deleteArchivedCharger(id, req.user.id);
 
   res.json({
     success: true,

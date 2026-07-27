@@ -2,8 +2,11 @@ import { ApiError } from "../../utils/api-error.js";
 import { findSiteById } from "../sites/sites.repository.js";
 import {
   findChargerById,
+  archiveChargerById,
   insertCharger,
   listChargers,
+  restoreChargerById,
+  softDeleteArchivedChargerById,
   updateChargerById,
   updateChargerStatusById,
 } from "./chargers.repository.js";
@@ -83,6 +86,51 @@ export async function updateChargerStatus(id, status) {
   }
 
   const charger = await updateChargerStatusById(id, status);
+
+  if (!charger) {
+    throw new ApiError(404, "CHARGER_NOT_FOUND", "Charger not found");
+  }
+
+  return charger;
+}
+
+export async function archiveCharger(id, currentUserId) {
+  const existingCharger = await getCharger(id);
+  const previousStatus = existingCharger.status === "archived" ? existingCharger.previous_status || "active" : existingCharger.status;
+  const charger = await archiveChargerById(id, currentUserId, previousStatus);
+
+  if (!charger) {
+    throw new ApiError(404, "CHARGER_NOT_FOUND", "Charger not found");
+  }
+
+  return charger;
+}
+
+export async function restoreCharger(id, currentUserId) {
+  const existingCharger = await getCharger(id);
+
+  if (existingCharger.status !== "archived") {
+    throw new ApiError(409, "CHARGER_NOT_ARCHIVED", "Only archived chargers can be restored");
+  }
+
+  await ensureWritableParentSite(existingCharger.site_id);
+  const charger = await restoreChargerById(id, currentUserId);
+
+  if (!charger) {
+    throw new ApiError(404, "CHARGER_NOT_FOUND", "Charger not found");
+  }
+
+  return charger;
+}
+
+export async function deleteArchivedCharger(id, currentUserId) {
+  const existingCharger = await getCharger(id);
+
+  if (existingCharger.status !== "archived") {
+    throw new ApiError(409, "CHARGER_NOT_ARCHIVED", "Only archived chargers can be permanently deleted");
+  }
+
+  const charger = await softDeleteArchivedChargerById(id, currentUserId);
 
   if (!charger) {
     throw new ApiError(404, "CHARGER_NOT_FOUND", "Charger not found");

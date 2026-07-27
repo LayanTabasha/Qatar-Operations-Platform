@@ -25,6 +25,8 @@ const siteSummarySelect = `
   LEFT JOIN (
     SELECT site_id, COUNT(*)::integer AS charger_count
     FROM chargers
+    WHERE status = 'active'
+      AND deleted_at IS NULL
     GROUP BY site_id
   ) charger_counts ON charger_counts.site_id = sites.id
   LEFT JOIN (

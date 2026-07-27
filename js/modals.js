@@ -30,6 +30,8 @@ function openModal(type, mode = "edit") {
   form.dataset.mode = mode;
   form.dataset.site = state.currentSiteName || "";
   form.dataset.charger = state.currentChargerId || "";
+  form.dataset.dtcId = "";
+  form.dataset.visit = state.currentVisitId || "";
   const deleteNote = type === "deleteCharger" ? `<p class="modal-note">This archives the current charger. Type REMOVE to confirm.</p>` : "";
   const saveLabel = type === "deleteCharger" ? "Archive Charger" : "Save";
   const saveClass = type === "deleteCharger" ? "danger-button" : "primary-button";
@@ -49,10 +51,10 @@ function fieldMarkup(label, kind, required = false) {
   if (kind === "fault-code-select" || kind === "fault-code-select-optional") {
     const activeCodes = state.faultCatalogue.filter((item) => item.active);
     const requiredCode = kind === "fault-code-select" ? requiredAttr : "";
-    return `<label><span>${label}</span><select id="${id}"${requiredCode}><option value="">${activeCodes.length ? "Select a fault code" : "No official fault codes configured"}</option>${activeCodes.map((item) => `<option value="${item.id}">${item.faultCode} - ${item.faultName}</option>`).join("")}</select></label>`;
+    return `<label><span>${label}</span><select id="${id}"${requiredCode}><option value="">Unknown / No DTC Code</option>${activeCodes.map((item) => `<option value="${item.id}">${item.faultCode}${item.ftbCode ? `/${item.ftbCode}` : ""} - ${item.faultName}</option>`).join("")}</select></label>`;
   }
   if (kind === "fault-code-details") {
-    return `<div class="full fault-code-details" id="fault-code-details"><span>Fault Name</span><strong>Not selected</strong><span>Meaning</span><p>Select an official fault code to show its meaning.</p><span>Severity</span><strong>Not selected</strong><span>Recommended Action</span><p>Not Available Yet</p></div>`;
+    return `<div class="full fault-code-details" id="fault-code-details"><span>Fault Title</span><strong>Unknown / No DTC Code</strong><span>Catalogue Description</span><p>No catalogue record selected.</p><span>Possible Causes</span><p>Not Available Yet</p><span>Recommended Action</span><p>Not Available Yet</p></div>`;
   }
   if (kind.startsWith("select:")) {
     const siteLabels = ["Site", "Related site"];
@@ -91,8 +93,8 @@ function renderFaultCodeDetails(selectId = "fault-code") {
   if (!panel) return;
   const item = selectedFaultCatalogueItem(selectId);
   panel.innerHTML = item
-    ? `<span>Fault Name</span><strong>${valueOrPlaceholder(item.faultName)}</strong><span>Meaning</span><p>${valueOrPlaceholder(item.meaning)}</p><span>Severity</span><strong>${valueOrPlaceholder(item.severity)}</strong><span>Recommended Action</span><p>${valueOrPlaceholder(item.recommendedAction)}</p>`
-    : `<span>Fault Name</span><strong>Not selected</strong><span>Meaning</span><p>Select an official fault code to show its meaning.</p><span>Severity</span><strong>Not selected</strong><span>Recommended Action</span><p>Not Available Yet</p>`;
+    ? `<span>Fault Title</span><strong>${valueOrPlaceholder(item.faultName)}</strong><span>Catalogue Description</span><p>${valueOrPlaceholder(item.meaning)}</p><span>Possible Causes</span><p>${valueOrPlaceholder(item.possibleCauses)}</p><span>Recommended Action</span><p>${valueOrPlaceholder(item.recommendedAction)}</p>`
+    : `<span>Fault Title</span><strong>Unknown / No DTC Code</strong><span>Catalogue Description</span><p>No catalogue record selected.</p><span>Possible Causes</span><p>Not Available Yet</p><span>Recommended Action</span><p>Not Available Yet</p>`;
 }
 
 function chargerSelectMarkup(label, id, requiredAttr = "") {
@@ -167,6 +169,21 @@ function prefillModal(type) {
     setFieldValue("site", state.currentSiteName);
     setFieldValue("related-site", state.currentSiteName);
     setFieldValue("charger", state.currentChargerId);
+  }
+  if (type === "siteVisit") {
+    const visit = state.visits.find((item) => item.id === state.currentVisitId);
+    if (visit) {
+      setFieldValue("site", visit.siteName);
+      setFieldValue("charger", visit.chargerId);
+      setFieldValue("visit-date", visit.visitDate);
+      setFieldValue("visit-status", visit.status);
+      setFieldValue("time-in", visit.timeIn);
+      setFieldValue("time-out", visit.timeOut);
+      setFieldValue("purpose", visit.purpose);
+      setFieldValue("work-completed", visit.workCompleted);
+      setFieldValue("findings", visit.notes);
+      setFieldValue("notes", visit.notes);
+    }
   }
 }
 
@@ -261,6 +278,61 @@ function removeSiteImageSelection() {
   const input = document.getElementById("upload-site-image");
   if (input) input.value = "";
   renderSiteImagePreview(null);
+}
+
+function safeDetailValue(value) {
+  if (typeof formatSettingValue === "function") return formatSettingValue(value);
+  return String(valueOrPlaceholder(value))
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function detailRow(label, value) {
+  return `<div class="data-row"><span>${label}</span><strong>${safeDetailValue(value)}</strong></div>`;
+}
+
+function openSiteVisitDetail(visitId) {
+  const visit = state.visits.find((item) => item.id === visitId);
+  if (!visit) return;
+  const form = document.getElementById("modal-form");
+  document.querySelector(".modal")?.classList.remove("preview-modal");
+  document.getElementById("modal-title").textContent = "Site Visit Details";
+  document.getElementById("modal-eyebrow").textContent = "Read-only Record";
+  form.dataset.type = "siteVisitDetail";
+  form.innerHTML = `
+    <div class="settings-section">
+      <div>
+        <h2>Visit Information</h2>
+        <p>${safeDetailValue(visit.siteName)}${visit.chargerName ? ` - ${safeDetailValue(visit.chargerName)}` : ""}</p>
+      </div>
+      <div class="data-list">
+        ${detailRow("Visit Date", formatMediumDate(visit.visitDate))}
+        ${detailRow("Time In", visit.timeIn || "Not Available Yet")}
+        ${detailRow("Time Out", visit.timeOut || "Not Available Yet")}
+        ${detailRow("Site", visit.siteName)}
+        ${detailRow("Engineer / Technician", visit.createdBy)}
+        ${detailRow("Purpose", visit.purpose)}
+        ${detailRow("Status", visit.status)}
+        ${detailRow("Visit Notes", visit.notes)}
+        ${detailRow("Work Completed", visit.workCompleted)}
+      </div>
+    </div>
+    <div class="settings-section">
+      <div><h2>Audit Information</h2></div>
+      <div class="data-list">
+        ${detailRow("Recorded On", formatMediumDateTime(visit.recordedOn))}
+        ${detailRow("Recorded By", visit.recordedBy)}
+        ${detailRow("Last Modified", formatMediumDateTime(visit.lastModified))}
+        ${detailRow("Last Modified By", visit.lastModifiedBy)}
+      </div>
+    </div>
+    <div class="modal-actions"><button class="secondary-button" type="button" id="cancel-modal">Close</button></div>
+  `;
+  document.getElementById("modal-backdrop").classList.remove("hidden");
+  resetModalScroll();
 }
 
 function readFileAsDataUrl(fileInputId) {
@@ -427,8 +499,19 @@ async function handleModalSubmit(event) {
 function validateVisitTimes() {
   const error = document.getElementById("modal-error");
   if (error) error.textContent = "";
+  const visitDate = document.getElementById("visit-date")?.value || "";
   const timeIn = document.getElementById("time-in")?.value || "";
   const timeOut = document.getElementById("time-out")?.value || "";
+  const engineer = document.getElementById("engineer-name")?.value.trim() || document.getElementById("technician-name")?.value.trim() || "";
+  const status = document.getElementById("visit-status")?.value || "";
+  if (!visitDate || !timeIn || !engineer) {
+    if (error) error.textContent = "Visit Date, Time In, and Engineer / Technician are required.";
+    return false;
+  }
+  if (!timeOut && status !== "Ongoing") {
+    if (error) error.textContent = "Time Out is required unless the visit status is Ongoing.";
+    return false;
+  }
   if (timeIn && timeOut && timeOut < timeIn) {
     if (error) error.textContent = "Time Out cannot be earlier than Time In.";
     return false;
@@ -565,7 +648,7 @@ async function simulateUpdate(type, mode = "edit") {
     const chargerId = charger?.id || state.currentChargerId;
     if (!chargerId) throw new Error("No charger is selected.");
     try {
-      await ChargersApi.updateStatus(chargerId, "archived");
+      await ChargersApi.archive(chargerId);
       state.currentChargerId = "";
       await loadOperationalData();
       document.getElementById("charger-profile").classList.add("hidden");
@@ -606,22 +689,25 @@ async function simulateUpdate(type, mode = "edit") {
   }
   if (type === "faultCode") {
     if (!isAdmin()) return;
+    const dtcId = form.dataset.dtcId || "";
     const faultCode = document.getElementById("fault-code")?.value.trim();
     const faultName = document.getElementById("fault-name")?.value.trim();
-    if (!faultCode || !faultName || state.faultCatalogue.some((item) => item.faultCode.toLowerCase() === faultCode.toLowerCase())) {
+    if (!faultCode || !faultName) {
       throw new Error("Enter a unique fault code and fault name.");
     }
-    const entry = normalizeFaultCatalogueRecord({
-      faultCode,
-      faultName,
-      meaning: document.getElementById("meaning")?.value.trim() || "",
+    const payload = {
+      dtc_code: faultCode,
+      fault_title: faultName,
+      description: document.getElementById("meaning")?.value.trim() || "",
       severity: document.getElementById("severity")?.value || "Not Classified",
-      recommendedAction: document.getElementById("recommended-action")?.value.trim() || "",
-      active: document.getElementById("status")?.value !== "Disabled",
-    });
-    state.faultCatalogue.push(entry);
+      recommended_actions: document.getElementById("recommended-action")?.value.trim() || "",
+      is_active: document.getElementById("status")?.value !== "Disabled",
+    };
+    const response = dtcId ? await DtcApi.update(dtcId, payload) : await DtcApi.create(payload);
+    const entry = normalizeFaultCatalogueRecord(response.dtc_record);
+    state.faultCatalogue = [entry, ...state.faultCatalogue.filter((item) => item.id !== entry.id)];
     renderSettings("Fault Catalogue");
-    activity = { actionType: "fault_catalogue_added", entityType: "fault_catalogue", entityId: entry.id, description: `${entry.faultCode} added to Fault Catalogue` };
+    activity = { actionType: dtcId ? "fault_catalogue_updated" : "fault_catalogue_added", entityType: "fault_catalogue", entityId: entry.id, description: `${entry.faultCode} ${dtcId ? "updated in" : "added to"} Fault Catalogue` };
   }
   if (type === "fault") {
     const { siteName, chargerId, chargerName } = getSelectedCharger();
@@ -636,6 +722,8 @@ async function simulateUpdate(type, mode = "edit") {
       faultCode: catalogueItem?.faultCode || "",
       faultName: catalogueItem?.faultName || "Official fault code not selected",
       faultDescription: catalogueItem?.meaning || "",
+      possibleCauses: catalogueItem?.possibleCauses || "",
+      category: catalogueItem?.category || "",
       severity: catalogueItem?.severity || "Not Classified",
       recommendedAction: catalogueItem?.recommendedAction || "",
       siteName,
@@ -663,38 +751,43 @@ async function simulateUpdate(type, mode = "edit") {
   }
   if (type === "siteVisit") {
     const { siteName, chargerId, chargerName } = getSelectedCharger();
-    const visitDate = document.getElementById("date")?.value || new Date().toISOString().slice(0, 10);
+    const site = getSite(siteName);
+    const visitDate = document.getElementById("visit-date")?.value || new Date().toISOString().slice(0, 10);
     const timeIn = document.getElementById("time-in")?.value || "";
     const timeOut = document.getElementById("time-out")?.value || "";
-    const visit = {
-      id: `visit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      siteName,
-      chargerId,
-      chargerName,
-      visitDate,
-      status: document.getElementById("visit-status")?.value || "Scheduled",
-      timeIn,
-      timeOut,
-      duration: calculateVisitDuration(timeIn, timeOut),
-      purpose: document.getElementById("purpose")?.value.trim() || "",
-      notes: document.getElementById("notes")?.value.trim() || "",
-      attachments: [],
-      createdBy: state.currentUser,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    if (!site?.id) throw new Error("Choose a valid site before saving this visit.");
+    const payload = {
+      site_id: site.id,
+      charger_id: chargerId || null,
+      visit_date: visitDate,
+      time_in: timeIn || null,
+      time_out: timeOut || null,
+      visited_by: document.getElementById("engineer-name")?.value.trim() || document.getElementById("technician-name")?.value.trim() || state.currentUser || "Operations Staff",
+      purpose: document.getElementById("purpose")?.value.trim() || "Site visit",
+      status: backendSiteVisitStatus(document.getElementById("visit-status")?.value || "Completed"),
+      observations: document.getElementById("findings")?.value.trim() || document.getElementById("notes")?.value.trim() || null,
+      actions_taken: document.getElementById("work-completed")?.value.trim() || null,
     };
-    state.visits.unshift(visit);
+    const existing = mode !== "create" ? state.visits.find((item) => item.id === state.currentVisitId) : null;
+    const response = existing?.id
+      ? await SiteVisitsApi.update(existing.id, payload)
+      : await SiteVisitsApi.create(payload);
+    const savedVisit = mapBackendSiteVisit(response.site_visit);
+    const existingIndex = state.visits.findIndex((item) => item.id === savedVisit.id);
+    if (existingIndex >= 0) state.visits.splice(existingIndex, 1, savedVisit);
+    else state.visits.unshift(savedVisit);
+    state.currentVisitId = savedVisit.id;
     activity = {
-      actionType: "site_visit_added",
+      actionType: existing ? "site_visit_updated" : "site_visit_added",
       entityType: "site_visit",
-      entityId: visit.id,
-      description: `${visit.status} site visit added for ${siteName}`,
+      entityId: savedVisit.id,
+      description: `${savedVisit.status} site visit ${existing ? "updated" : "added"} for ${siteName}`,
       siteName,
       chargerName,
     };
   }
   if (["siteVisit", "visitReport", "fault", "document", "weeklyReport", "guide"].includes(type)) {
-    const currentVisit = type === "siteVisit" ? state.visits[0] : null;
+    const currentVisit = type === "siteVisit" ? state.visits.find((visit) => visit.id === state.currentVisitId) || state.visits[0] : null;
     const currentFault = type === "fault" ? state.faults[0] : null;
     const weeklyReportId = type === "weeklyReport" ? `weekly-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` : "";
     const troubleshootingGuideId = type === "guide" ? `guide-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` : "";

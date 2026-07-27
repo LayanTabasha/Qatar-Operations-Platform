@@ -1,0 +1,46 @@
+import fs from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+
+const repoRoot = path.resolve(process.cwd(), "..");
+
+function readRootFile(relativePath) {
+  return fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
+}
+
+describe("frontend site visit workflow", () => {
+  it("reads the actual Visit Date, Time In, and Time Out form fields", () => {
+    const modalsSource = readRootFile("js/modals.js");
+    const saveWorkflowStart = modalsSource.indexOf("async function simulateUpdate");
+    const siteVisitStart = modalsSource.indexOf('if (type === "siteVisit")', saveWorkflowStart);
+    const uploadStart = modalsSource.indexOf('if (["siteVisit"', siteVisitStart);
+    const siteVisitSaveBlock = modalsSource.slice(siteVisitStart, uploadStart);
+
+    expect(siteVisitSaveBlock).toContain('document.getElementById("visit-date")?.value');
+    expect(siteVisitSaveBlock).toContain('document.getElementById("time-in")?.value');
+    expect(siteVisitSaveBlock).toContain('document.getElementById("time-out")?.value');
+    expect(siteVisitSaveBlock).not.toContain('document.getElementById("date")?.value');
+  });
+
+  it("sends visit_date, time_in, and time_out to the Site Visits API", () => {
+    const modalsSource = readRootFile("js/modals.js");
+
+    expect(modalsSource).toContain("visit_date: visitDate");
+    expect(modalsSource).toContain("time_in: timeIn || null");
+    expect(modalsSource).toContain("time_out: timeOut || null");
+    expect(modalsSource).toContain("status: backendSiteVisitStatus");
+    expect(modalsSource).toContain("await SiteVisitsApi.create(payload)");
+    expect(modalsSource).toContain("await SiteVisitsApi.update(existing.id, payload)");
+  });
+
+  it("renders visitDate, timeIn, and timeOut from persisted records", () => {
+    const sitesPageSource = readRootFile("js/sites-page.js");
+
+    expect(sitesPageSource).toContain("visitDate: visit.visit_date");
+    expect(sitesPageSource).toContain("timeIn: visit.time_in || \"\"");
+    expect(sitesPageSource).toContain("timeOut: visit.time_out || \"\"");
+    expect(sitesPageSource).toContain("recordedOn: visit.created_at");
+    expect(sitesPageSource).toContain("recordedBy: visit.recorded_by_name");
+    expect(sitesPageSource).toContain("formatMediumDate(visit.visitDate)");
+  });
+});

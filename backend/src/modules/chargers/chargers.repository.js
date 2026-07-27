@@ -24,12 +24,22 @@ const chargerSummarySelect = `
     chargers.description,
     chargers.image_path,
     chargers.status,
+    chargers.previous_status,
+    chargers.archived_at,
+    archived_by_user.full_name AS archived_by_name,
+    chargers.restored_at,
+    restored_by_user.full_name AS restored_by_name,
+    chargers.deleted_at,
+    deleted_by_user.full_name AS deleted_by_name,
     COALESCE(fault_counts.open_fault_count, 0)::integer AS open_fault_count,
     visit_counts.last_site_visit,
     chargers.created_at,
     chargers.updated_at
   FROM chargers
   JOIN sites ON sites.id = chargers.site_id
+  LEFT JOIN users archived_by_user ON archived_by_user.id = chargers.archived_by
+  LEFT JOIN users restored_by_user ON restored_by_user.id = chargers.restored_by
+  LEFT JOIN users deleted_by_user ON deleted_by_user.id = chargers.deleted_by
   LEFT JOIN (
     SELECT charger_id, COUNT(*)::integer AS open_fault_count
     FROM faults
@@ -46,7 +56,7 @@ const chargerSummarySelect = `
 
 export async function listChargers({ site_id, status, type, search, sort, order, limit }) {
   const values = [];
-  const filters = [];
+  const filters = ["chargers.deleted_at IS NULL"];
 
   if (site_id) {
     values.push(site_id);
@@ -57,7 +67,7 @@ export async function listChargers({ site_id, status, type, search, sort, order,
     values.push(status);
     filters.push(`chargers.status = $${values.length}`);
   } else {
-    filters.push("chargers.status <> 'archived'");
+    filters.push("chargers.status = 'active'");
   }
 
   if (type) {
@@ -100,6 +110,21 @@ export async function findChargerById(id) {
     `
       ${chargerSummarySelect}
       WHERE chargers.id = $1
+        AND chargers.deleted_at IS NULL
+      LIMIT 1
+    `,
+    [id],
+  );
+
+  return result.rows[0] || null;
+}
+
+export async function findDeletedChargerById(id) {
+  const result = await query(
+    `
+      ${chargerSummarySelect}
+      WHERE chargers.id = $1
+        AND chargers.deleted_at IS NOT NULL
       LIMIT 1
     `,
     [id],
@@ -183,4 +208,57 @@ export async function updateChargerStatusById(id, status) {
   }
 
   return findChargerById(result.rows[0].id);
+}
+
+export async function archiveChargerById(id, userId, previousStatus) {
+  const result = await query(
+    `
+      UPDATE chargers
+      SET status = 'archived',
+          previous_status = $2,
+          archived_at = now(),
+          archived_by = $3
+      WHERE id = $1
+        AND deleted_at IS NULL
+      RETURNING id
+    `,
+    [id, previousStatus, userId],
+  );
+
+  return result.rows[0] ? findChargerById(result.rows[0].id) : null;
+}
+
+export async function restoreChargerById(id, userId) {
+  const result = await query(
+    `
+      UPDATE chargers
+      SET status = 'active',
+          restored_at = now(),
+          restored_by = $2
+      WHERE id = $1
+        AND status = 'archived'
+        AND deleted_at IS NULL
+      RETURNING id
+    `,
+    [id, userId],
+  );
+
+  return result.rows[0] ? findChargerById(result.rows[0].id) : null;
+}
+
+export async function softDeleteArchivedChargerById(id, userId) {
+  const result = await query(
+    `
+      UPDATE chargers
+      SET deleted_at = now(),
+          deleted_by = $2
+      WHERE id = $1
+        AND status = 'archived'
+        AND deleted_at IS NULL
+      RETURNING id
+    `,
+    [id, userId],
+  );
+
+  return result.rows[0] ? findDeletedChargerById(result.rows[0].id) : null;
 }

@@ -252,9 +252,73 @@ async function resetManagedUserPassword(userId) {
 
 function renderFaultCatalogueTable() {
   const rows = state.faultCatalogue.length
-    ? state.faultCatalogue.map((item) => `<tr><td>${formatSettingValue(item.faultCode)}</td><td>${formatSettingValue(item.faultName)}</td><td>${formatSettingValue(item.meaning)}</td><td>${formatSettingValue(item.severity)}</td><td>${formatSettingValue(item.recommendedAction)}</td><td>${item.active ? "Active" : "Disabled"}</td></tr>`).join("")
-    : `<tr><td colspan="6">No official company fault codes have been imported or added yet.</td></tr>`;
-  return `<div class="settings-section"><div class="panel-head"><div><h2>Fault Catalogue</h2><p>Administrator-managed official fault codes. Operations users can select these codes but cannot edit meanings.</p></div><button class="primary-button" data-modal="faultCode" type="button">Add Fault Code</button></div><div class="toolbar"><input placeholder="Search fault codes" disabled /><button class="secondary-button" type="button" disabled>Import Company List</button></div><div class="table-wrap"><table><thead><tr><th>Fault Code</th><th>Fault Name</th><th>Meaning</th><th>Severity</th><th>Recommended Action</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    ? state.faultCatalogue.map((item) => `<tr><td>${formatSettingValue(item.faultCode)}${item.ftbCode ? ` / ${formatSettingValue(item.ftbCode)}` : ""}</td><td>${formatSettingValue(item.faultName)}</td><td>${formatSettingValue(item.category)}</td><td>${formatSettingValue(item.severity)}</td><td>${formatSettingValue(item.chargerModel)}</td><td>${formatSettingValue(item.sourceVersion)}</td><td>${item.active ? "Active" : "Inactive"}</td><td>${isAdmin() ? `<div class="file-actions"><button class="file-icon-button" data-dtc-edit="${item.id}" data-tooltip="Edit" type="button">Edit</button><button class="${item.active ? "danger-button" : "secondary-button"}" data-dtc-status="${item.id}" data-active="${item.active ? "false" : "true"}" type="button">${item.active ? "Deactivate" : "Activate"}</button></div>` : ""}</td></tr>`).join("")
+    : `<tr><td colspan="8">No official company fault codes have been imported or added yet.</td></tr>`;
+  const adminTools = isAdmin()
+    ? `<button class="primary-button" data-modal="faultCode" type="button">Add DTC Record</button>`
+    : "";
+  const importTools = isAdmin()
+    ? `<label class="secondary-button dtc-import-button"><span>Import Excel Catalogue</span><input id="dtc-import-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden /></label>`
+    : "";
+  return `<div class="settings-section"><div class="panel-head"><div><h2>DTC Catalogue</h2><p>Structured manufacturer DTC records imported into the backend database for fault identification.</p></div>${adminTools}</div><div class="toolbar"><input id="dtc-search" placeholder="Search DTC code or keyword" /><button class="secondary-button" id="dtc-search-button" type="button">Search</button>${importTools}</div><p class="settings-note" id="dtc-catalogue-message" aria-live="polite"></p><div class="table-wrap"><table><thead><tr><th>DTC / FTB</th><th>Fault Title</th><th>Category</th><th>Severity</th><th>Charger Model</th><th>Source Version</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+
+async function loadDtcCatalogue(params = {}) {
+  const message = document.getElementById("dtc-catalogue-message");
+  if (message) message.textContent = "Loading DTC catalogue...";
+  try {
+    const response = await DtcApi.list({ status: "all", limit: 100, ...params });
+    state.faultCatalogue = (response.dtc_records || []).map(normalizeFaultCatalogueRecord);
+    if (document.querySelector("#settings-menu .active")?.dataset.setting === "Fault Catalogue") {
+      document.getElementById("settings-panel").innerHTML = renderAdminPanel("Fault Catalogue");
+      const nextMessage = document.getElementById("dtc-catalogue-message");
+      if (nextMessage) nextMessage.textContent = `${state.faultCatalogue.length} DTC records loaded.`;
+    }
+  } catch (err) {
+    if (message) message.textContent = err.message || "Could not load DTC catalogue.";
+  }
+}
+
+async function searchDtcCatalogue() {
+  const query = document.getElementById("dtc-search")?.value.trim() || "";
+  await loadDtcCatalogue(query ? { query } : {});
+}
+
+async function importDtcCatalogue(file) {
+  const message = document.getElementById("dtc-catalogue-message");
+  if (!file) return;
+  if (!/\.xlsx$/i.test(file.name)) {
+    if (message) message.textContent = "Upload a valid .xlsx DTC catalogue file.";
+    return;
+  }
+  if (message) message.textContent = "Importing DTC catalogue...";
+  try {
+    const response = await DtcApi.importWorkbook(file);
+    const summary = response.import_summary || {};
+    await loadDtcCatalogue();
+    const nextMessage = document.getElementById("dtc-catalogue-message");
+    if (nextMessage) nextMessage.textContent = `Import complete. New: ${summary.new_records || 0}. Updated: ${summary.updated_records || 0}. Skipped: ${summary.skipped_records || 0}.`;
+  } catch (err) {
+    if (message) message.textContent = err.message || "DTC import failed.";
+  }
+}
+
+function editDtcRecord(recordId) {
+  const record = state.faultCatalogue.find((item) => item.id === recordId);
+  if (!record) return;
+  openModal("faultCode", "edit");
+  document.getElementById("modal-form").dataset.dtcId = record.id;
+  document.getElementById("fault-code").value = record.faultCode;
+  document.getElementById("fault-name").value = record.faultName;
+  document.getElementById("meaning").value = record.meaning;
+  document.getElementById("severity").value = record.severity;
+  document.getElementById("recommended-action").value = record.recommendedAction;
+  document.getElementById("status").value = record.active ? "Active" : "Disabled";
+}
+
+async function changeDtcStatus(recordId, isActive) {
+  await DtcApi.updateStatus(recordId, isActive);
+  await loadDtcCatalogue();
 }
 
 function renderAdminPanel(selected) {
@@ -296,4 +360,5 @@ function renderSettings(selected = "Profile") {
 
   panel.innerHTML = content[selected] || renderAdminPanel(selected);
   if (selected === "User Management" && isAdmin()) loadManagedUsers();
+  if (selected === "Fault Catalogue") loadDtcCatalogue();
 }

@@ -64,6 +64,41 @@ describe("database schema files", () => {
     expect(sqlFilesIn(seedsDir)).toEqual(["001_roles.sql", "002_sample_sites.sql", "003_sample_chargers.sql"]);
   });
 
+  it("renames site visit time columns to the API field names", () => {
+    const migration = fs.readFileSync(path.join(migrationsDir, "012_rename_site_visit_time_columns.sql"), "utf8").toLowerCase();
+
+    expect(migration).toContain("rename column check_in_time to time_in");
+    expect(migration).toContain("rename column check_out_time to time_out");
+  });
+
+  it("adds production Site Visit status and last-modified audit fields", () => {
+    const migration = fs.readFileSync(path.join(migrationsDir, "013_add_site_visit_status_and_update_audit.sql"), "utf8").toLowerCase();
+
+    expect(migration).toContain("add column status");
+    expect(migration).toContain("add column updated_by");
+    expect(migration).toContain("site_visits_status_check");
+  });
+
+  it("adds charger lifecycle audit fields for archive restore and soft delete", () => {
+    const migration = fs.readFileSync(path.join(migrationsDir, "014_add_charger_lifecycle_audit.sql"), "utf8").toLowerCase();
+
+    ["archived_at", "archived_by", "restored_at", "restored_by", "deleted_at", "deleted_by", "previous_status"].forEach((column) => {
+      expect(migration).toContain(column);
+    });
+  });
+
+  it("creates the DTC fault catalogue and links faults to catalogue records", () => {
+    const migration = fs.readFileSync(path.join(migrationsDir, "015_create_fault_catalogue.sql"), "utf8").toLowerCase();
+
+    expect(migration).toContain("create table fault_catalogue");
+    expect(migration).toContain("dtc_code_normalized");
+    expect(migration).toContain("fault_catalogue_unique_scope");
+    expect(migration).toContain("alter table faults");
+    expect(migration).toContain("add column fault_catalogue_id");
+    expect(migration).toContain("catalogue_snapshot");
+    expect(migration).toContain("idx_fault_catalogue_dtc_code");
+  });
+
   it("has the simplified role seed", () => {
     const rolesSeed = fs.readFileSync(path.join(seedsDir, "001_roles.sql"), "utf8").toLowerCase();
 
