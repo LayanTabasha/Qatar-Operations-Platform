@@ -1,4 +1,7 @@
 import request from "supertest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const authRepositoryMocks = vi.hoisted(() => ({
@@ -10,6 +13,7 @@ const sitesRepositoryMocks = vi.hoisted(() => ({
   findSiteById: vi.fn(),
   insertSite: vi.fn(),
   updateSiteById: vi.fn(),
+  updateSiteImagePathById: vi.fn(),
   updateSiteStatusById: vi.fn(),
 }));
 
@@ -23,6 +27,7 @@ vi.mock("../src/modules/sites/sites.repository.js", () => sitesRepositoryMocks);
 
 let app;
 let jwt;
+const siteImageUploadRoot = path.join(os.tmpdir(), "qatar-ops-site-image-test-uploads");
 
 const siteId = "33333333-3333-4333-8333-333333333333";
 const adminUser = {
@@ -63,6 +68,7 @@ beforeAll(async () => {
   process.env.AUTH_COOKIE_NAME = "qatar_ops_token";
   process.env.COOKIE_SECURE = "false";
   process.env.COOKIE_SAME_SITE = "lax";
+  process.env.SITE_IMAGE_UPLOAD_ROOT = siteImageUploadRoot;
 
   ({ app } = await import("../src/app.js"));
   jwt = await import("jsonwebtoken");
@@ -74,6 +80,7 @@ beforeEach(() => {
   sitesRepositoryMocks.findSiteById.mockResolvedValue(siteSummary);
   sitesRepositoryMocks.insertSite.mockResolvedValue(siteSummary);
   sitesRepositoryMocks.updateSiteById.mockResolvedValue(siteSummary);
+  sitesRepositoryMocks.updateSiteImagePathById.mockResolvedValue({ ...siteSummary, image_path: "/uploads/site-images/test.webp" });
   sitesRepositoryMocks.updateSiteStatusById.mockResolvedValue(siteSummary);
 });
 
@@ -129,6 +136,56 @@ describe("sites routes", () => {
       .set("Cookie", authCookie(viewerUser))
       .send({ status: "archived" })
       .expect(403);
+  });
+
+  it("rejects viewers when uploading a site image", async () => {
+    await request(app)
+      .post(`/api/v1/sites/${siteId}/image`)
+      .set("Cookie", authCookie(viewerUser))
+      .expect(403);
+  });
+
+  it("requires an image when uploading a site image", async () => {
+    const response = await request(app)
+      .post(`/api/v1/sites/${siteId}/image`)
+      .set("Cookie", authCookie(operatorUser))
+      .expect(400);
+
+    expect(response.body.error.code).toBe("IMAGE_REQUIRED");
+  });
+
+  it("rejects unsupported site image types", async () => {
+    const response = await request(app)
+      .post(`/api/v1/sites/${siteId}/image`)
+      .set("Cookie", authCookie(operatorUser))
+      .attach("image", Buffer.from("<svg></svg>"), {
+        filename: "site.svg",
+        contentType: "image/svg+xml",
+      })
+      .expect(400);
+
+    expect(response.body.error.code).toBe("INVALID_IMAGE_TYPE");
+  });
+
+  it("stores a site image and updates the public image path", async () => {
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=", "base64");
+
+    const response = await request(app)
+      .post(`/api/v1/sites/${siteId}/image`)
+      .set("Cookie", authCookie(operatorUser))
+      .attach("image", png, {
+        filename: "unsafe original name.png",
+        contentType: "image/png",
+      })
+      .expect(200);
+
+    expect(response.body.image_path).toMatch(/^\/uploads\/site-images\/.+\.png$/);
+    expect(response.body.image_path).not.toContain("unsafe original name");
+    expect(sitesRepositoryMocks.updateSiteImagePathById).toHaveBeenCalledWith(siteId, response.body.image_path);
+
+    const storedFile = path.join(siteImageUploadRoot, path.basename(response.body.image_path));
+    expect(fs.existsSync(storedFile)).toBe(true);
+    fs.unlinkSync(storedFile);
   });
 
   it("allows operators to create a site", async () => {

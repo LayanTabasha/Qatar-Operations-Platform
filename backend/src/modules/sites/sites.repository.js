@@ -137,3 +137,21 @@ export async function updateSiteStatusById(id, status) {
 
   return findSiteById(result.rows[0].id);
 }
+
+export async function updateSiteImagePathById(id, imagePath) {
+  const result = await query(
+    `
+      UPDATE sites
+      SET image_path = $2
+      WHERE id = $1
+      RETURNING id
+    `,
+    [id, imagePath],
+  );
+
+  if (result.rowCount === 0) {
+    return null;
+  }
+
+  return findSiteById(result.rows[0].id);
+}

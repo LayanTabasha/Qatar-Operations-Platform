@@ -1,5 +1,12 @@
 import { ApiError } from "../../utils/api-error.js";
-import { findSiteById, insertSite, listSites, updateSiteById, updateSiteStatusById } from "./sites.repository.js";
+import {
+  findSiteById,
+  insertSite,
+  listSites,
+  updateSiteById,
+  updateSiteImagePathById,
+  updateSiteStatusById,
+} from "./sites.repository.js";
 
 function handleSiteWriteError(err) {
   if (err.code === "23505") {
@@ -47,6 +54,16 @@ export async function updateSite(id, input) {
 
 export async function updateSiteStatus(id, status) {
   const site = await updateSiteStatusById(id, status);
+
+  if (!site) {
+    throw new ApiError(404, "SITE_NOT_FOUND", "Site not found");
+  }
+
+  return site;
+}
+
+export async function updateSiteImage(id, imagePath) {
+  const site = await updateSiteImagePathById(id, imagePath);
 
   if (!site) {
     throw new ApiError(404, "SITE_NOT_FOUND", "Site not found");

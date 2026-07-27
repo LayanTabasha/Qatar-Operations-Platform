@@ -1,5 +1,8 @@
+import fs from "node:fs/promises";
 import { asyncHandler } from "../../utils/async-handler.js";
-import { createSite, getSite, getSites, updateSite, updateSiteStatus } from "./sites.service.js";
+import { ApiError } from "../../utils/api-error.js";
+import { publicPathForSiteImage } from "./site-image-upload.middleware.js";
+import { createSite, getSite, getSites, updateSite, updateSiteImage, updateSiteStatus } from "./sites.service.js";
 import {
   createSiteSchema,
   listSitesQuerySchema,
@@ -56,6 +59,36 @@ export const updateSiteStatusRecord = asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
+    site,
+  });
+});
+
+export const ensureSiteExistsForImage = asyncHandler(async (req, _res, next) => {
+  const { id } = siteIdParamsSchema.parse(req.params);
+  req.site = await getSite(id);
+  next();
+});
+
+export const uploadSiteImageRecord = asyncHandler(async (req, res) => {
+  const { id } = siteIdParamsSchema.parse(req.params);
+
+  if (!req.file) {
+    throw new ApiError(400, "IMAGE_REQUIRED", "Choose a site image before uploading");
+  }
+
+  const imagePath = publicPathForSiteImage(req.file);
+  let site;
+
+  try {
+    site = await updateSiteImage(id, imagePath);
+  } catch (err) {
+    await fs.unlink(req.file.path).catch(() => {});
+    throw err;
+  }
+
+  res.json({
+    success: true,
+    image_path: imagePath,
     site,
   });
 });

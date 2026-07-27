@@ -1,6 +1,7 @@
 const isLocalFrontend = ["", "localhost", "127.0.0.1"].includes(window.location.hostname);
 const DEFAULT_API_ORIGIN = isLocalFrontend ? "http://localhost:3000" : window.location.origin;
-const API_BASE_URL = `${window.QATAR_OPS_API_ORIGIN || DEFAULT_API_ORIGIN}/api/v1`;
+const API_ORIGIN = window.QATAR_OPS_API_ORIGIN || DEFAULT_API_ORIGIN;
+const API_BASE_URL = `${API_ORIGIN}/api/v1`;
 
 class ApiError extends Error {
   constructor(message, status, payload) {
@@ -18,6 +19,12 @@ function buildQueryString(params = {}) {
   });
   const text = query.toString();
   return text ? `?${text}` : "";
+}
+
+function apiAssetUrl(path) {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path) || path.startsWith("data:")) return path;
+  return `${API_ORIGIN}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 async function apiRequest(path, options = {}) {
@@ -84,6 +91,16 @@ const SitesApi = {
     return apiRequest(`/sites/${id}/status`, {
       method: "PATCH",
       body: { status },
+    });
+  },
+
+  uploadImage(id, file) {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    return apiRequest(`/sites/${id}/image`, {
+      method: "POST",
+      body: formData,
     });
   },
 };

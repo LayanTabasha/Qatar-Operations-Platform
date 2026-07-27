@@ -219,8 +219,7 @@ Create example:
   "code": "MSHEIREB",
   "location": "Doha, Qatar",
   "address": "Optional address",
-  "description": "Optional description",
-  "image_path": "sites/msheireb/cover.webp"
+  "description": "Optional description"
 }
 ```
 
@@ -249,7 +248,16 @@ Restore example:
 }
 ```
 
-`image_path` is metadata only. Image upload and file storage are not implemented in the Sites API yet.
+Upload or replace a site image with multipart form data:
+
+```text
+POST /api/v1/sites/:id/image
+Field name: image
+Allowed: JPEG, PNG, WebP
+Maximum size: 5 MB
+```
+
+The API stores the file on disk and saves only the public path in `sites.image_path`.
 
 ## Chargers API
 

@@ -408,9 +408,10 @@ function refreshDerivedCounts() {
 
 function imageBlock(src, label, className = "") {
   const imageSource = typeof src === "object" ? src?.display || src?.original : src;
+  const resolvedImageSource = typeof apiAssetUrl === "function" ? apiAssetUrl(imageSource) : imageSource;
   const placeholderText = className.includes("charger") ? "No Charger Image Available" : "No Site Image Available";
   return src
-    ? `<div class="image-placeholder ${className} has-image"><img src="${imageSource}" alt="${label}" loading="lazy" /></div>`
+    ? `<div class="image-placeholder ${className} has-image"><img src="${resolvedImageSource}" alt="${label}" loading="lazy" /></div>`
     : `<div class="image-placeholder ${className} branded-placeholder"><div class="brand-mark"><strong>ZEEDA</strong><span>ENERGY</span></div><small>${placeholderText}</small></div>`;
 }
 

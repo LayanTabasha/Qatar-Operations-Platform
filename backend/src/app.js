@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import express from "express";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
+import { siteImageUploadRoot } from "./modules/sites/site-image-upload.middleware.js";
 import { corsOptions } from "./config/cors.js";
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
@@ -32,6 +33,7 @@ app.use(
 app.use(apiRateLimit);
 
 app.get("/api/health", getHealth);
+app.use("/uploads/site-images", express.static(siteImageUploadRoot));
 app.use("/api/v1", apiRouter);
 
 app.use(notFound);

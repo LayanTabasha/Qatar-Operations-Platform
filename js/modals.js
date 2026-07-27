@@ -1,6 +1,7 @@
-const IMAGE_UPLOAD_MAX_BYTES = 3 * 1024 * 1024;
+const IMAGE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 const IMAGE_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp"];
 let pendingModalImage = null;
+let pendingSiteImageFile = null;
 let removeExistingSiteImage = false;
 
 function openModal(type, mode = "edit") {
@@ -21,6 +22,7 @@ function openModal(type, mode = "edit") {
   const form = document.getElementById("modal-form");
   document.querySelector(".modal")?.classList.remove("preview-modal");
   pendingModalImage = null;
+  pendingSiteImageFile = null;
   removeExistingSiteImage = false;
   document.getElementById("modal-title").textContent = config.title;
   document.getElementById("modal-eyebrow").textContent = type === "confirmDelete" ? "Confirm" : "Operational Form";
@@ -63,7 +65,7 @@ function fieldMarkup(label, kind, required = false) {
   if (kind === "textarea") return `<label class="full"><span>${label}</span><textarea id="${id}" rows="3"${requiredAttr}></textarea></label>`;
   if (kind === "image-file") return `<label class="full"><span>${label}</span><input id="${id}" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple${requiredAttr} /><small>JPG, PNG, or WebP only. Photos appear inside the fault record.</small></label>`;
   if (kind === "file" && label === "Upload site image") {
-    return `<label class="full image-upload-field"><span>${label}</span><input id="${id}" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"${requiredAttr} /><div class="image-upload-preview" id="site-image-preview"><span>No image selected</span></div><div class="quick-actions compact image-upload-actions"><button class="secondary-button" id="replace-site-image" type="button">Replace Image</button><button class="danger-button" id="remove-site-image" type="button">Remove Image</button></div><small>JPG, PNG, or WebP. Maximum 3 MB in this browser prototype. Display image is optimized to a 16:9 layout.</small></label>`;
+    return `<label class="full image-upload-field"><span>${label}</span><input id="${id}" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"${requiredAttr} /><div class="image-upload-preview" id="site-image-preview"><span>No image selected</span></div><div class="quick-actions compact image-upload-actions"><button class="secondary-button" id="replace-site-image" type="button">Replace Image</button><button class="danger-button" id="remove-site-image" type="button">Remove Selected Image</button></div><small>JPG, PNG, or WebP. Maximum 5 MB. The image is previewed before upload and saved after the site details are saved.</small></label>`;
   }
   return `<label><span>${label}</span><input id="${id}" type="${kind}"${requiredAttr} /></label>`;
 }
@@ -119,6 +121,7 @@ function closeModal() {
   document.querySelector(".modal")?.classList.remove("preview-modal");
   activePreview = { fileId: "", zoom: 1, rotation: 0, mode: "fit-screen" };
   pendingModalImage = null;
+  pendingSiteImageFile = null;
   removeExistingSiteImage = false;
   document.querySelector(".modal")?.scrollTo(0, 0);
 }
@@ -171,15 +174,16 @@ function renderSiteImagePreview(image, label = "Site Image") {
   const preview = document.getElementById("site-image-preview");
   if (!preview) return;
   const imageSource = typeof image === "object" ? image?.display || image?.original : image;
+  const resolvedImageSource = typeof apiAssetUrl === "function" ? apiAssetUrl(imageSource) : imageSource;
   preview.innerHTML = imageSource
-    ? `<img src="${imageSource}" alt="${label}" />`
+    ? `<img src="${resolvedImageSource}" alt="${label}" />`
     : `<span>No image selected</span>`;
 }
 
 function validateImageFile(file) {
   if (!file) return "Choose an image file first.";
   if (!IMAGE_UPLOAD_TYPES.includes(file.type)) return "Site cover image must be JPG, PNG, or WebP.";
-  if (file.size > IMAGE_UPLOAD_MAX_BYTES) return "Site cover image must be 3 MB or smaller in this browser prototype.";
+  if (file.size > IMAGE_UPLOAD_MAX_BYTES) return "Site cover image must be 5 MB or smaller.";
   return "";
 }
 
@@ -238,10 +242,12 @@ async function handleSiteImageSelection() {
   if (!file) return;
   try {
     pendingModalImage = await readAndOptimizeSiteImage(file);
+    pendingSiteImageFile = file;
     removeExistingSiteImage = false;
     renderSiteImagePreview(pendingModalImage, pendingModalImage.name);
   } catch (error) {
     pendingModalImage = null;
+    pendingSiteImageFile = null;
     if (input) input.value = "";
     if (errorBox) errorBox.textContent = error.message;
     renderSiteImagePreview(null);
@@ -250,7 +256,8 @@ async function handleSiteImageSelection() {
 
 function removeSiteImageSelection() {
   pendingModalImage = null;
-  removeExistingSiteImage = true;
+  pendingSiteImageFile = null;
+  removeExistingSiteImage = false;
   const input = document.getElementById("upload-site-image");
   if (input) input.value = "";
   renderSiteImagePreview(null);
@@ -486,6 +493,15 @@ async function simulateUpdate(type, mode = "edit") {
         : await SitesApi.create(payload);
       if (backendSiteStatus(status) !== (response.site?.status || "active")) {
         await SitesApi.updateStatus(response.site.id, backendSiteStatus(status));
+      }
+      if (pendingSiteImageFile) {
+        try {
+          const imageResponse = await SitesApi.uploadImage(response.site.id, pendingSiteImageFile);
+          response.site = imageResponse.site || response.site;
+        } catch (uploadError) {
+          await loadOperationalData();
+          throw new Error(`Site details were saved, but the image upload failed: ${userFriendlyApiError(uploadError)}`);
+        }
       }
       state.currentSiteName = response.site?.name || name;
       await loadOperationalData();
