@@ -2,6 +2,9 @@ const isLocalFrontend = ["", "localhost", "127.0.0.1"].includes(window.location.
 const DEFAULT_API_ORIGIN = isLocalFrontend ? "http://localhost:3000" : window.location.origin;
 const API_ORIGIN = window.QATAR_OPS_API_ORIGIN || DEFAULT_API_ORIGIN;
 const API_BASE_URL = `${API_ORIGIN}/api/v1`;
+const QATAR_OPS_FRONTEND_VERSION = "2026.07.27-site-image-upload";
+
+console.info(`Qatar Operations frontend ${QATAR_OPS_FRONTEND_VERSION}`);
 
 class ApiError extends Error {
   constructor(message, status, payload) {

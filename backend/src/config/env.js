@@ -19,9 +19,12 @@ const envSchema = z.object({
   FRONTEND_ORIGIN: z.string().url(),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   TRUST_PROXY: z
-    .enum(["true", "false"])
+    .enum(["true", "false", "1"])
     .default("false")
-    .transform((value) => value === "true"),
+    .transform((value) => {
+      if (value === "1") return 1;
+      return value === "true";
+    }),
   JWT_SECRET: z.string().min(32, "Must be at least 32 characters long"),
   JWT_EXPIRES_IN: z.string().default("8h"),
   AUTH_COOKIE_NAME: z.string().min(1).default("qatar_ops_token"),
@@ -43,11 +46,11 @@ const productionEnvSchema = envSchema.superRefine((value, ctx) => {
     });
   }
 
-  if (!value.TRUST_PROXY) {
+  if (value.TRUST_PROXY !== 1) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["TRUST_PROXY"],
-      message: "Must be true in production when Express runs behind Nginx",
+      message: "Must be 1 in production when Express runs behind one Nginx proxy",
     });
   }
 });

@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { logger } from "../../config/logger.js";
 import { asyncHandler } from "../../utils/async-handler.js";
 import { ApiError } from "../../utils/api-error.js";
 import { publicPathForSiteImage } from "./site-image-upload.middleware.js";
@@ -82,9 +83,27 @@ export const uploadSiteImageRecord = asyncHandler(async (req, res) => {
   try {
     site = await updateSiteImage(id, imagePath);
   } catch (err) {
+    logger.error(
+      {
+        err,
+        siteId: id,
+        filename: req.file.filename,
+        statusCode: err.statusCode || 500,
+      },
+      "Site image database update failed",
+    );
     await fs.unlink(req.file.path).catch(() => {});
     throw err;
   }
+
+  logger.info(
+    {
+      siteId: id,
+      filename: req.file.filename,
+      imagePath,
+    },
+    "Site image uploaded",
+  );
 
   res.json({
     success: true,

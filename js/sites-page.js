@@ -33,6 +33,12 @@ function buildSites() {
     </article>`).join("");
 }
 
+function imagePathWithVersion(imagePath, updatedAt) {
+  if (!imagePath || !imagePath.startsWith("/uploads/") || !updatedAt) return imagePath || "";
+  const separator = imagePath.includes("?") ? "&" : "?";
+  return `${imagePath}${separator}v=${encodeURIComponent(updatedAt)}`;
+}
+
 function statusLabel(status) {
   const labels = {
     active: "Active",
@@ -106,7 +112,7 @@ function mapBackendSite(site, chargers) {
     backendStatus: site.status,
     description: site.description || "",
     notes: "",
-    image: site.image_path || "",
+    image: imagePathWithVersion(site.image_path, site.updated_at),
     chargers: siteChargers,
     chargerCount: site.charger_count ?? siteChargers.length,
     openFaultCount: site.open_fault_count ?? 0,

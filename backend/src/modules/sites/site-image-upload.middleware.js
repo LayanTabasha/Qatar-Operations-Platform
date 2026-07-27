@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import multer from "multer";
+import { logger } from "../../config/logger.js";
 import { ApiError } from "../../utils/api-error.js";
 
 const siteImageUploadRoot = process.env.SITE_IMAGE_UPLOAD_ROOT || "/var/www/qatar-operations/uploads/site-images";
@@ -55,13 +56,22 @@ export function siteImageUpload(req, res, next) {
       return;
     }
 
+    logger.warn(
+      {
+        err,
+        siteId: req.params?.id,
+        statusCode: err.statusCode || (err.code === "LIMIT_FILE_SIZE" ? 413 : 400),
+      },
+      "Site image upload rejected",
+    );
+
     if (err instanceof ApiError) {
       next(err);
       return;
     }
 
     if (err.code === "LIMIT_FILE_SIZE") {
-      next(new ApiError(400, "IMAGE_TOO_LARGE", "Site image must be 5 MB or smaller"));
+      next(new ApiError(413, "IMAGE_TOO_LARGE", "Site image must be 5 MB or smaller"));
       return;
     }
 

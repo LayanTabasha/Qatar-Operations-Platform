@@ -411,8 +411,17 @@ function imageBlock(src, label, className = "") {
   const resolvedImageSource = typeof apiAssetUrl === "function" ? apiAssetUrl(imageSource) : imageSource;
   const placeholderText = className.includes("charger") ? "No Charger Image Available" : "No Site Image Available";
   return src
-    ? `<div class="image-placeholder ${className} has-image"><img src="${resolvedImageSource}" alt="${label}" loading="lazy" /></div>`
+    ? `<div class="image-placeholder ${className} has-image" data-placeholder-text="${placeholderText}"><img src="${resolvedImageSource}" alt="${label}" loading="lazy" onerror="showImageFallback(this)" /></div>`
     : `<div class="image-placeholder ${className} branded-placeholder"><div class="brand-mark"><strong>ZEEDA</strong><span>ENERGY</span></div><small>${placeholderText}</small></div>`;
+}
+
+function showImageFallback(image) {
+  const wrapper = image?.closest?.(".image-placeholder");
+  if (!wrapper) return;
+  const placeholderText = wrapper.dataset.placeholderText || "No Site Image Available";
+  wrapper.classList.remove("has-image");
+  wrapper.classList.add("branded-placeholder");
+  wrapper.innerHTML = `<div class="brand-mark"><strong>ZEEDA</strong><span>ENERGY</span></div><small>${placeholderText}</small>`;
 }
 
 function placeholder(label, value = "Not Available Yet") {

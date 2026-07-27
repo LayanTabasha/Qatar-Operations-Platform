@@ -54,6 +54,7 @@ const siteSummary = {
   created_at: "2026-07-20T09:00:00.000Z",
   updated_at: "2026-07-20T09:00:00.000Z",
 };
+const tinyPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=", "base64");
 
 beforeAll(async () => {
   process.env.NODE_ENV = "test";
@@ -167,13 +168,60 @@ describe("sites routes", () => {
     expect(response.body.error.code).toBe("INVALID_IMAGE_TYPE");
   });
 
-  it("stores a site image and updates the public image path", async () => {
-    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=", "base64");
+  it("rejects oversized site images", async () => {
+    const oversizedImage = Buffer.alloc(5 * 1024 * 1024 + 1, 1);
 
     const response = await request(app)
       .post(`/api/v1/sites/${siteId}/image`)
       .set("Cookie", authCookie(operatorUser))
-      .attach("image", png, {
+      .attach("image", oversizedImage, {
+        filename: "large.png",
+        contentType: "image/png",
+      })
+      .expect(413);
+
+    expect(response.body.error.code).toBe("IMAGE_TOO_LARGE");
+  });
+
+  it("returns 404 before upload when the site is unknown", async () => {
+    sitesRepositoryMocks.findSiteById.mockResolvedValueOnce(null);
+
+    const response = await request(app)
+      .post(`/api/v1/sites/${siteId}/image`)
+      .set("Cookie", authCookie(operatorUser))
+      .attach("image", tinyPng, {
+        filename: "site.png",
+        contentType: "image/png",
+      })
+      .expect(404);
+
+    expect(response.body.error.code).toBe("SITE_NOT_FOUND");
+    expect(sitesRepositoryMocks.updateSiteImagePathById).not.toHaveBeenCalled();
+  });
+
+  it("allows admins to upload a site image", async () => {
+    const response = await request(app)
+      .post(`/api/v1/sites/${siteId}/image`)
+      .set("Cookie", authCookie(adminUser))
+      .attach("image", tinyPng, {
+        filename: "admin-site.png",
+        contentType: "image/png",
+      })
+      .expect(200);
+
+    expect(response.body.image_path).toMatch(/^\/uploads\/site-images\/.+\.png$/);
+    expect(sitesRepositoryMocks.updateSiteImagePathById).toHaveBeenCalledWith(siteId, response.body.image_path);
+
+    const storedFile = path.join(siteImageUploadRoot, path.basename(response.body.image_path));
+    expect(fs.existsSync(storedFile)).toBe(true);
+    fs.unlinkSync(storedFile);
+  });
+
+  it("allows operators to store a site image and updates the public image path", async () => {
+    const response = await request(app)
+      .post(`/api/v1/sites/${siteId}/image`)
+      .set("Cookie", authCookie(operatorUser))
+      .attach("image", tinyPng, {
         filename: "unsafe original name.png",
         contentType: "image/png",
       })
