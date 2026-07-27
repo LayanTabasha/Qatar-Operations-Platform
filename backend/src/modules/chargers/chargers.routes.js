@@ -12,8 +12,8 @@ export const chargersRouter = Router();
 
 chargersRouter.use(authenticate);
 
-chargersRouter.get("/", authorizeRoles("admin", "operator", "viewer"), listChargers);
-chargersRouter.get("/:id", authorizeRoles("admin", "operator", "viewer"), getChargerById);
-chargersRouter.post("/", authorizeRoles("admin", "operator"), createChargerRecord);
-chargersRouter.patch("/:id/status", authorizeRoles("admin", "operator"), updateChargerStatusRecord);
-chargersRouter.patch("/:id", authorizeRoles("admin", "operator"), updateChargerRecord);
+chargersRouter.get("/", authorizeRoles("admin", "operations_staff", "viewer"), listChargers);
+chargersRouter.get("/:id", authorizeRoles("admin", "operations_staff", "viewer"), getChargerById);
+chargersRouter.post("/", authorizeRoles("admin", "operations_staff"), createChargerRecord);
+chargersRouter.patch("/:id/status", authorizeRoles("admin", "operations_staff"), updateChargerStatusRecord);
+chargersRouter.patch("/:id", authorizeRoles("admin", "operations_staff"), updateChargerRecord);

@@ -134,3 +134,37 @@ const ChargersApi = {
     });
   },
 };
+
+const UsersApi = {
+  list() {
+    return apiRequest("/users", { method: "GET" });
+  },
+
+  create(user) {
+    return apiRequest("/users", {
+      method: "POST",
+      body: user,
+    });
+  },
+
+  update(id, user) {
+    return apiRequest(`/users/${id}`, {
+      method: "PATCH",
+      body: user,
+    });
+  },
+
+  updateStatus(id, isActive) {
+    return apiRequest(`/users/${id}/status`, {
+      method: "PATCH",
+      body: { is_active: isActive },
+    });
+  },
+
+  resetPassword(id, password) {
+    return apiRequest(`/users/${id}/reset-password`, {
+      method: "POST",
+      body: { password },
+    });
+  },
+};

@@ -29,7 +29,7 @@ describe("roles seed command", () => {
     expect(dbQuery).toHaveBeenCalledTimes(1);
     expect(dbQuery.mock.calls[0][0].toLowerCase()).toContain("on conflict (name) do update");
     expect(dbQuery.mock.calls[0][0]).toContain("'admin'");
-    expect(dbQuery.mock.calls[0][0]).toContain("'operator'");
+    expect(dbQuery.mock.calls[0][0]).toContain("'operations_staff'");
     expect(dbQuery.mock.calls[0][0]).toContain("'viewer'");
   });
 });

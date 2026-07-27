@@ -37,7 +37,7 @@ const adminUser = {
   role: "admin",
   is_active: true,
 };
-const operatorUser = { ...adminUser, role: "operator" };
+const operatorUser = { ...adminUser, role: "operations_staff" };
 const viewerUser = { ...adminUser, role: "viewer" };
 const siteSummary = {
   id: siteId,

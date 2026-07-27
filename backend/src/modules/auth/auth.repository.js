@@ -6,6 +6,9 @@ const safeUserSelect = `
     users.full_name,
     users.email,
     users.is_active,
+    users.last_login_at,
+    users.created_at,
+    users.updated_at,
     roles.name AS role
   FROM users
   JOIN roles ON roles.id = users.role_id
@@ -20,6 +23,9 @@ export async function findUserWithPasswordByEmail(email) {
         users.email,
         users.password_hash,
         users.is_active,
+        users.last_login_at,
+        users.created_at,
+        users.updated_at,
         roles.name AS role
       FROM users
       JOIN roles ON roles.id = users.role_id

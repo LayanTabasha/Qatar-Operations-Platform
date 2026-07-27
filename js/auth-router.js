@@ -28,7 +28,7 @@ function getSavedViewContext() {
 function normalizeAuthenticatedUser(user) {
   const roleLabels = {
     admin: "Administrator",
-    operator: "Operations Staff",
+    operations_staff: "Operations Staff",
     viewer: "Viewer",
   };
   const roleKey = user?.role || "";

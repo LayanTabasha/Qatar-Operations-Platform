@@ -11,8 +11,13 @@ const authRepositoryMocks = vi.hoisted(() => ({
 
 const usersRepositoryMocks = vi.hoisted(() => ({
   listUsers: vi.fn(),
+  findUserById: vi.fn(),
+  countActiveAdmins: vi.fn(),
   findRoleByName: vi.fn(),
   createUser: vi.fn(),
+  updateUserById: vi.fn(),
+  updateUserStatusById: vi.fn(),
+  updateUserPasswordById: vi.fn(),
 }));
 
 vi.mock("../src/modules/auth/auth.repository.js", () => authRepositoryMocks);
@@ -30,6 +35,18 @@ const activeAdmin = {
   email: "admin@example.com",
   role: "admin",
   is_active: true,
+};
+const activeOperationsStaff = {
+  ...activeAdmin,
+  id: "22222222-2222-4222-8222-222222222222",
+  email: "operations@example.com",
+  role: "operations_staff",
+};
+const activeViewer = {
+  ...activeAdmin,
+  id: "33333333-3333-4333-8333-333333333333",
+  email: "viewer@example.com",
+  role: "viewer",
 };
 
 beforeAll(async () => {
@@ -55,6 +72,7 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   usersRepositoryMocks.listUsers.mockResolvedValue([]);
+  usersRepositoryMocks.countActiveAdmins.mockResolvedValue(2);
 });
 
 function createToken(user = activeAdmin) {
@@ -86,6 +104,28 @@ describe("authentication routes", () => {
     const response = await request(app)
       .post("/api/v1/auth/login")
       .send({ email: "admin@example.com", password: "WrongPassword1!" })
+      .expect(401);
+
+    expect(response.body.error.code).toBe("INVALID_CREDENTIALS");
+  });
+
+  it("returns 401 for invalid email addresses without revealing whether the user exists", async () => {
+    authRepositoryMocks.findUserWithPasswordByEmail.mockResolvedValue(null);
+
+    const response = await request(app)
+      .post("/api/v1/auth/login")
+      .send({ email: "missing@example.com", password: "RandomPassword1" })
+      .expect(401);
+
+    expect(response.body.error.code).toBe("INVALID_CREDENTIALS");
+  });
+
+  it("returns 401 for random credentials", async () => {
+    authRepositoryMocks.findUserWithPasswordByEmail.mockResolvedValue(null);
+
+    const response = await request(app)
+      .post("/api/v1/auth/login")
+      .send({ email: "random@example.com", password: "Anything12345" })
       .expect(401);
 
     expect(response.body.error.code).toBe("INVALID_CREDENTIALS");
@@ -175,6 +215,92 @@ describe("authorization middleware", () => {
 });
 
 describe("user management routes", () => {
+  it("allows admins to list users", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+    usersRepositoryMocks.listUsers.mockResolvedValue([activeAdmin]);
+
+    const response = await request(app)
+      .get("/api/v1/users")
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .expect(200);
+
+    expect(response.body.users[0].email).toBe(activeAdmin.email);
+  });
+
+  it("rejects operations staff from listing users", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeOperationsStaff);
+
+    await request(app)
+      .get("/api/v1/users")
+      .set("Cookie", [`qatar_ops_token=${createToken(activeOperationsStaff)}`])
+      .expect(403);
+  });
+
+  it("rejects viewers from listing users", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeViewer);
+
+    await request(app)
+      .get("/api/v1/users")
+      .set("Cookie", [`qatar_ops_token=${createToken(activeViewer)}`])
+      .expect(403);
+  });
+
+  it("creates users as operations_staff by default", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+    usersRepositoryMocks.findRoleByName.mockResolvedValue({
+      id: "44444444-4444-4444-8444-444444444444",
+      name: "operations_staff",
+    });
+    usersRepositoryMocks.createUser.mockResolvedValue({
+      id: "55555555-5555-4555-8555-555555555555",
+      full_name: "New User",
+      email: "new@example.com",
+      is_active: true,
+      created_at: "2026-07-27T06:00:00.000Z",
+      updated_at: "2026-07-27T06:00:00.000Z",
+    });
+
+    const response = await request(app)
+      .post("/api/v1/users")
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .send({
+        full_name: "New User",
+        email: "NEW@EXAMPLE.COM",
+        password: "StrongPassword1",
+      })
+      .expect(201);
+
+    expect(response.body.user.role).toBe("operations_staff");
+    expect(usersRepositoryMocks.createUser).toHaveBeenCalledWith(expect.objectContaining({ email: "new@example.com" }));
+  });
+
+  it("allows admins to explicitly create another admin", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+    usersRepositoryMocks.findRoleByName.mockResolvedValue({
+      id: "44444444-4444-4444-8444-444444444444",
+      name: "admin",
+    });
+    usersRepositoryMocks.createUser.mockResolvedValue({
+      id: "66666666-6666-4666-8666-666666666666",
+      full_name: "Supervisor",
+      email: "supervisor@example.com",
+      is_active: true,
+    });
+
+    const response = await request(app)
+      .post("/api/v1/users")
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .send({
+        full_name: "Supervisor",
+        email: "supervisor@example.com",
+        password: "StrongPassword1",
+        role: "admin",
+      })
+      .expect(201);
+
+    expect(response.body.user.role).toBe("admin");
+  });
+
   it("rejects manager as a user role", async () => {
     authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
 
@@ -190,6 +316,46 @@ describe("user management routes", () => {
       .expect(400);
 
     expect(response.body.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("rejects invalid email addresses", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+
+    await request(app)
+      .post("/api/v1/users")
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .send({ full_name: "Bad Email", email: "bad-email", password: "StrongPassword1" })
+      .expect(400);
+  });
+
+  it("rejects weak passwords", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+
+    await request(app)
+      .post("/api/v1/users")
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .send({ full_name: "Weak Password", email: "weak@example.com", password: "password" })
+      .expect(400);
+  });
+
+  it("rejects operations staff from creating users", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeOperationsStaff);
+
+    await request(app)
+      .post("/api/v1/users")
+      .set("Cookie", [`qatar_ops_token=${createToken(activeOperationsStaff)}`])
+      .send({ full_name: "Blocked", email: "blocked@example.com", password: "StrongPassword1" })
+      .expect(403);
+  });
+
+  it("rejects viewers from creating users", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeViewer);
+
+    await request(app)
+      .post("/api/v1/users")
+      .set("Cookie", [`qatar_ops_token=${createToken(activeViewer)}`])
+      .send({ full_name: "Blocked", email: "blocked@example.com", password: "StrongPassword1" })
+      .expect(403);
   });
 
   it("never returns password_hash when listing users", async () => {
@@ -224,5 +390,86 @@ describe("user management routes", () => {
       .expect(409);
 
     expect(response.body.error.code).toBe("EMAIL_ALREADY_EXISTS");
+  });
+
+  it("allows admins to deactivate and reactivate another user", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+    usersRepositoryMocks.findUserById.mockResolvedValue(activeViewer);
+    usersRepositoryMocks.updateUserStatusById.mockResolvedValue({ ...activeViewer, is_active: false });
+
+    await request(app)
+      .patch(`/api/v1/users/${activeViewer.id}/status`)
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .send({ is_active: false })
+      .expect(200);
+
+    expect(usersRepositoryMocks.updateUserStatusById).toHaveBeenCalledWith(activeViewer.id, false);
+
+    usersRepositoryMocks.updateUserStatusById.mockResolvedValue({ ...activeViewer, is_active: true });
+
+    await request(app)
+      .patch(`/api/v1/users/${activeViewer.id}/status`)
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .send({ status: "active" })
+      .expect(200);
+  });
+
+  it("allows admins to reset another user's password", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+    usersRepositoryMocks.findUserById.mockResolvedValue(activeViewer);
+    usersRepositoryMocks.updateUserPasswordById.mockResolvedValue(activeViewer);
+
+    const response = await request(app)
+      .post(`/api/v1/users/${activeViewer.id}/reset-password`)
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .send({ password: "NewStrongPassword1" })
+      .expect(200);
+
+    expect(response.body.user.password_hash).toBeUndefined();
+    expect(usersRepositoryMocks.updateUserPasswordById).toHaveBeenCalledWith(activeViewer.id, expect.any(String));
+  });
+
+  it("prevents the current admin from deactivating themselves", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+    usersRepositoryMocks.findUserById.mockResolvedValue(activeAdmin);
+
+    const response = await request(app)
+      .patch(`/api/v1/users/${activeAdmin.id}/status`)
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .send({ is_active: false })
+      .expect(400);
+
+    expect(response.body.error.code).toBe("CANNOT_DEACTIVATE_SELF");
+  });
+
+  it("prevents the current admin from demoting themselves", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+    usersRepositoryMocks.findUserById.mockResolvedValue(activeAdmin);
+
+    const response = await request(app)
+      .patch(`/api/v1/users/${activeAdmin.id}`)
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .send({ role: "viewer" })
+      .expect(400);
+
+    expect(response.body.error.code).toBe("CANNOT_DEMOTE_SELF");
+  });
+
+  it("prevents the final active admin from being deactivated or demoted", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+    usersRepositoryMocks.findUserById.mockResolvedValue({ ...activeAdmin, id: activeViewer.id });
+    usersRepositoryMocks.countActiveAdmins.mockResolvedValue(1);
+
+    await request(app)
+      .patch(`/api/v1/users/${activeViewer.id}/status`)
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .send({ is_active: false })
+      .expect(400);
+
+    await request(app)
+      .patch(`/api/v1/users/${activeViewer.id}`)
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .send({ role: "viewer" })
+      .expect(400);
   });
 });

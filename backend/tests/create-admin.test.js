@@ -92,9 +92,9 @@ describe("admin seed command", () => {
     const dbQuery = vi.fn().mockResolvedValueOnce({
       rows: [
         {
-          id: "operator-user-id",
+          id: "operations-staff-user-id",
           email: "admin@zeedaenergy.com",
-          role: "operator",
+          role: "operations_staff",
         },
       ],
     });

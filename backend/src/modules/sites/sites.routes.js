@@ -15,9 +15,9 @@ export const sitesRouter = Router();
 
 sitesRouter.use(authenticate);
 
-sitesRouter.get("/", authorizeRoles("admin", "operator", "viewer"), listSites);
-sitesRouter.get("/:id", authorizeRoles("admin", "operator", "viewer"), getSiteById);
-sitesRouter.post("/", authorizeRoles("admin", "operator"), createSiteRecord);
-sitesRouter.post("/:id/image", authorizeRoles("admin", "operator"), ensureSiteExistsForImage, siteImageUpload, uploadSiteImageRecord);
-sitesRouter.patch("/:id/status", authorizeRoles("admin", "operator"), updateSiteStatusRecord);
-sitesRouter.patch("/:id", authorizeRoles("admin", "operator"), updateSiteRecord);
+sitesRouter.get("/", authorizeRoles("admin", "operations_staff", "viewer"), listSites);
+sitesRouter.get("/:id", authorizeRoles("admin", "operations_staff", "viewer"), getSiteById);
+sitesRouter.post("/", authorizeRoles("admin", "operations_staff"), createSiteRecord);
+sitesRouter.post("/:id/image", authorizeRoles("admin", "operations_staff"), ensureSiteExistsForImage, siteImageUpload, uploadSiteImageRecord);
+sitesRouter.patch("/:id/status", authorizeRoles("admin", "operations_staff"), updateSiteStatusRecord);
+sitesRouter.patch("/:id", authorizeRoles("admin", "operations_staff"), updateSiteRecord);

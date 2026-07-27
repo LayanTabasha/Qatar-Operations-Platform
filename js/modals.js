@@ -590,28 +590,17 @@ async function simulateUpdate(type, mode = "edit") {
     if (!isAdmin()) return;
     const fullName = document.getElementById("full-name")?.value.trim();
     const email = document.getElementById("work-email")?.value.trim().toLowerCase();
-    const role = document.getElementById("role")?.value;
-    const department = document.getElementById("department")?.value || "Operations";
-    const status = document.getElementById("account-status")?.value;
+    const roleLabel = document.getElementById("role")?.value || "Operations Staff";
+    const role = { "Administrator": "admin", "Operations Staff": "operations_staff", "Viewer": "viewer" }[roleLabel] || "operations_staff";
     const temporaryPassword = document.getElementById("temporary-password")?.value.trim();
-    const mustChangePassword = document.getElementById("require-password-change-on-first-login")?.value === "Yes";
-    if (!fullName || !email || !temporaryPassword || state.users.some((user) => user.email.toLowerCase() === email)) {
-      throw new Error("Enter a unique email and temporary password.");
-    }
-    state.users.push({
-      id: `user-${Date.now()}`,
-      name: fullName,
+    if (!fullName || !email || !temporaryPassword) throw new Error("Full name, email, and temporary password are required.");
+    await UsersApi.create({
+      full_name: fullName,
       email,
+      password: temporaryPassword,
       role,
-      department,
-      status,
-      mustChangePassword,
-      lastLogin: "Not Available Yet",
-      lastPasswordChange: "Not Available Yet",
-      createdAt: new Date().toISOString().slice(0, 10),
-      createdBy: state.currentUser,
     });
-    saveUsers();
+    await loadManagedUsers();
     renderSettings("User Management");
     activity = { actionType: "user_created", entityType: "user", entityId: email, description: `${fullName} user account created` };
   }

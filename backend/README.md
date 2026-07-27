@@ -2,7 +2,7 @@
 
 This folder contains the backend foundation for the Qatar Operations Platform.
 
-The current root website is still a plain HTML, CSS, and JavaScript frontend. This backend is not connected to that frontend yet.
+The current root website is a plain HTML, CSS, and JavaScript frontend connected to this backend for authentication, sites, chargers, and Admin-only user management.
 
 ## Current Phase
 
@@ -21,7 +21,7 @@ Phase 3 adds authentication and authorization on top of the Phase 1 and Phase 2 
 - Role authorization middleware
 - Admin-only user creation and listing
 
-Operational API modules are not implemented yet. The database schema defines the main tables, and authentication plus admin user-management endpoints now exist, but there are still no sites, chargers, uploads, reports, documents, or faults API endpoints in this phase.
+Sites, chargers, authentication, and Admin-only user-management endpoints are implemented. Uploads, reports, documents, and faults still need future backend modules.
 
 ## Backend Structure
 
@@ -70,7 +70,7 @@ src/modules/chargers
 The platform role model is intentionally simple:
 
 - `admin`: full access, including user management.
-- `operator`: full operational access, but cannot manage users or roles.
+- `operations_staff`: full operational access, but cannot manage users or roles.
 - `viewer`: read-only access.
 
 Authorization middleware now exists for authentication-protected backend routes, but operational modules such as sites, faults, documents, and reports have not been connected to it yet.
@@ -85,17 +85,21 @@ Current backend routes are mounted under `/api/v1`:
 - `POST /auth/logout`: clears the auth cookie.
 - `GET /auth/me`: reloads and returns the current authenticated user.
 - `GET /users`: admin-only user list.
-- `POST /users`: admin-only user creation.
+- `POST /users`: admin-only user creation. Missing role defaults to `operations_staff`.
+- `GET /users/:id`: admin-only user detail.
+- `PATCH /users/:id`: admin-only user name or role update.
+- `PATCH /users/:id/status`: admin-only activate/deactivate.
+- `POST /users/:id/reset-password`: admin-only temporary password reset.
 - `GET /sites`: authenticated site list.
 - `GET /sites/:id`: authenticated site detail.
-- `POST /sites`: admin/operator site creation.
-- `PATCH /sites/:id`: admin/operator site update.
-- `PATCH /sites/:id/status`: admin/operator archive or restore.
+- `POST /sites`: admin/operations_staff site creation.
+- `PATCH /sites/:id`: admin/operations_staff site update.
+- `PATCH /sites/:id/status`: admin/operations_staff archive or restore.
 - `GET /chargers`: authenticated charger list.
 - `GET /chargers/:id`: authenticated charger detail.
-- `POST /chargers`: admin/operator charger creation.
-- `PATCH /chargers/:id`: admin/operator charger update.
-- `PATCH /chargers/:id/status`: admin/operator charger status change.
+- `POST /chargers`: admin/operations_staff charger creation.
+- `PATCH /chargers/:id`: admin/operations_staff charger update.
+- `PATCH /chargers/:id/status`: admin/operations_staff charger status change.
 
 There are no permanent site or charger deletion endpoints.
 
@@ -208,7 +212,7 @@ order=asc|desc
 Permissions:
 
 - `admin`: can list, view, create, update, archive, and restore sites.
-- `operator`: can list, view, create, update, archive, and restore sites.
+- `operations_staff`: can list, view, create, update, archive, and restore sites.
 - `viewer`: can list and view sites only.
 
 Create example:
@@ -288,7 +292,7 @@ Search checks charger name, charger code, model, manufacturer, and serial number
 Permissions:
 
 - `admin`: can list, view, create, update, archive, and restore chargers.
-- `operator`: can list, view, create, update, archive, and restore chargers.
+- `operations_staff`: can list, view, create, update, archive, and restore chargers.
 - `viewer`: can list and view chargers only.
 
 Every charger belongs to one site. A new charger cannot be created under an archived site, and an archived charger cannot be restored while its parent site is archived.
@@ -362,7 +366,7 @@ COOKIE_SAME_SITE=lax
 
 Use `COOKIE_SECURE=true` only when the API is served over HTTPS.
 
-The existing root frontend testing login is separate from this backend authentication until the frontend is connected to these API routes. This backend does not depend on the old frontend login or static test credentials.
+The root frontend uses this backend authentication. Random credentials, browser-only login, and public self-registration are not supported.
 
 ## Creating the First Admin
 
@@ -396,3 +400,16 @@ npm.cmd run seed:admin
 The password must be at least 12 characters and include uppercase letters, lowercase letters, and a number. A symbol is not required for the current internal MVP.
 
 These admin values are only used by the manual admin seed command. It reports whether the admin was created or already existed. Never commit a real `.env` file or a real password.
+
+## Creating Managed Users
+
+Admins can create future accounts from the website Settings page under User Management. New accounts default to `operations_staff` unless an Admin explicitly chooses `admin` or `viewer`.
+
+For one-time server-side account creation, use:
+
+```bash
+npm run user:create -- --name="Full Name" --email="user@example.com" --password="StrongPassword1" --role=operations_staff
+npm run user:create-admin -- --name="Supervisor Name" --email="supervisor@example.com" --password="StrongPassword1"
+```
+
+Do not hard-code real passwords in repository files or shell history shared with other people.

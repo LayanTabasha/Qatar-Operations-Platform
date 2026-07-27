@@ -82,6 +82,26 @@ document.addEventListener("click", (event) => {
     if (note) note.textContent = `Active session for ${user?.email || state.currentUserEmail}. Last login: ${user?.lastLogin || "Not Available Yet"}.`;
   }
 
+  const editUserButton = event.target.closest("[data-user-edit]");
+  if (editUserButton) editManagedUser(editUserButton.dataset.userEdit);
+
+  const statusUserButton = event.target.closest("[data-user-status]");
+  if (statusUserButton) {
+    changeManagedUserStatus(statusUserButton.dataset.userStatus, statusUserButton.dataset.active === "true").catch((err) => {
+      alert(err.message || "User status could not be changed.");
+    });
+  }
+
+  const resetUserButton = event.target.closest("[data-user-reset]");
+  if (resetUserButton) {
+    resetManagedUserPassword(resetUserButton.dataset.userReset).catch((err) => {
+      alert(err.message || "Password could not be reset.");
+    });
+  }
+
+  const clearUserButton = event.target.closest("#settings-user-cancel");
+  if (clearUserButton) clearUserForm();
+
   const replaceSiteImageButton = event.target.closest("#replace-site-image");
   if (replaceSiteImageButton) {
     event.preventDefault();
@@ -132,6 +152,11 @@ document.getElementById("settings-menu").addEventListener("click", (event) => {
   if (button) renderSettings(button.dataset.setting);
 });
 document.getElementById("settings-panel").addEventListener("submit", (event) => {
+  if (event.target.id === "settings-user-form") {
+    event.preventDefault();
+    submitUserManagementForm();
+    return;
+  }
   if (event.target.id !== "settings-password-form") return;
   event.preventDefault();
   changeSettingsPassword();

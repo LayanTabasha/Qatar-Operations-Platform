@@ -109,7 +109,7 @@ function isAdmin() {
 }
 
 function canManageOperations() {
-  return ["admin", "operator"].includes(state.currentUserRoleKey) || ["Administrator", "Operations Staff"].includes(state.currentUserRole);
+  return ["admin", "operations_staff"].includes(state.currentUserRoleKey) || ["Administrator", "Operations Staff"].includes(state.currentUserRole);
 }
 
 function saveState() {

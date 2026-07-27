@@ -68,9 +68,10 @@ describe("database schema files", () => {
     const rolesSeed = fs.readFileSync(path.join(seedsDir, "001_roles.sql"), "utf8").toLowerCase();
 
     expect(rolesSeed).toContain("'admin'");
-    expect(rolesSeed).toContain("'operator'");
+    expect(rolesSeed).toContain("'operations_staff'");
     expect(rolesSeed).toContain("'viewer'");
     expect(rolesSeed).toContain("on conflict (name) do update");
+    expect(rolesSeed).not.toContain("'operator'");
     expect(rolesSeed).not.toContain("'manager'");
   });
 
