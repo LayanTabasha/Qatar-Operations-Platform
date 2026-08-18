@@ -7,13 +7,14 @@ const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const state = fs.readFileSync(path.join(root, "js/state.js"), "utf8");
 
 const FRONTEND_STRUCTURE_VERSION = "20260818-frontend-structure-v1";
-const HOMEPAGE_STRUCTURE_VERSION = "20260818-homepage-recent-activity-v1";
+const HOMEPAGE_STRUCTURE_VERSION = "20260818-homepage-requests-status-v1";
 const HOME_SHARED_VERSION = "20260818-home-shared-v1";
 const RECORDS_BY_SITE_VERSION = "20260818-records-by-site-v1";
 const VISIT_ACTIVITY_VERSION = "20260818-visit-activity-v1";
 const FAULT_STATUS_VERSION = "20260818-fault-status-v1";
 const CHARGER_STATUS_VERSION = "20260818-charger-status-v1";
 const RECENT_ACTIVITY_VERSION = "20260818-recent-activity-v1";
+const REQUESTS_STATUS_VERSION = "20260818-requests-status-v1";
 const DISPLAY_UTILS_VERSION = "20260818-display-utils-v1";
 const HOMEPAGE_REQUESTS_VERSION = "20260813-homepage-requests";
 const REQUESTS_BOOTSTRAP_VERSION = "20260813-requests-bootstrap";
@@ -53,6 +54,7 @@ describe("frontend cache-version integrity", () => {
     const faultStatusIndex = sources.indexOf(`frontend/pages/homepage/fault-status.js?v=${FAULT_STATUS_VERSION}`);
     const chargerStatusIndex = sources.indexOf(`frontend/pages/homepage/charger-status.js?v=${CHARGER_STATUS_VERSION}`);
     const recentActivityIndex = sources.indexOf(`frontend/pages/homepage/recent-activity.js?v=${RECENT_ACTIVITY_VERSION}`);
+    const requestsStatusIndex = sources.indexOf(`frontend/pages/homepage/requests-status.js?v=${REQUESTS_STATUS_VERSION}`);
     const homepageIndex = sources.indexOf(`frontend/pages/homepage/home-page.js?v=${HOMEPAGE_STRUCTURE_VERSION}`);
 
     expect(stateIndex).toBeGreaterThanOrEqual(0);
@@ -63,7 +65,8 @@ describe("frontend cache-version integrity", () => {
     expect(faultStatusIndex).toBeGreaterThan(visitActivityIndex);
     expect(chargerStatusIndex).toBeGreaterThan(faultStatusIndex);
     expect(recentActivityIndex).toBeGreaterThan(chargerStatusIndex);
-    expect(homepageIndex).toBeGreaterThan(recentActivityIndex);
+    expect(requestsStatusIndex).toBeGreaterThan(recentActivityIndex);
+    expect(homepageIndex).toBeGreaterThan(requestsStatusIndex);
     expect(sources.indexOf(`app.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`js/sites-page.js?v=${FAULT_LIFECYCLE_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`js/api-client.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);

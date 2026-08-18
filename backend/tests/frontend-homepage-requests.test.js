@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const root = path.resolve(process.cwd(), "..");
 const home = fs.readFileSync(path.join(root, "frontend/pages/homepage/home-page.js"), "utf8");
+const requestsStatus = fs.readFileSync(path.join(root, "frontend/pages/homepage/requests-status.js"), "utf8");
 const page = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const state = fs.readFileSync(path.join(root, "js/state.js"), "utf8");
 const sites = fs.readFileSync(path.join(root, "js/sites-page.js"), "utf8");
@@ -21,16 +22,16 @@ function browserScripts() {
 
 describe("Homepage Requests integration", () => {
   it("shows the KPI and chart only through the established Requests role predicate", () => {
-    expect(home).toContain("const visible = window.QatarOpsRequests.canAccess()");
-    expect(state).toContain('["admin", "hq_user", "operations_staff"].includes');
+    expect(requestsStatus).toContain("const visible = window.QatarOpsRequests.canAccess()");
+    expect(state).toContain('["admin", "hq_user"].includes');
     expect(page).toContain('id="open-requests-kpi"');
     expect(page).toContain('id="requests-status-card"');
   });
 
   it("counts active and high-priority requests without completed requests", () => {
-    expect(home).toContain('["open", "in_progress"].includes(item.status)');
-    expect(home).toContain('item.priority === "high"');
-    expect(home).toContain("No high priority requests");
+    expect(requestsStatus).toContain('["open", "in_progress"].includes(item.status)');
+    expect(requestsStatus).toContain('item.priority === "high"');
+    expect(requestsStatus).toContain("No high priority requests");
   });
 
   it("renders exactly the three supported request statuses", () => {
@@ -40,17 +41,17 @@ describe("Homepage Requests integration", () => {
     expect(state).not.toContain('label: "Overdue"');
     expect(state).not.toContain('label: "Closed"');
     expect(state).not.toContain('label: "Awaiting Verification"');
-    expect(home).toContain('class="requests-status-summary"');
-    expect(home).toContain('class="request-status-row"');
-    expect(home).toContain('class="request-status-heading"');
-    expect(home).not.toContain('class="request-status-doughnut"');
+    expect(requestsStatus).toContain('class="requests-status-summary"');
+    expect(requestsStatus).toContain('class="request-status-row"');
+    expect(requestsStatus).toContain('class="request-status-heading"');
+    expect(requestsStatus).not.toContain('class="request-status-doughnut"');
     expect(page).toContain('class="panel dashboard-card hidden" id="requests-status-card"');
     expect(page).not.toContain('class="panel dashboard-card wide hidden" id="requests-status-card"');
   });
 
   it("keeps the Open Requests KPI defined as Open plus In Progress", () => {
-    expect(home).toContain('const active = state.requests.filter((item) => ["open", "in_progress"].includes(item.status))');
-    expect(home).toContain("if (count) count.textContent = active.length");
+    expect(requestsStatus).toContain('const active = state.requests.filter((item) => ["open", "in_progress"].includes(item.status))');
+    expect(requestsStatus).toContain("if (count) count.textContent = active.length");
   });
 
   it("places Site Visit Activity and Requests Status in the responsive dashboard grid", () => {
@@ -83,13 +84,13 @@ describe("Homepage Requests integration", () => {
     const homepage = page.slice(page.indexOf('id="home"'), page.indexOf('id="sites"'));
     expect(homepage).not.toContain("Pending Data");
     expect(homepage).toContain("Current sites");
-    expect(home).toContain("No high priority requests");
+    expect(requestsStatus).toContain("No high priority requests");
   });
 
   it("uses the shared Requests API with isolated failure handling", () => {
-    expect(home).toContain("window.QatarOpsApi.Requests.list({ limit: 500 })");
-    expect(home).toContain("state.homepageRequestsError = error.message");
-    expect(home).not.toContain("localStorage");
+    expect(requestsStatus).toContain("window.QatarOpsApi.Requests.list({ limit: 500 })");
+    expect(requestsStatus).toContain("state.homepageRequestsError = error.message");
+    expect(requestsStatus).not.toContain("localStorage");
     expect(sites).toContain("Promise.resolve().then(loadHomepageRequests).catch");
   });
 
@@ -110,7 +111,7 @@ describe("Homepage Requests integration", () => {
   it("loads the shared Requests contract before every consumer", () => {
     const sources = browserScripts().map(({ source }) => source);
     const sharedIndex = sources.indexOf("js/state.js");
-    for (const consumer of ["js/auth-router.js", "frontend/pages/homepage/home-page.js", "js/sites-page.js", "js/requests-page.js"]) {
+    for (const consumer of ["js/auth-router.js", "frontend/pages/homepage/requests-status.js", "frontend/pages/homepage/home-page.js", "js/sites-page.js", "js/requests-page.js"]) {
       expect(sources.indexOf(consumer)).toBeGreaterThan(sharedIndex);
     }
   });

@@ -61,7 +61,7 @@ describe("Homepage Records by Site component", () => {
     const sources = Array.from(index.matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1]);
     const component = "frontend/pages/homepage/records-by-site.js?v=20260818-records-by-site-v1";
     const shared = "frontend/pages/homepage/home-shared.js?v=20260818-home-shared-v1";
-    const homepage = "frontend/pages/homepage/home-page.js?v=20260818-homepage-recent-activity-v1";
+    const homepage = "frontend/pages/homepage/home-page.js?v=20260818-homepage-requests-status-v1";
     expect(sources.indexOf(shared)).toBeGreaterThanOrEqual(0);
     expect(sources.indexOf(component)).toBeGreaterThanOrEqual(0);
     expect(sources.indexOf(shared)).toBeLessThan(sources.indexOf(component));
