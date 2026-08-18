@@ -10,8 +10,6 @@ const sitesSharedSource = fs.readFileSync(path.resolve(root, "../frontend/pages/
 const sitesListSource = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/sites-list.js"), "utf8");
 const siteVisitsSource = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/site-visits.js"), "utf8");
 const faultsSource = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/faults.js"), "utf8");
-const operationalRecordsSource = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/operational-records.js"), "utf8");
-const chargerLifecycleSource = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/charger-lifecycle.js"), "utf8");
 const sitesSource = fs.readFileSync(path.resolve(root, "../js/sites-page.js"), "utf8");
 const stateSource = fs.readFileSync(path.resolve(root, "../js/state.js"), "utf8");
 const appSource = fs.readFileSync(path.resolve(root, "../app.js"), "utf8");
@@ -37,8 +35,6 @@ function renderer(role, roleSource = "state") {
   vm.runInContext(sitesListSource, context);
   vm.runInContext(siteVisitsSource, context);
   vm.runInContext(faultsSource, context);
-  vm.runInContext(operationalRecordsSource, context);
-  vm.runInContext(chargerLifecycleSource, context);
   vm.runInContext(sitesSource, context);
   return {
     map: vm.runInContext("mapContentRecord", context),
@@ -122,7 +118,7 @@ describe("rendered persistent content actions", () => {
   it("normalizes the live Administrator role and delegates dynamic action events", () => {
     expect(stateSource).toContain('["admin", "administrator"].includes(normalized)');
     expect(stateSource).toContain('["admin", "hq_user", "operations_staff"].includes(role)');
-    expect(operationalRecordsSource).toContain("canManageOperations()");
+    expect(sitesSource).toContain("canManageOperations()");
     expect(appSource).toContain('event.target.closest("[data-content-edit]")');
     expect(appSource).toContain('event.target.closest("[data-content-delete]")');
     expect(appSource).toContain("state.currentContentRecordId = contentEditButton.dataset.contentEdit");

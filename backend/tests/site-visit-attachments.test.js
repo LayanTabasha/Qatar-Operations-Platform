@@ -12,7 +12,6 @@ const attachmentRoutes = fs.readFileSync(path.join(root, "src/modules/attachment
 const frontendPreview = fs.readFileSync(path.resolve(root, "../frontend/shared/files/file-preview.js"), "utf8");
 const sitesPage = fs.readFileSync(path.resolve(root, "../js/sites-page.js"), "utf8");
 const siteVisits = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/site-visits.js"), "utf8");
-const operationalRecords = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/operational-records.js"), "utf8");
 const sitesDataMappers = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/sites-data-mappers.js"), "utf8");
 const modals = fs.readFileSync(path.resolve(root, "../js/modals.js"), "utf8");
 const dedupeSource = sitesDataMappers.slice(
@@ -59,7 +58,7 @@ describe("persistent Site Visit reports", () => {
   });
 
   it("renders report metadata and actions in the Site Visits UI", () => {
-    expect(operationalRecords).toContain("Report / Attachment");
+    expect(sitesPage).toContain("Report / Attachment");
     expect(siteVisits).toContain("visitAttachmentsMarkup(visit)");
     expect(siteVisits).toContain("No report attached");
     expect(modals).toContain("Remove Report");

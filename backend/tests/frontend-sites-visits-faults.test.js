@@ -9,7 +9,6 @@ const index = read("index.html");
 const siteVisits = read("frontend/pages/sites/site-visits.js");
 const faults = read("frontend/pages/sites/faults.js");
 const sitesPage = read("js/sites-page.js");
-const operationalRecords = read("frontend/pages/sites/operational-records.js");
 const modals = read("js/modals.js");
 
 function featureRuntime(canManage = true) {
@@ -96,6 +95,6 @@ describe("extracted Sites Visit and Fault renderers", () => {
       expect(production.match(new RegExp(`function ${name}\\(`, "g")) || [], name).toHaveLength(1);
     }
     expect(sitesPage).toContain("async function removeSiteVisitReportAttachment");
-    expect(operationalRecords).toContain("function openOperationalDeleteConfirmation");
+    expect(sitesPage).toContain("function openOperationalDeleteConfirmation");
   });
 });
