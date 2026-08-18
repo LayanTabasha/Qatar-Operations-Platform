@@ -22,6 +22,7 @@ function runtime(state, uploads = []) {
     valueOrPlaceholder: (value) => value ?? "Pending Data",
   });
   vm.runInContext(read("frontend/shared/utils/display-utils.js"), context);
+  vm.runInContext(read("frontend/pages/homepage/home-shared.js"), context);
   vm.runInContext(read(componentPath), context, { filename: componentPath });
   return { context, target };
 }
@@ -40,7 +41,6 @@ describe("Homepage Records by Site component", () => {
     };
     const uploads = [{ siteName: "Msheireb" }, { siteName: "Msheireb" }, { siteName: "Other" }];
     const { context, target } = runtime(state, uploads);
-    context.chartEmpty = () => "unused";
     context.renderRecordsBySiteChart();
     expect(target.innerHTML).toContain("Msheireb");
     expect(target.innerHTML).toContain("Chargers <b>2</b>");
@@ -51,17 +51,20 @@ describe("Homepage Records by Site component", () => {
 
   it("retains the shared Homepage empty state", () => {
     const { context, target } = runtime({ sites: [], faults: [], visits: [] });
-    context.chartEmpty = (message) => `EMPTY:${message}`;
     context.renderRecordsBySiteChart();
-    expect(target.innerHTML).toBe("EMPTY:No site records are available yet.");
+    expect(target.innerHTML).toContain("No site records are available yet.");
+    expect(target.innerHTML).toContain("Records entered in the platform will appear here automatically.");
   });
 
   it("loads before the orchestrator and remains callable from renderDashboardCharts", () => {
     const index = read("index.html");
     const sources = Array.from(index.matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1]);
     const component = "frontend/pages/homepage/records-by-site.js?v=20260818-records-by-site-v1";
-    const homepage = "frontend/pages/homepage/home-page.js?v=20260818-homepage-records-by-site-v1";
+    const shared = "frontend/pages/homepage/home-shared.js?v=20260818-home-shared-v1";
+    const homepage = "frontend/pages/homepage/home-page.js?v=20260818-home-shared-extraction-v1";
+    expect(sources.indexOf(shared)).toBeGreaterThanOrEqual(0);
     expect(sources.indexOf(component)).toBeGreaterThanOrEqual(0);
+    expect(sources.indexOf(shared)).toBeLessThan(sources.indexOf(component));
     expect(sources.indexOf(component)).toBeLessThan(sources.indexOf(homepage));
 
     const { context, target } = runtime({ sites: [], faults: [], visits: [], dashboardChargers: [] });
