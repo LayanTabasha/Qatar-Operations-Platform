@@ -8,6 +8,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const utilityPath = "frontend/shared/utils/display-utils.js";
 const callerPaths = [
   "frontend/pages/homepage/fault-trend.js",
+  "frontend/pages/sites/sites-shared.js",
   "js/sites-page.js",
   "js/modals.js",
 ];

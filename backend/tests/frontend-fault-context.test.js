@@ -8,6 +8,7 @@ const root = path.resolve(process.cwd(), "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const index = read("index.html");
 const mapperSource = read("frontend/pages/sites/sites-data-mappers.js");
+const sitesSharedSource = read("frontend/pages/sites/sites-shared.js");
 const sitesSource = read("js/sites-page.js");
 const modalsSource = read("js/modals.js");
 const appSource = read("app.js");
@@ -41,6 +42,7 @@ function runtime() {
     function formatSettingValue(value) { return String(value || ""); }
   `);
   run(mapperSource, "frontend/pages/sites/sites-data-mappers.js");
+  run(sitesSharedSource, "frontend/pages/sites/sites-shared.js");
   run(sitesSource, "js/sites-page.js");
   run(modalsSource, "js/modals.js");
   run(`

@@ -8,6 +8,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 function loadBrowserScript(file, additions = {}) {
   const context = vm.createContext({ console, Map, Set, Date, String, Number, Array, Object, Math, ...additions });
+  if (file === "js/sites-page.js") vm.runInContext(read("frontend/pages/sites/sites-shared.js"), context, { filename: "frontend/pages/sites/sites-shared.js" });
   vm.runInContext(read(file), context, { filename: file });
   return context;
 }
