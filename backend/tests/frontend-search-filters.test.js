@@ -8,7 +8,10 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 function loadBrowserScript(file, additions = {}) {
   const context = vm.createContext({ console, Map, Set, Date, String, Number, Array, Object, Math, ...additions });
-  if (file === "js/sites-page.js") vm.runInContext(read("frontend/pages/sites/sites-shared.js"), context, { filename: "frontend/pages/sites/sites-shared.js" });
+  if (file === "js/sites-page.js") {
+    vm.runInContext(read("frontend/pages/sites/sites-shared.js"), context, { filename: "frontend/pages/sites/sites-shared.js" });
+    vm.runInContext(read("frontend/pages/sites/sites-list.js"), context, { filename: "frontend/pages/sites/sites-list.js" });
+  }
   vm.runInContext(read(file), context, { filename: file });
   return context;
 }
@@ -152,14 +155,15 @@ describe("frontend search and filter controls", () => {
 
   it("keeps handlers and empty states for every existing frontend implementation", () => {
     const index = read("index.html");
-    const sites = read("js/sites-page.js");
+    const sites = read("frontend/pages/sites/sites-list.js");
+    const sitesPage = read("js/sites-page.js");
     const requests = read("js/requests-page.js");
     const archive = read("frontend/pages/settings/archive-page.js");
     const globalSearch = read("frontend/pages/homepage/global-search.js");
     const contacts = read("frontend/pages/contacts/contacts-page.js");
     for (const id of ["global-search", "sites-search", "sites-status-filter", "fault-trend-range", "visit-activity-mode"]) expect(index).toContain(`id="${id}"`);
     expect(sites).toContain("bindSitesFilters");
-    expect(sites).toContain("updateOperationalRecordResults");
+    expect(sitesPage).toContain("updateOperationalRecordResults");
     expect(sites).toContain("No sites match the selected filters");
     expect(requests).toContain("filteredRequests()");
     expect(requests).toContain("No requests match the selected filters");

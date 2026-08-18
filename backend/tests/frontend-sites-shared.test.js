@@ -7,6 +7,7 @@ const root = path.resolve(process.cwd(), "..");
 const sharedPath = "frontend/pages/sites/sites-shared.js";
 const shared = fs.readFileSync(path.join(root, sharedPath), "utf8");
 const sites = fs.readFileSync(path.join(root, "js/sites-page.js"), "utf8");
+const sitesList = fs.readFileSync(path.join(root, "frontend/pages/sites/sites-list.js"), "utf8");
 const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
 
 function runtime(overrides = {}) {
@@ -90,6 +91,6 @@ describe("shared Sites helpers", () => {
       expect(sites).not.toMatch(new RegExp(`function ${name}\\s*\\(`));
     }
     expect(production.match(/const operationalRecordFilters\s*=\s*new Map\(\)/g) || []).toHaveLength(1);
-    expect(sites).toContain('const siteListFilters = { search: "", status: "" };');
+    expect(sitesList).toContain('const siteListFilters = { search: "", status: "" };');
   });
 });

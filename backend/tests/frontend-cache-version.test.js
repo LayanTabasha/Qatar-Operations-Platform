@@ -21,6 +21,7 @@ const KPI_CARDS_VERSION = "20260818-kpi-cards-v1";
 const DISPLAY_UTILS_VERSION = "20260818-display-utils-v2";
 const SITES_DATA_MAPPERS_VERSION = "20260818-sites-data-mappers-v1";
 const SITES_SHARED_VERSION = "20260818-sites-shared-v1";
+const SITES_LIST_VERSION = "20260818-sites-list-v1";
 const HOMEPAGE_REQUESTS_VERSION = "20260813-homepage-requests";
 const REQUESTS_BOOTSTRAP_VERSION = "20260813-requests-bootstrap";
 const ROLE_PERMISSIONS_VERSION = "20260817-charger-natural-sort";
@@ -66,6 +67,7 @@ describe("frontend cache-version integrity", () => {
     const homepageIndex = sources.indexOf(`frontend/pages/homepage/home-page.js?v=${HOMEPAGE_STRUCTURE_VERSION}`);
     const sitesDataMappersIndex = sources.indexOf(`frontend/pages/sites/sites-data-mappers.js?v=${SITES_DATA_MAPPERS_VERSION}`);
     const sitesSharedIndex = sources.indexOf(`frontend/pages/sites/sites-shared.js?v=${SITES_SHARED_VERSION}`);
+    const sitesListIndex = sources.indexOf(`frontend/pages/sites/sites-list.js?v=${SITES_LIST_VERSION}`);
     const sitesPageIndex = sources.indexOf(`js/sites-page.js?v=${FAULT_LIFECYCLE_VERSION}`);
 
     expect(stateIndex).toBeGreaterThanOrEqual(0);
@@ -83,7 +85,8 @@ describe("frontend cache-version integrity", () => {
     expect(homepageIndex).toBeGreaterThan(kpiCardsIndex);
     expect(sitesDataMappersIndex).toBeGreaterThan(homepageIndex);
     expect(sitesSharedIndex).toBeGreaterThan(sitesDataMappersIndex);
-    expect(sitesPageIndex).toBeGreaterThan(sitesSharedIndex);
+    expect(sitesListIndex).toBeGreaterThan(sitesSharedIndex);
+    expect(sitesPageIndex).toBeGreaterThan(sitesListIndex);
     expect(sources.indexOf(`app.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sitesPageIndex).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`js/api-client.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);

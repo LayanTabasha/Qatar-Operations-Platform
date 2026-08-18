@@ -6,6 +6,7 @@ const root = path.resolve(process.cwd(), "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const index = read("index.html");
 const sites = read("js/sites-page.js");
+const sitesList = read("frontend/pages/sites/sites-list.js");
 const modals = read("js/modals.js");
 const state = read("js/state.js");
 const app = read("app.js");
@@ -15,7 +16,7 @@ describe("Site and Charger creation controls", () => {
   it("shows Add Site only to administrators", () => {
     expect(index).toContain('id="add-site-button"');
     expect(index).toContain('data-modal="site" data-mode="create"');
-    expect(sites).toContain('classList.toggle("hidden", !isAdmin())');
+    expect(sitesList).toContain('classList.toggle("hidden", !isAdmin())');
     expect(state).toContain("function isAdmin()");
     expect(index).toContain('class="primary-button hidden" id="add-site-button"');
   });
@@ -47,9 +48,9 @@ describe("Site and Charger creation controls", () => {
   });
 
   it("preserves edit and archive controls with role-safe rendering", () => {
-    expect(sites).toContain('data-modal="site" data-mode="edit"');
+    expect(sitesList).toContain('data-modal="site" data-mode="edit"');
     expect(sites).toContain('data-modal="charger" type="button">Edit Charger Information');
-    expect(sites).toContain('data-archive-active="site"');
+    expect(sitesList).toContain('data-archive-active="site"');
     expect(sites).toContain('data-archive-active="charger"');
     expect(sites).not.toContain('data-archive-delete="');
   });

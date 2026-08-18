@@ -9,6 +9,7 @@ describe("frontend Archive workflow", () => {
   const sources = () => ({
     api: readRootFile("js/api-client.js"), archive: readRootFile("frontend/pages/settings/archive-page.js"),
     settings: readRootFile("js/settings-page.js"), sites: readRootFile("js/sites-page.js"),
+    sitesList: readRootFile("frontend/pages/sites/sites-list.js"),
     mappers: readRootFile("frontend/pages/sites/sites-data-mappers.js"),
     state: readRootFile("js/state.js"), modals: readRootFile("js/modals.js"),
     index: readRootFile("index.html"), styles: readRootFile("styles.css"),
@@ -105,8 +106,8 @@ describe("frontend Archive workflow", () => {
   });
 
   it("provides admin-only Archive actions on active sites and chargers without permanent delete", () => {
-    const { sites } = sources();
-    expect(sites).toContain('data-archive-active="site"');
+    const { sites, sitesList } = sources();
+    expect(sitesList).toContain('data-archive-active="site"');
     expect(sites).toContain('data-archive-active="charger"');
     expect(sites).toContain("isAdmin()");
     expect(sites).not.toContain('data-archive-delete="');
