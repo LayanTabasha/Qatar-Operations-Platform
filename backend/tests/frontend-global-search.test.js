@@ -102,7 +102,7 @@ describe("Homepage Global Search component", () => {
     expect(componentIndex).toBeGreaterThan(sources.indexOf("js/state.js?v=20260818-fault-lifecycle-v1"));
     expect(componentIndex).toBeGreaterThan(sources.indexOf("js/auth-router.js?v=20260813-requests-bootstrap"));
     expect(componentIndex).toBeGreaterThan(sources.indexOf("frontend/shared/utils/display-utils.js?v=20260818-display-utils-v1"));
-    expect(sources.indexOf("frontend/pages/homepage/home-page.js?v=20260818-homepage-fault-trend-v1")).toBeGreaterThan(componentIndex);
+    expect(sources.indexOf("frontend/pages/homepage/home-page.js?v=20260818-homepage-kpi-orchestrator-v1")).toBeGreaterThan(componentIndex);
     expect(read(homepagePath)).toContain("renderGlobalSearchResults(globalSearch.value)");
   });
 
