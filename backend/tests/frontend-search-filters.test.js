@@ -11,6 +11,8 @@ function loadBrowserScript(file, additions = {}) {
   if (file === "js/sites-page.js") {
     vm.runInContext(read("frontend/pages/sites/sites-shared.js"), context, { filename: "frontend/pages/sites/sites-shared.js" });
     vm.runInContext(read("frontend/pages/sites/sites-list.js"), context, { filename: "frontend/pages/sites/sites-list.js" });
+    vm.runInContext(read("frontend/pages/sites/site-visits.js"), context, { filename: "frontend/pages/sites/site-visits.js" });
+    vm.runInContext(read("frontend/pages/sites/faults.js"), context, { filename: "frontend/pages/sites/faults.js" });
   }
   vm.runInContext(read(file), context, { filename: file });
   return context;

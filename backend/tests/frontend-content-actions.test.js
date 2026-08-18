@@ -8,6 +8,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const mapperSource = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/sites-data-mappers.js"), "utf8");
 const sitesSharedSource = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/sites-shared.js"), "utf8");
 const sitesListSource = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/sites-list.js"), "utf8");
+const siteVisitsSource = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/site-visits.js"), "utf8");
+const faultsSource = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/faults.js"), "utf8");
 const sitesSource = fs.readFileSync(path.resolve(root, "../js/sites-page.js"), "utf8");
 const stateSource = fs.readFileSync(path.resolve(root, "../js/state.js"), "utf8");
 const appSource = fs.readFileSync(path.resolve(root, "../app.js"), "utf8");
@@ -31,6 +33,8 @@ function renderer(role, roleSource = "state") {
   vm.runInContext(mapperSource, context);
   vm.runInContext(sitesSharedSource, context);
   vm.runInContext(sitesListSource, context);
+  vm.runInContext(siteVisitsSource, context);
+  vm.runInContext(faultsSource, context);
   vm.runInContext(sitesSource, context);
   return {
     map: vm.runInContext("mapContentRecord", context),

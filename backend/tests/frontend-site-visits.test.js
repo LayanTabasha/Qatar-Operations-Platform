@@ -34,7 +34,7 @@ describe("frontend site visit workflow", () => {
   });
 
   it("renders visitDate, timeIn, and timeOut from persisted records", () => {
-    const sitesPageSource = readRootFile("js/sites-page.js");
+    const sitesPageSource = readRootFile("frontend/pages/sites/site-visits.js");
     const mapperSource = readRootFile("frontend/pages/sites/sites-data-mappers.js");
 
     expect(mapperSource).toContain("visitDate: visit.visit_date");
@@ -46,11 +46,11 @@ describe("frontend site visit workflow", () => {
   });
 
   it("provides role-aware edit/delete actions and exact confirmation", () => {
-    const sites = readRootFile("js/sites-page.js");
+    const siteVisits = readRootFile("frontend/pages/sites/site-visits.js");
     const modals = readRootFile("js/modals.js");
     const api = readRootFile("js/api-client.js");
-    expect(sites).toContain('data-delete-type="siteVisit"');
-    expect(sites).toContain("canManageOperations()");
+    expect(siteVisits).toContain('data-delete-type="siteVisit"');
+    expect(siteVisits).toContain("canManageOperations()");
     expect(modals).toContain('setFieldValue("site", visit.siteName);\n      refreshChargerSelect();');
     expect(modals).toContain('operational-delete-confirmation")?.value.trim() !== "DELETE"');
     expect(modals).toContain("window.QatarOpsApi.SiteVisits.remove(form.dataset.recordId)");

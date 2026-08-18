@@ -75,7 +75,7 @@ describe("frontend DTC catalogue workflow", () => {
 
   it("keeps Fault Code optional and provides a separate severity selector", () => {
     const modalsSource = readRootFile("js/modals.js");
-    const sitesSource = readRootFile("js/sites-page.js");
+    const sitesSource = readRootFile("frontend/pages/sites/faults.js");
 
     expect(modalsSource).toContain('id="severity"');
     expect(modalsSource).toContain("Select the technical impact of the fault.");
