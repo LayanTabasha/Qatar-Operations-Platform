@@ -47,7 +47,7 @@ describe("shared Homepage helpers", () => {
     const sources = Array.from(read("index.html").matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1]);
     const sharedIndex = sources.indexOf("frontend/pages/homepage/home-shared.js?v=20260818-home-shared-v1");
     const recordsIndex = sources.indexOf("frontend/pages/homepage/records-by-site.js?v=20260818-records-by-site-v1");
-    const homepageIndex = sources.indexOf("frontend/pages/homepage/home-page.js?v=20260818-homepage-fault-status-v1");
+    const homepageIndex = sources.indexOf("frontend/pages/homepage/home-page.js?v=20260818-homepage-charger-status-v1");
     expect(sharedIndex).toBeGreaterThanOrEqual(0);
     expect(recordsIndex).toBeGreaterThan(sharedIndex);
     expect(homepageIndex).toBeGreaterThan(recordsIndex);

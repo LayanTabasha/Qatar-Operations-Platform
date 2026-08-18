@@ -63,7 +63,7 @@ describe("Homepage Site Visit Activity component", () => {
     const sources = Array.from(read("index.html").matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1]);
     const sharedIndex = sources.indexOf("frontend/pages/homepage/home-shared.js?v=20260818-home-shared-v1");
     const componentIndex = sources.indexOf("frontend/pages/homepage/visit-activity.js?v=20260818-visit-activity-v1");
-    const homepageIndex = sources.indexOf("frontend/pages/homepage/home-page.js?v=20260818-homepage-fault-status-v1");
+    const homepageIndex = sources.indexOf("frontend/pages/homepage/home-page.js?v=20260818-homepage-charger-status-v1");
     expect(componentIndex).toBeGreaterThan(sharedIndex);
     expect(homepageIndex).toBeGreaterThan(componentIndex);
     expect(read(homepagePath)).toContain("renderVisitActivityChart();");
