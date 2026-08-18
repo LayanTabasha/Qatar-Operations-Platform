@@ -64,13 +64,14 @@ describe("Contacts optional Site frontend", () => {
 
   it("opens Add/Edit forms with the correct optional Site selection", () => {
     const stateScript = read("js/state.js");
+    const displayUtilsScript = read("frontend/shared/utils/display-utils.js");
     const contactsScript = read("frontend/pages/contacts/contacts-page.js");
     const modalsScript = read("js/modals.js");
     const virtualConsole = new VirtualConsole();
     const errors = [];
     virtualConsole.on("jsdomError", (error) => errors.push(error));
     const dom = new JSDOM(`<!doctype html><section id="contacts"></section><div id="modal-backdrop" class="hidden"><div class="modal"><h2 id="modal-title"></h2><p id="modal-eyebrow"></p><form id="modal-form"></form></div></div>
-      <script>HTMLElement.prototype.scrollTo=function(){};</script><script>${stateScript}</script><script>${contactsScript}</script><script>${modalsScript}</script>
+      <script>HTMLElement.prototype.scrollTo=function(){};</script><script>${stateScript}</script><script>${displayUtilsScript}</script><script>${contactsScript}</script><script>${modalsScript}</script>
       <script>
         state.currentUserRoleKey="operations_staff";
         state.sites=[{id:"site-1",name:"Msheireb",chargers:[]}];

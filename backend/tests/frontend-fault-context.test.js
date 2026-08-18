@@ -26,6 +26,7 @@ function runtime() {
   const context = dom.getInternalVMContext();
   const run = (source, filename = "runtime.js") => vm.runInContext(source, context, { filename });
   run(read("js/state.js"), "js/state.js");
+  run(read("frontend/shared/utils/display-utils.js"), "frontend/shared/utils/display-utils.js");
   run(`
     state.authenticated = true;
     state.currentUser = "Runtime Tester";

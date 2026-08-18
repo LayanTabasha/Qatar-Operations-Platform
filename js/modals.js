@@ -481,16 +481,6 @@ function removeSiteImageSelection() {
   renderSiteImagePreview(null);
 }
 
-function safeDetailValue(value) {
-  if (typeof formatSettingValue === "function") return formatSettingValue(value);
-  return String(valueOrPlaceholder(value))
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
 function detailRow(label, value) {
   return `<div class="data-row"><span>${label}</span><strong>${safeDetailValue(value)}</strong></div>`;
 }
