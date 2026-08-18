@@ -60,7 +60,7 @@ describe("Homepage Fault Status component", () => {
     const sources = Array.from(read("index.html").matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1]);
     const sharedIndex = sources.indexOf("frontend/pages/homepage/home-shared.js?v=20260818-home-shared-v1");
     const componentIndex = sources.indexOf("frontend/pages/homepage/fault-status.js?v=20260818-fault-status-v1");
-    const homepageIndex = sources.indexOf("frontend/pages/homepage/home-page.js?v=20260818-homepage-charger-status-v1");
+    const homepageIndex = sources.indexOf("frontend/pages/homepage/home-page.js?v=20260818-homepage-recent-activity-v1");
     expect(componentIndex).toBeGreaterThan(sharedIndex);
     expect(homepageIndex).toBeGreaterThan(componentIndex);
     expect(read(homepagePath)).toContain("renderFaultStatusChart();");

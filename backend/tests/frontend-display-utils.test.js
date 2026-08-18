@@ -25,7 +25,7 @@ describe("shared display utilities", () => {
     const index = read("index.html");
     const sources = Array.from(index.matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1]);
     const utility = "frontend/shared/utils/display-utils.js?v=20260818-display-utils-v1";
-    const homepage = "frontend/pages/homepage/home-page.js?v=20260818-homepage-charger-status-v1";
+    const homepage = "frontend/pages/homepage/home-page.js?v=20260818-homepage-recent-activity-v1";
     expect(sources).toContain(utility);
     expect(sources.indexOf(utility)).toBeLessThan(sources.indexOf(homepage));
   });
