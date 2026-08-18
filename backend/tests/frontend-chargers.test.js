@@ -7,7 +7,7 @@ const readRootFile = (relativePath) => fs.readFileSync(path.join(repoRoot, relat
 
 describe("frontend Archive workflow", () => {
   const sources = () => ({
-    api: readRootFile("js/api-client.js"), archive: readRootFile("js/archive-page.js"),
+    api: readRootFile("js/api-client.js"), archive: readRootFile("frontend/pages/settings/archive-page.js"),
     settings: readRootFile("js/settings-page.js"), sites: readRootFile("js/sites-page.js"),
     state: readRootFile("js/state.js"), modals: readRootFile("js/modals.js"),
     index: readRootFile("index.html"), styles: readRootFile("styles.css"),
@@ -121,7 +121,7 @@ describe("frontend Archive workflow", () => {
   it("loads every changed browser asset with a current cache token", () => {
     const { index } = sources();
     expect(index).toContain("app.js?v=20260818-legacy-content-actions-v3");
-    expect(index).toContain("js/archive-page.js?v=20260811-requests-frontend");
+    expect(index).toContain("frontend/pages/settings/archive-page.js?v=20260818-frontend-structure-v1");
     expect(index).toContain("js/settings-page.js?v=20260816-permanent-user-delete");
     expect(index).toContain("js/api-client.js?v=20260818-legacy-content-actions-v3");
     expect(index).toContain("js/state.js?v=20260818-fault-lifecycle-v1");

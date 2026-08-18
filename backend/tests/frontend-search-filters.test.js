@@ -153,9 +153,9 @@ describe("frontend search and filter controls", () => {
     const index = read("index.html");
     const sites = read("js/sites-page.js");
     const requests = read("js/requests-page.js");
-    const archive = read("js/archive-page.js");
+    const archive = read("frontend/pages/settings/archive-page.js");
     const home = read("js/home-page.js");
-    const contacts = read("js/contacts-page.js");
+    const contacts = read("frontend/pages/contacts/contacts-page.js");
     for (const id of ["global-search", "sites-search", "sites-status-filter", "fault-trend-range", "visit-activity-mode"]) expect(index).toContain(`id="${id}"`);
     expect(sites).toContain("bindSitesFilters");
     expect(sites).toContain("updateOperationalRecordResults");

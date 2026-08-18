@@ -8,7 +8,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 describe("Contacts optional Site frontend", () => {
   it("removes Scope and exposes the optional Assigned Site contract", () => {
-    const contacts = read("js/contacts-page.js");
+    const contacts = read("frontend/pages/contacts/contacts-page.js");
     const state = read("js/state.js");
     const modals = read("js/modals.js");
     expect(state).toContain('["Assigned Site", "select:Not site-specific"]');
@@ -24,7 +24,7 @@ describe("Contacts optional Site frontend", () => {
   });
 
   it("runs the Contacts lifecycle with valid and nullable Site records", () => {
-    const contactsScript = read("js/contacts-page.js");
+    const contactsScript = read("frontend/pages/contacts/contacts-page.js");
     const errors = [];
     const virtualConsole = new VirtualConsole();
     virtualConsole.on("jsdomError", (error) => errors.push(error));
@@ -64,7 +64,7 @@ describe("Contacts optional Site frontend", () => {
 
   it("opens Add/Edit forms with the correct optional Site selection", () => {
     const stateScript = read("js/state.js");
-    const contactsScript = read("js/contacts-page.js");
+    const contactsScript = read("frontend/pages/contacts/contacts-page.js");
     const modalsScript = read("js/modals.js");
     const virtualConsole = new VirtualConsole();
     const errors = [];

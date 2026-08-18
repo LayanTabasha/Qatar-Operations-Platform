@@ -6,18 +6,18 @@ const root = path.resolve(process.cwd(), "..");
 const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const state = fs.readFileSync(path.join(root, "js/state.js"), "utf8");
 
-const FRONTEND_STABILIZATION_VERSION = "20260811-requests-frontend";
+const FRONTEND_STRUCTURE_VERSION = "20260818-frontend-structure-v1";
 const HOMEPAGE_REQUESTS_VERSION = "20260813-homepage-requests";
 const REQUESTS_BOOTSTRAP_VERSION = "20260813-requests-bootstrap";
 const ROLE_PERMISSIONS_VERSION = "20260817-charger-natural-sort";
 const USER_DELETE_UI_VERSION = "20260816-permanent-user-delete";
 const HOMEPAGE_COMPACT_VERSION = "20260816-homepage-compact";
-const CONTACT_OPTIONAL_SITE_VERSION = "20260818-contacts-optional-site";
 const CONTENT_RECORD_ACTIONS_VERSION = "20260818-legacy-content-actions-v3";
 const FAULT_LIFECYCLE_VERSION = "20260818-fault-lifecycle-v1";
-const STABILIZATION_PHASE_SCRIPTS = [
-  "js/file-preview.js",
-  "js/archive-page.js",
+const MOVED_FRONTEND_SCRIPTS = [
+  "frontend/pages/contacts/contacts-page.js",
+  "frontend/shared/files/file-preview.js",
+  "frontend/pages/settings/archive-page.js",
 ];
 
 function browserScriptSources() {
@@ -25,12 +25,12 @@ function browserScriptSources() {
 }
 
 describe("frontend cache-version integrity", () => {
-  it("uses the coherent cache token for every script changed in the stabilization phase", () => {
+  it("uses the coherent cache token for every moved frontend script", () => {
     const sources = browserScriptSources();
 
-    for (const script of STABILIZATION_PHASE_SCRIPTS) {
+    for (const script of MOVED_FRONTEND_SCRIPTS) {
       expect(sources, `${script} must be browser-loaded with the current cache token`).toContain(
-        `${script}?v=${FRONTEND_STABILIZATION_VERSION}`,
+        `${script}?v=${FRONTEND_STRUCTURE_VERSION}`,
       );
     }
   });
@@ -64,7 +64,7 @@ describe("frontend cache-version integrity", () => {
     expect(index).toContain(`js/auth-router.js?v=${REQUESTS_BOOTSTRAP_VERSION}`);
     expect(index).toContain(`js/home-page.js?v=${FAULT_LIFECYCLE_VERSION}`);
     expect(index).toContain(`js/sites-page.js?v=${FAULT_LIFECYCLE_VERSION}`);
-    expect(index).toContain(`js/contacts-page.js?v=${CONTACT_OPTIONAL_SITE_VERSION}`);
+    expect(index).toContain(`frontend/pages/contacts/contacts-page.js?v=${FRONTEND_STRUCTURE_VERSION}`);
     expect(index).toContain(`js/modals.js?v=${FAULT_LIFECYCLE_VERSION}`);
     expect(index).toContain(`app.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`);
   });
