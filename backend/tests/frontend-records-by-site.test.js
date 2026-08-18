@@ -61,7 +61,7 @@ describe("Homepage Records by Site component", () => {
     const sources = Array.from(index.matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1]);
     const component = "frontend/pages/homepage/records-by-site.js?v=20260818-records-by-site-v1";
     const shared = "frontend/pages/homepage/home-shared.js?v=20260818-home-shared-v1";
-    const homepage = "frontend/pages/homepage/home-page.js?v=20260818-homepage-global-search-v1";
+    const homepage = "frontend/pages/homepage/home-page.js?v=20260818-homepage-fault-trend-v1";
     expect(sources.indexOf(shared)).toBeGreaterThanOrEqual(0);
     expect(sources.indexOf(component)).toBeGreaterThanOrEqual(0);
     expect(sources.indexOf(shared)).toBeLessThan(sources.indexOf(component));
@@ -72,6 +72,7 @@ describe("Homepage Records by Site component", () => {
     vm.runInContext(read("frontend/pages/homepage/visit-activity.js"), context);
     vm.runInContext(read("frontend/pages/homepage/fault-status.js"), context);
     vm.runInContext(read("frontend/pages/homepage/charger-status.js"), context);
+    vm.runInContext(read("frontend/pages/homepage/fault-trend.js"), context);
     vm.runInContext(read(homepagePath), context, { filename: homepagePath });
     context.renderDashboardCharts();
     expect(target.innerHTML).toContain("No site records are available yet.");

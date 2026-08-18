@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const root = path.resolve(process.cwd(), "..");
 const home = fs.readFileSync(path.join(root, "frontend/pages/homepage/home-page.js"), "utf8");
+const faultTrend = fs.readFileSync(path.join(root, "frontend/pages/homepage/fault-trend.js"), "utf8");
 const requestsStatus = fs.readFileSync(path.join(root, "frontend/pages/homepage/requests-status.js"), "utf8");
 const page = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const state = fs.readFileSync(path.join(root, "js/state.js"), "utf8");
@@ -65,18 +66,18 @@ describe("Homepage Requests integration", () => {
 
   it("renders a chronological split fault trend from one set of per-site series", () => {
     expect(page).toContain('id="fault-trend-site"');
-    expect(home).toContain('state.sites.map((site)');
-    expect(home).toContain('faultBelongsToSite(fault, site)');
-    expect(home).toContain('type: "line"');
-    expect(home).toContain('siteSelected ? "Site Faults" : "Total Faults"');
-    expect(home).toContain('counts.set(key, 0)');
+    expect(faultTrend).toContain('state.sites.map((site)');
+    expect(faultTrend).toContain('faultBelongsToSite(fault, site)');
+    expect(faultTrend).toContain('type: "line"');
+    expect(faultTrend).toContain('siteSelected ? "Site Faults" : "Total Faults"');
+    expect(faultTrend).toContain('counts.set(key, 0)');
     expect(page).toContain('id="fault-trend-site-list"');
     expect(page).toContain('id="fault-trend-total"');
-    expect(home).toContain("siteSeries.reduce((sum, entry) => sum + entry.total, 0)");
-    expect(home).toContain("faultTrendSparkline(series.values, color, site.name)");
+    expect(faultTrend).toContain("siteSeries.reduce((sum, entry) => sum + entry.total, 0)");
+    expect(faultTrend).toContain("faultTrendSparkline(series.values, color, site.name)");
     expect(app).toContain('[data-fault-trend-site]');
-    expect(home).toContain('No faults reported for this site during this period.');
-    expect(home).toContain("const days = Number(document.getElementById(\"fault-trend-range\")?.value || 30)");
+    expect(faultTrend).toContain('No faults reported for this site during this period.');
+    expect(faultTrend).toContain("const days = Number(document.getElementById(\"fault-trend-range\")?.value || 30)");
     expect(app).toContain('["fault-trend-site", "fault-trend-range", "visit-activity-mode"]');
   });
 

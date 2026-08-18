@@ -7,7 +7,7 @@ const root = path.resolve(process.cwd(), "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const utilityPath = "frontend/shared/utils/display-utils.js";
 const callerPaths = [
-  "frontend/pages/homepage/home-page.js",
+  "frontend/pages/homepage/fault-trend.js",
   "js/sites-page.js",
   "js/modals.js",
 ];
@@ -25,7 +25,7 @@ describe("shared display utilities", () => {
     const index = read("index.html");
     const sources = Array.from(index.matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1]);
     const utility = "frontend/shared/utils/display-utils.js?v=20260818-display-utils-v1";
-    const homepage = "frontend/pages/homepage/home-page.js?v=20260818-homepage-global-search-v1";
+    const homepage = "frontend/pages/homepage/home-page.js?v=20260818-homepage-fault-trend-v1";
     expect(sources).toContain(utility);
     expect(sources.indexOf(utility)).toBeLessThan(sources.indexOf(homepage));
   });

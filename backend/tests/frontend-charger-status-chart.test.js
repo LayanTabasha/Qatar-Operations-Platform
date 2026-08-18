@@ -62,7 +62,7 @@ describe("Homepage Charger Status Distribution component", () => {
     const sources = Array.from(read("index.html").matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1]);
     const sharedIndex = sources.indexOf("frontend/pages/homepage/home-shared.js?v=20260818-home-shared-v1");
     const componentIndex = sources.indexOf("frontend/pages/homepage/charger-status.js?v=20260818-charger-status-v1");
-    const homepageIndex = sources.indexOf("frontend/pages/homepage/home-page.js?v=20260818-homepage-global-search-v1");
+    const homepageIndex = sources.indexOf("frontend/pages/homepage/home-page.js?v=20260818-homepage-fault-trend-v1");
     expect(componentIndex).toBeGreaterThan(sharedIndex);
     expect(homepageIndex).toBeGreaterThan(componentIndex);
     expect(read(homepagePath)).toContain("renderChargerStatusChart();");
