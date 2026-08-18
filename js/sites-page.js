@@ -364,12 +364,6 @@ function fileIcon(type) {
   return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[type] || paths.preview}</svg>`;
 }
 
-function formatFileSize(bytes) {
-  if (!bytes) return "--";
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function moduleFilterKey(title) {
   return [state.currentSiteName || "all-sites", state.currentChargerId || "all-chargers", title].join("::");
 }
