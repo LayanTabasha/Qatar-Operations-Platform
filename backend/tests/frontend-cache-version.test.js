@@ -24,6 +24,8 @@ const SITES_SHARED_VERSION = "20260818-sites-shared-v1";
 const SITES_LIST_VERSION = "20260818-sites-list-v1";
 const SITE_VISITS_VERSION = "20260818-site-visits-v1";
 const SITES_FAULTS_VERSION = "20260818-sites-faults-v1";
+const OPERATIONAL_RECORDS_VERSION = "20260818-operational-records-v1";
+const CHARGER_LIFECYCLE_VERSION = "20260818-charger-lifecycle-v1";
 const HOMEPAGE_REQUESTS_VERSION = "20260813-homepage-requests";
 const REQUESTS_BOOTSTRAP_VERSION = "20260813-requests-bootstrap";
 const ROLE_PERMISSIONS_VERSION = "20260817-charger-natural-sort";
@@ -72,6 +74,8 @@ describe("frontend cache-version integrity", () => {
     const sitesListIndex = sources.indexOf(`frontend/pages/sites/sites-list.js?v=${SITES_LIST_VERSION}`);
     const siteVisitsIndex = sources.indexOf(`frontend/pages/sites/site-visits.js?v=${SITE_VISITS_VERSION}`);
     const sitesFaultsIndex = sources.indexOf(`frontend/pages/sites/faults.js?v=${SITES_FAULTS_VERSION}`);
+    const operationalRecordsIndex = sources.indexOf(`frontend/pages/sites/operational-records.js?v=${OPERATIONAL_RECORDS_VERSION}`);
+    const chargerLifecycleIndex = sources.indexOf(`frontend/pages/sites/charger-lifecycle.js?v=${CHARGER_LIFECYCLE_VERSION}`);
     const sitesPageIndex = sources.indexOf(`js/sites-page.js?v=${FAULT_LIFECYCLE_VERSION}`);
 
     expect(stateIndex).toBeGreaterThanOrEqual(0);
@@ -92,7 +96,9 @@ describe("frontend cache-version integrity", () => {
     expect(sitesListIndex).toBeGreaterThan(sitesSharedIndex);
     expect(siteVisitsIndex).toBeGreaterThan(sitesListIndex);
     expect(sitesFaultsIndex).toBeGreaterThan(siteVisitsIndex);
-    expect(sitesPageIndex).toBeGreaterThan(sitesFaultsIndex);
+    expect(operationalRecordsIndex).toBeGreaterThan(sitesFaultsIndex);
+    expect(chargerLifecycleIndex).toBeGreaterThan(operationalRecordsIndex);
+    expect(sitesPageIndex).toBeGreaterThan(chargerLifecycleIndex);
     expect(sources.indexOf(`app.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sitesPageIndex).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`js/api-client.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);

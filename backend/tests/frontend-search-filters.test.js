@@ -13,6 +13,8 @@ function loadBrowserScript(file, additions = {}) {
     vm.runInContext(read("frontend/pages/sites/sites-list.js"), context, { filename: "frontend/pages/sites/sites-list.js" });
     vm.runInContext(read("frontend/pages/sites/site-visits.js"), context, { filename: "frontend/pages/sites/site-visits.js" });
     vm.runInContext(read("frontend/pages/sites/faults.js"), context, { filename: "frontend/pages/sites/faults.js" });
+    vm.runInContext(read("frontend/pages/sites/operational-records.js"), context, { filename: "frontend/pages/sites/operational-records.js" });
+    vm.runInContext(read("frontend/pages/sites/charger-lifecycle.js"), context, { filename: "frontend/pages/sites/charger-lifecycle.js" });
   }
   vm.runInContext(read(file), context, { filename: file });
   return context;
@@ -158,7 +160,7 @@ describe("frontend search and filter controls", () => {
   it("keeps handlers and empty states for every existing frontend implementation", () => {
     const index = read("index.html");
     const sites = read("frontend/pages/sites/sites-list.js");
-    const sitesPage = read("js/sites-page.js");
+    const sitesPage = read("frontend/pages/sites/operational-records.js");
     const requests = read("js/requests-page.js");
     const archive = read("frontend/pages/settings/archive-page.js");
     const globalSearch = read("frontend/pages/homepage/global-search.js");
