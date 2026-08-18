@@ -7,9 +7,10 @@ const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const state = fs.readFileSync(path.join(root, "js/state.js"), "utf8");
 
 const FRONTEND_STRUCTURE_VERSION = "20260818-frontend-structure-v1";
-const HOMEPAGE_STRUCTURE_VERSION = "20260818-home-shared-extraction-v1";
+const HOMEPAGE_STRUCTURE_VERSION = "20260818-homepage-visit-activity-v1";
 const HOME_SHARED_VERSION = "20260818-home-shared-v1";
 const RECORDS_BY_SITE_VERSION = "20260818-records-by-site-v1";
+const VISIT_ACTIVITY_VERSION = "20260818-visit-activity-v1";
 const DISPLAY_UTILS_VERSION = "20260818-display-utils-v1";
 const HOMEPAGE_REQUESTS_VERSION = "20260813-homepage-requests";
 const REQUESTS_BOOTSTRAP_VERSION = "20260813-requests-bootstrap";
@@ -45,13 +46,15 @@ describe("frontend cache-version integrity", () => {
     const displayUtilsIndex = sources.indexOf(`frontend/shared/utils/display-utils.js?v=${DISPLAY_UTILS_VERSION}`);
     const homeSharedIndex = sources.indexOf(`frontend/pages/homepage/home-shared.js?v=${HOME_SHARED_VERSION}`);
     const recordsBySiteIndex = sources.indexOf(`frontend/pages/homepage/records-by-site.js?v=${RECORDS_BY_SITE_VERSION}`);
+    const visitActivityIndex = sources.indexOf(`frontend/pages/homepage/visit-activity.js?v=${VISIT_ACTIVITY_VERSION}`);
     const homepageIndex = sources.indexOf(`frontend/pages/homepage/home-page.js?v=${HOMEPAGE_STRUCTURE_VERSION}`);
 
     expect(stateIndex).toBeGreaterThanOrEqual(0);
     expect(displayUtilsIndex).toBeGreaterThan(stateIndex);
     expect(homeSharedIndex).toBeGreaterThan(displayUtilsIndex);
     expect(recordsBySiteIndex).toBeGreaterThan(homeSharedIndex);
-    expect(homepageIndex).toBeGreaterThan(recordsBySiteIndex);
+    expect(visitActivityIndex).toBeGreaterThan(recordsBySiteIndex);
+    expect(homepageIndex).toBeGreaterThan(visitActivityIndex);
     expect(sources.indexOf(`app.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`js/sites-page.js?v=${FAULT_LIFECYCLE_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`js/api-client.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
