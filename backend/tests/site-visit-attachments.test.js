@@ -11,10 +11,11 @@ const officePreview = fs.readFileSync(path.join(root, "src/modules/attachments/o
 const attachmentRoutes = fs.readFileSync(path.join(root, "src/modules/attachments/attachments.routes.js"), "utf8");
 const frontendPreview = fs.readFileSync(path.resolve(root, "../frontend/shared/files/file-preview.js"), "utf8");
 const sitesPage = fs.readFileSync(path.resolve(root, "../js/sites-page.js"), "utf8");
+const sitesDataMappers = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/sites-data-mappers.js"), "utf8");
 const modals = fs.readFileSync(path.resolve(root, "../js/modals.js"), "utf8");
-const dedupeSource = sitesPage.slice(
-  sitesPage.indexOf("function deduplicateSiteVisitAttachments"),
-  sitesPage.indexOf("function siteVisitStatusLabel"),
+const dedupeSource = sitesDataMappers.slice(
+  sitesDataMappers.indexOf("function deduplicateSiteVisitAttachments"),
+  sitesDataMappers.indexOf("function siteVisitStatusLabel"),
 );
 const deduplicateSiteVisitAttachments = Function(`${dedupeSource}; return deduplicateSiteVisitAttachments;`)();
 
@@ -67,7 +68,7 @@ describe("persistent Site Visit reports", () => {
   });
 
   it("uses backend visit attachments as the authoritative deduplicated source", () => {
-    expect(sitesPage).toContain("function deduplicateSiteVisitAttachments");
+    expect(sitesDataMappers).toContain("function deduplicateSiteVisitAttachments");
     expect(sitesPage).toContain("visit.attachmentRecords || []");
     expect(sitesPage).toContain('file.module !== "siteVisit"');
     expect(sitesPage).not.toContain('getValidUploads().filter((file) => file.siteVisitId === visit.id');

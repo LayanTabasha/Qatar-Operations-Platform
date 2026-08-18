@@ -49,7 +49,7 @@ describe("frontend site image workflow", () => {
   });
 
   it("renders saved uploads as public assets with cache-busting and fallback support", () => {
-    const sitesPageSource = readRootFile("js/sites-page.js");
+    const sitesPageSource = readRootFile("frontend/pages/sites/sites-data-mappers.js");
     const stateSource = readRootFile("js/state.js");
 
     expect(sitesPageSource).toContain("imagePathWithVersion(site.image_path, site.updated_at)");

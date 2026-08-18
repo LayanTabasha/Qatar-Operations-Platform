@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const mapperSource = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/sites-data-mappers.js"), "utf8");
 const sitesSource = fs.readFileSync(path.resolve(root, "../js/sites-page.js"), "utf8");
 const stateSource = fs.readFileSync(path.resolve(root, "../js/state.js"), "utf8");
 const appSource = fs.readFileSync(path.resolve(root, "../app.js"), "utf8");
@@ -25,6 +26,7 @@ function renderer(role, roleSource = "state") {
     canManageOperations: () => [state.currentUserRoleKey, state.currentUserRole, state.authUser?.roleKey, state.authUser?.role]
       .some((value) => ["admin", "administrator", "hq_user", "operations_staff"].includes(String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_"))),
   });
+  vm.runInContext(mapperSource, context);
   vm.runInContext(sitesSource, context);
   return {
     map: vm.runInContext("mapContentRecord", context),

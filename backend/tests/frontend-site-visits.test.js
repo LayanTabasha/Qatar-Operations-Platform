@@ -35,12 +35,13 @@ describe("frontend site visit workflow", () => {
 
   it("renders visitDate, timeIn, and timeOut from persisted records", () => {
     const sitesPageSource = readRootFile("js/sites-page.js");
+    const mapperSource = readRootFile("frontend/pages/sites/sites-data-mappers.js");
 
-    expect(sitesPageSource).toContain("visitDate: visit.visit_date");
-    expect(sitesPageSource).toContain("timeIn: visit.time_in || \"\"");
-    expect(sitesPageSource).toContain("timeOut: visit.time_out || \"\"");
-    expect(sitesPageSource).toContain("recordedOn: visit.created_at");
-    expect(sitesPageSource).toContain("recordedBy: visit.recorded_by_name");
+    expect(mapperSource).toContain("visitDate: visit.visit_date");
+    expect(mapperSource).toContain("timeIn: visit.time_in || \"\"");
+    expect(mapperSource).toContain("timeOut: visit.time_out || \"\"");
+    expect(mapperSource).toContain("recordedOn: visit.created_at");
+    expect(mapperSource).toContain("recordedBy: visit.recorded_by_name");
     expect(sitesPageSource).toContain("formatMediumDate(visit.visitDate)");
   });
 

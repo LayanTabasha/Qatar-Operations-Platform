@@ -7,7 +7,7 @@ import { runLegacyContentRecovery } from "../src/scripts/reconcile-legacy-conten
 const root = path.resolve(process.cwd(), "..");
 
 function frontendReconciler() {
-  const source = fs.readFileSync(path.join(root, "js/sites-page.js"), "utf8");
+  const source = fs.readFileSync(path.join(root, "frontend/pages/sites/sites-data-mappers.js"), "utf8");
   const start = source.indexOf("function contentIdentityValue");
   const end = source.indexOf("function mapContentRecord", start);
   const context = vm.createContext({});

@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 const root = path.resolve(process.cwd(), "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const index = read("index.html");
+const mapperSource = read("frontend/pages/sites/sites-data-mappers.js");
 const sitesSource = read("js/sites-page.js");
 const modalsSource = read("js/modals.js");
 const appSource = read("app.js");
@@ -39,6 +40,7 @@ function runtime() {
     function saveViewContext() {}
     function formatSettingValue(value) { return String(value || ""); }
   `);
+  run(mapperSource, "frontend/pages/sites/sites-data-mappers.js");
   run(sitesSource, "js/sites-page.js");
   run(modalsSource, "js/modals.js");
   run(`

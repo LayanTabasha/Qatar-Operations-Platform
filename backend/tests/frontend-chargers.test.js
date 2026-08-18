@@ -9,15 +9,16 @@ describe("frontend Archive workflow", () => {
   const sources = () => ({
     api: readRootFile("js/api-client.js"), archive: readRootFile("frontend/pages/settings/archive-page.js"),
     settings: readRootFile("js/settings-page.js"), sites: readRootFile("js/sites-page.js"),
+    mappers: readRootFile("frontend/pages/sites/sites-data-mappers.js"),
     state: readRootFile("js/state.js"), modals: readRootFile("js/modals.js"),
     index: readRootFile("index.html"), styles: readRootFile("styles.css"),
   });
 
   it("maps and submits the three existing charger form fields", () => {
-    const { sites, modals, state } = sources();
-    expect(sites).toContain('operator: charger.operator || ""');
-    expect(sites).toContain('administrator: charger.administrator || ""');
-    expect(sites).toContain('installationDate: charger.installation_date || ""');
+    const { mappers, modals, state } = sources();
+    expect(mappers).toContain('operator: charger.operator || ""');
+    expect(mappers).toContain('administrator: charger.administrator || ""');
+    expect(mappers).toContain('installationDate: charger.installation_date || ""');
     expect(modals).toContain('operator: document.getElementById("operator")?.value.trim() || null');
     expect(modals).toContain('administrator: document.getElementById("administrator")?.value.trim() || null');
     expect(modals).toContain('installation_date: document.getElementById("installation-date")?.value || null');
