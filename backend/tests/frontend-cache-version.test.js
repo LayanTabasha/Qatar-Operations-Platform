@@ -7,6 +7,7 @@ const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const state = fs.readFileSync(path.join(root, "js/state.js"), "utf8");
 
 const FRONTEND_STRUCTURE_VERSION = "20260818-frontend-structure-v1";
+const HOMEPAGE_STRUCTURE_VERSION = "20260818-homepage-structure-v1";
 const HOMEPAGE_REQUESTS_VERSION = "20260813-homepage-requests";
 const REQUESTS_BOOTSTRAP_VERSION = "20260813-requests-bootstrap";
 const ROLE_PERMISSIONS_VERSION = "20260817-charger-natural-sort";
@@ -40,7 +41,7 @@ describe("frontend cache-version integrity", () => {
     const stateIndex = sources.indexOf(`js/state.js?v=${FAULT_LIFECYCLE_VERSION}`);
 
     expect(stateIndex).toBeGreaterThanOrEqual(0);
-    expect(sources.indexOf(`js/home-page.js?v=${FAULT_LIFECYCLE_VERSION}`)).toBeGreaterThan(stateIndex);
+    expect(sources.indexOf(`frontend/pages/homepage/home-page.js?v=${HOMEPAGE_STRUCTURE_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`app.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`js/sites-page.js?v=${FAULT_LIFECYCLE_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`js/api-client.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
@@ -62,7 +63,7 @@ describe("frontend cache-version integrity", () => {
     expect(index).toContain(`js/settings-page.js?v=${USER_DELETE_UI_VERSION}`);
     expect(index).toContain(`js/requests-page.js?v=${ROLE_PERMISSIONS_VERSION}`);
     expect(index).toContain(`js/auth-router.js?v=${REQUESTS_BOOTSTRAP_VERSION}`);
-    expect(index).toContain(`js/home-page.js?v=${FAULT_LIFECYCLE_VERSION}`);
+    expect(index).toContain(`frontend/pages/homepage/home-page.js?v=${HOMEPAGE_STRUCTURE_VERSION}`);
     expect(index).toContain(`js/sites-page.js?v=${FAULT_LIFECYCLE_VERSION}`);
     expect(index).toContain(`frontend/pages/contacts/contacts-page.js?v=${FRONTEND_STRUCTURE_VERSION}`);
     expect(index).toContain(`js/modals.js?v=${FAULT_LIFECYCLE_VERSION}`);

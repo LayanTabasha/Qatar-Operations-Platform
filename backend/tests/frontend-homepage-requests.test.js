@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = path.resolve(process.cwd(), "..");
-const home = fs.readFileSync(path.join(root, "js/home-page.js"), "utf8");
+const home = fs.readFileSync(path.join(root, "frontend/pages/homepage/home-page.js"), "utf8");
 const page = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const state = fs.readFileSync(path.join(root, "js/state.js"), "utf8");
 const sites = fs.readFileSync(path.join(root, "js/sites-page.js"), "utf8");
@@ -110,7 +110,7 @@ describe("Homepage Requests integration", () => {
   it("loads the shared Requests contract before every consumer", () => {
     const sources = browserScripts().map(({ source }) => source);
     const sharedIndex = sources.indexOf("js/state.js");
-    for (const consumer of ["js/auth-router.js", "js/home-page.js", "js/sites-page.js", "js/requests-page.js"]) {
+    for (const consumer of ["js/auth-router.js", "frontend/pages/homepage/home-page.js", "js/sites-page.js", "js/requests-page.js"]) {
       expect(sources.indexOf(consumer)).toBeGreaterThan(sharedIndex);
     }
   });

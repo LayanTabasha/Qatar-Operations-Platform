@@ -1,6 +1,6 @@
 // Main bootstrap only.
 // Page-specific code lives in:
-// - js/home-page.js
+// - frontend/pages/homepage/home-page.js
 // - js/sites-page.js
 // - js/settings-page.js
 // Modal/form code lives in js/modals.js.
