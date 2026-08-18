@@ -154,7 +154,7 @@ describe("frontend search and filter controls", () => {
     const sites = read("js/sites-page.js");
     const requests = read("js/requests-page.js");
     const archive = read("frontend/pages/settings/archive-page.js");
-    const home = read("frontend/pages/homepage/home-page.js");
+    const globalSearch = read("frontend/pages/homepage/global-search.js");
     const contacts = read("frontend/pages/contacts/contacts-page.js");
     for (const id of ["global-search", "sites-search", "sites-status-filter", "fault-trend-range", "visit-activity-mode"]) expect(index).toContain(`id="${id}"`);
     expect(sites).toContain("bindSitesFilters");
@@ -163,8 +163,8 @@ describe("frontend search and filter controls", () => {
     expect(requests).toContain("filteredRequests()");
     expect(requests).toContain("No requests match the selected filters");
     expect(archive).toContain("filteredArchiveItems()");
-    expect(home).toContain("globalSearchRecords");
-    expect(home).toContain("No matching records");
+    expect(globalSearch).toContain("globalSearchRecords");
+    expect(globalSearch).toContain("No matching records");
     expect(contacts).toContain("filterContacts");
   });
 });
