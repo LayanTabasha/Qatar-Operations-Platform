@@ -87,6 +87,39 @@ describe("database schema files", () => {
     });
   });
 
+  it("adds exactly the three missing charger persistence fields", () => {
+    const migration = fs.readFileSync(
+      path.join(migrationsDir, "021_add_charger_operator_administrator_installation_date.sql"),
+      "utf8",
+    ).toLowerCase();
+    const addedColumns = Array.from(migration.matchAll(/add column\s+(\w+)\s+(text|date)/g), (match) => [match[1], match[2]]);
+
+    expect(addedColumns).toEqual([
+      ["operator", "text"],
+      ["administrator", "text"],
+      ["installation_date", "date"],
+    ]);
+    expect(migration).not.toContain("alter column");
+    expect(migration).not.toContain("drop column");
+  });
+
+  it("adds archive metadata and filtered indexes for sites and chargers", () => {
+    const migration = fs.readFileSync(path.join(migrationsDir, "019_add_archive_metadata.sql"), "utf8").toLowerCase();
+    expect(migration).toContain("alter table sites");
+    expect(migration).toContain("archived_at");
+    expect(migration).toContain("archived_by");
+    expect(migration).toContain("archive_reason");
+    expect(migration).toContain("idx_sites_archived_at");
+    expect(migration).toContain("idx_chargers_archived_at");
+  });
+
+  it("writes all archive lifecycle actions to the existing activity log", () => {
+    const sitesRepository = fs.readFileSync(path.join(modulesDir, "sites", "sites.repository.js"), "utf8");
+    const chargersRepository = fs.readFileSync(path.join(modulesDir, "chargers", "chargers.repository.js"), "utf8");
+    ["site_archived", "site_restored", "site_permanently_deleted"].forEach((action) => expect(sitesRepository).toContain(action));
+    ["charger_archived", "charger_restored", "charger_permanently_deleted"].forEach((action) => expect(chargersRepository).toContain(action));
+  });
+
   it("creates the DTC fault catalogue and links faults to catalogue records", () => {
     const migration = fs.readFileSync(path.join(migrationsDir, "015_create_fault_catalogue.sql"), "utf8").toLowerCase();
 

@@ -18,7 +18,10 @@ function renderSettingsMenu(selected) {
   const adminButtons = isAdmin()
     ? `<div class="settings-menu-label">Administration</div>${administrationSettingsItems.map((item) => `<button class="${item === selected ? "active" : ""}" data-setting="${item}" type="button">${item}</button>`).join("")}`
     : "";
-  document.getElementById("settings-menu").innerHTML = `<div class="settings-menu-label">Account</div>${accountButtons}${adminButtons}`;
+  const systemButtons = isAdmin()
+    ? `<div class="settings-menu-label">System</div>${systemSettingsItems.map((item) => `<button class="${item === selected ? "active" : ""}" data-setting="${item}" type="button">${item}</button>`).join("")}`
+    : "";
+  document.getElementById("settings-menu").innerHTML = `<div class="settings-menu-label">Account</div>${accountButtons}${adminButtons}${systemButtons}`;
 }
 
 function renderReadOnlyProfile(user) {
@@ -68,7 +71,7 @@ function renderSecurityInfo(user) {
   return `
     <div class="settings-section">
       <div>
-        <h2>Account Security</h2>
+        <h2>Security</h2>
         <p>Security values are controlled by the authentication system and audit logs.</p>
       </div>
       <div class="settings-info-grid">
@@ -84,29 +87,82 @@ function renderSecurityInfo(user) {
   `;
 }
 
-function renderSessionManagement(user) {
+function healthStatusLabel(status) {
+  return { healthy: "Operational", degraded: "Degraded", unavailable: "Unavailable", unknown: "Unknown", not_configured: "Not configured" }[status] || "Unknown";
+}
+
+function healthTone(status) {
+  return { healthy: "status-good", degraded: "status-warning", unavailable: "status-bad" }[status] || "status-neutral";
+}
+
+function formatUptime(seconds) {
+  if (!Number.isFinite(seconds)) return "Unknown";
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return [days && `${days}d`, (days || hours) && `${hours}h`, `${minutes}m`].filter(Boolean).join(" ");
+}
+
+function healthInfoItem(label, value, status = "unknown", message = "") {
+  return `<div class="settings-info-item health-card ${healthTone(status)}"><span>${formatSettingValue(label)}</span><strong>${formatSettingValue(value)}</strong>${message ? `<small>${formatSettingValue(message)}</small>` : ""}</div>`;
+}
+
+function renderPlatformHealth(data = null, stateName = "loading", error = null) {
+  if (stateName === "loading") {
+    return `<div class="settings-section platform-health"><div class="panel-head"><div><h2>Platform Health</h2><p>Checking critical platform services...</p></div></div><div class="health-loading" role="status"><span class="spinner"></span> Loading platform status</div></div>`;
+  }
+  if (stateName === "error") {
+    const accessMessage = error?.status === 401 ? "Your session has expired. Sign in again to view Platform Health." : error?.status === 403 ? "Administrator access is required to view Platform Health." : "Platform status could not be retrieved.";
+    return `<div class="settings-section platform-health"><div><h2>Platform Health</h2><p>${formatSettingValue(accessMessage)}</p></div><div class="health-error" role="alert">${formatSettingValue(error?.message || "Request failed")}</div><div class="quick-actions compact"><button class="primary-button" id="platform-health-retry" type="button">Retry</button></div></div>`;
+  }
+
+  const cards = [
+    healthInfoItem("Overall Platform Status", healthStatusLabel(data.status), data.status, data.message),
+    healthInfoItem("Backend API", healthStatusLabel(data.components?.backend?.status), data.components?.backend?.status, data.components?.backend?.message),
+    healthInfoItem("Database", healthStatusLabel(data.components?.database?.status), data.components?.database?.status, data.components?.database?.message),
+    healthInfoItem("File Storage", healthStatusLabel(data.components?.storage?.status), data.components?.storage?.status, data.components?.storage?.message),
+    healthInfoItem("Application Uptime", formatUptime(data.application?.uptimeSeconds), "healthy"),
+    healthInfoItem("Application Version", data.application?.version, "healthy"),
+    healthInfoItem("Last Health Check", formatDateTime(data.lastHealthCheck), "healthy"),
+  ];
+  if (data.migrations) cards.push(healthInfoItem("Latest Database Migration", data.migrations.latest || healthStatusLabel(data.migrations.status), data.migrations.status, data.migrations.message));
+  if (data.backup) cards.push(healthInfoItem("Backup Status", healthStatusLabel(data.backup.status), data.backup.status, data.backup.message));
+  return `<div class="settings-section platform-health"><div class="panel-head"><div><h2>Platform Health</h2><p>Live status of critical application dependencies.</p></div><button class="primary-button" id="platform-health-refresh" type="button">Refresh Status</button></div><div class="settings-info-grid">${cards.join("")}</div><p class="settings-note">Retrieved ${formatSettingValue(formatDateTime(data.retrievedAt))}</p></div>`;
+}
+
+async function loadPlatformHealth() {
+  if (!isAdmin()) return;
+  const panel = document.getElementById("settings-panel");
+  if (!panel) return;
+  panel.innerHTML = renderPlatformHealth(null, "loading");
+  try {
+    const data = await window.QatarOpsApi.PlatformHealth.platform();
+    data.retrievedAt = new Date().toISOString();
+    if (document.querySelector('#settings-menu [data-setting="Platform Health"].active')) panel.innerHTML = renderPlatformHealth(data, "ready");
+  } catch (error) {
+    if (document.querySelector('#settings-menu [data-setting="Platform Health"].active')) panel.innerHTML = renderPlatformHealth(null, "error", error);
+  }
+}
+
+function renderPlatformHealthPlaceholder() {
   return `
     <div class="settings-section">
-      <div>
-        <h2>Session Management</h2>
-        <p>Control your current session. Device-wide session revocation belongs to the backend authentication provider.</p>
+      <div class="panel-head">
+        <div>
+          <h2>Platform Health</h2>
+          <p>Open Platform Health to check critical services.</p>
+        </div>
       </div>
       <div class="settings-info-grid">
-        ${settingInfoItem("Signed In As", user?.email || state.currentUserEmail)}
-        ${settingInfoItem("Session State", state.authenticated ? "Active" : "Inactive", state.authenticated ? "status-good" : "")}
-        ${settingInfoItem("Last Login", formatDateTime(user?.lastLogin))}
+        ${settingInfoItem("Status", "Loading")}
       </div>
-      <div class="quick-actions compact settings-actions">
-        <button class="secondary-button" id="settings-view-session-button" type="button">View Active Session</button>
-        <button class="secondary-button" type="button" disabled>Sign Out of All Devices</button>
-        <button class="danger-button" id="settings-sign-out-button" type="button">Sign Out</button>
-      </div>
-      <p class="settings-note" id="settings-session-note" aria-live="polite"></p>
+      <p class="settings-note">Retrieving live status...</p>
     </div>
   `;
 }
 
 function renderUserTable() {
+  const currentUserId = state.authUser?.id || "";
   const userRows = state.users.length
     ? state.users.map((user) => `
     <tr>
@@ -120,7 +176,11 @@ function renderUserTable() {
         <div class="file-actions">
           <button class="file-icon-button" data-user-edit="${user.id}" data-tooltip="Edit" type="button">Edit</button>
           <button class="file-icon-button" data-user-reset="${user.id}" data-tooltip="Reset Password" type="button">Reset</button>
-          <button class="${user.isActive ? "danger-button" : "secondary-button"}" data-user-status="${user.id}" data-active="${user.isActive ? "false" : "true"}" type="button">${user.isActive ? "Deactivate" : "Activate"}</button>
+          ${user.id === currentUserId
+            ? `<button class="secondary-button" type="button" disabled title="You cannot deactivate your own account">Current User</button>`
+            : user.isActive
+              ? `<button class="danger-button" data-user-delete="${user.id}" type="button">Delete</button>`
+              : `<button class="secondary-button" data-user-status="${user.id}" data-active="true" type="button">Activate</button><button class="danger-button" data-user-delete="${user.id}" type="button">Delete</button>`}
         </div>
       </td>
     </tr>
@@ -138,7 +198,7 @@ function renderUserManagementForm() {
       <label><span>Full Name</span><input id="settings-user-name" type="text" autocomplete="name" /></label>
       <label><span>Email</span><input id="settings-user-email" type="email" autocomplete="email" /></label>
       <label><span>Temporary Password</span><input id="settings-user-password" type="password" autocomplete="new-password" /></label>
-      <label><span>Role</span><select id="settings-user-role"><option value="operations_staff" selected>Operations Staff</option><option value="viewer">Viewer</option><option value="admin">Administrator</option></select></label>
+      <label><span>Role</span><select id="settings-user-role"><option value="operations_staff" selected>Operations Staff</option><option value="hq_user">HQ User</option><option value="viewer">Viewer</option><option value="admin">Administrator</option></select></label>
       <div class="modal-actions full">
         <button class="secondary-button" id="settings-user-cancel" type="button">Clear</button>
         <button class="primary-button" id="settings-user-save" type="submit">Add User</button>
@@ -152,6 +212,7 @@ function roleLabel(role) {
     admin: "Administrator",
     operations_staff: "Operations Staff",
     viewer: "Viewer",
+    hq_user: "HQ User",
   }[role] || role;
 }
 
@@ -174,7 +235,7 @@ async function loadManagedUsers() {
   const panel = document.getElementById("settings-users-table");
   if (panel) panel.innerHTML = `<div class="empty-state"><h2>Loading users...</h2></div>`;
   try {
-    const response = await UsersApi.list();
+    const response = await window.QatarOpsApi.Users.list();
     state.users = (response.users || []).map(normalizeManagedUser);
     const target = document.getElementById("settings-users-table");
     if (target) target.innerHTML = renderUserTable();
@@ -209,10 +270,10 @@ async function submitUserManagementForm() {
   };
   try {
     if (userId) {
-      await UsersApi.update(userId, payload);
+      await window.QatarOpsApi.Users.update(userId, payload);
       if (success) success.textContent = "User updated.";
     } else {
-      await UsersApi.create({
+      await window.QatarOpsApi.Users.create({
         ...payload,
         email: document.getElementById("settings-user-email")?.value.trim(),
         password: document.getElementById("settings-user-password")?.value,
@@ -239,102 +300,73 @@ function editManagedUser(userId) {
 }
 
 async function changeManagedUserStatus(userId, isActive) {
-  await UsersApi.updateStatus(userId, isActive);
+  if (userId === state.authUser?.id && !isActive) throw new Error("You cannot deactivate your own account.");
+  await window.QatarOpsApi.Users.updateStatus(userId, isActive);
   await loadManagedUsers();
+  const success = document.getElementById("settings-user-success");
+  if (success) success.textContent = isActive ? "User activated." : "User deactivated.";
 }
+
+function openDeleteUserModal(userId) {
+  if (!isAdmin() || userId === state.authUser?.id) return;
+  const user = state.users.find((item) => item.id === userId);
+  if (!user) return;
+
+  const form = document.getElementById("modal-form");
+  document.querySelector(".modal")?.classList.remove("preview-modal", "request-modal");
+  document.getElementById("modal-eyebrow").textContent = "Administrator Action";
+  document.getElementById("modal-title").textContent = "Delete User?";
+  form.innerHTML = `
+    <div class="modal-error full" id="modal-error" aria-live="polite"></div>
+    <div class="settings-info-grid full">
+      ${settingInfoItem("Name", user.name)}
+      ${settingInfoItem("Email", user.email)}
+    </div>
+    <p class="modal-note">This permanently deletes the user account. The user will lose access immediately and cannot be restored. Historical operational records will be retained.</p>
+    <div class="modal-actions"><button class="secondary-button" type="button" id="cancel-modal">Cancel</button><button class="danger-button" data-user-delete-confirm="${user.id}" type="button">Delete</button></div>`;
+  document.getElementById("modal-backdrop").classList.remove("hidden");
+  document.body.classList.add("modal-open");
+}
+
+document.getElementById("settings-panel")?.addEventListener("click", (event) => {
+  const deleteButton = event.target.closest("[data-user-delete]");
+  if (deleteButton) openDeleteUserModal(deleteButton.dataset.userDelete);
+});
+
+document.getElementById("modal-form")?.addEventListener("click", async (event) => {
+  const confirmButton = event.target.closest("[data-user-delete-confirm]");
+  if (!confirmButton) return;
+
+  const errorBox = document.getElementById("modal-error");
+  confirmButton.disabled = true;
+  if (errorBox) errorBox.textContent = "";
+  try {
+    await window.QatarOpsApi.Users.remove(confirmButton.dataset.userDeleteConfirm);
+    await loadManagedUsers();
+    closeModal();
+    const success = document.getElementById("settings-user-success");
+    if (success) success.textContent = "User deleted successfully";
+  } catch (error) {
+    confirmButton.disabled = false;
+    if (errorBox) errorBox.textContent = error.message || "User could not be deleted.";
+  }
+});
 
 async function resetManagedUserPassword(userId) {
   const password = window.prompt("Enter a temporary password for this user.");
   if (!password) return;
-  await UsersApi.resetPassword(userId, password);
+  await window.QatarOpsApi.Users.resetPassword(userId, password);
   alert("Temporary password has been saved.");
-}
-
-function renderFaultCatalogueTable() {
-  const rows = state.faultCatalogue.length
-    ? state.faultCatalogue.map((item) => `<tr><td>${formatSettingValue(item.faultCode)}${item.ftbCode ? ` / ${formatSettingValue(item.ftbCode)}` : ""}</td><td>${formatSettingValue(item.faultName)}</td><td>${formatSettingValue(item.category)}</td><td>${formatSettingValue(item.severity)}</td><td>${formatSettingValue(item.chargerModel)}</td><td>${formatSettingValue(item.sourceVersion)}</td><td>${item.active ? "Active" : "Inactive"}</td><td>${isAdmin() ? `<div class="file-actions"><button class="file-icon-button" data-dtc-edit="${item.id}" data-tooltip="Edit" type="button">Edit</button><button class="${item.active ? "danger-button" : "secondary-button"}" data-dtc-status="${item.id}" data-active="${item.active ? "false" : "true"}" type="button">${item.active ? "Deactivate" : "Activate"}</button></div>` : ""}</td></tr>`).join("")
-    : `<tr><td colspan="8">No official company fault codes have been imported or added yet.</td></tr>`;
-  const adminTools = isAdmin()
-    ? `<button class="primary-button" data-modal="faultCode" type="button">Add DTC Record</button>`
-    : "";
-  const importTools = isAdmin()
-    ? `<label class="secondary-button dtc-import-button"><span>Import Excel Catalogue</span><input id="dtc-import-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden /></label>`
-    : "";
-  return `<div class="settings-section"><div class="panel-head"><div><h2>DTC Catalogue</h2><p>Structured manufacturer DTC records imported into the backend database for fault identification.</p></div>${adminTools}</div><div class="toolbar"><input id="dtc-search" placeholder="Search DTC code or keyword" /><button class="secondary-button" id="dtc-search-button" type="button">Search</button>${importTools}</div><p class="settings-note" id="dtc-catalogue-message" aria-live="polite"></p><div class="table-wrap"><table><thead><tr><th>DTC / FTB</th><th>Fault Title</th><th>Category</th><th>Severity</th><th>Charger Model</th><th>Source Version</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-}
-
-async function loadDtcCatalogue(params = {}) {
-  const message = document.getElementById("dtc-catalogue-message");
-  if (message) message.textContent = "Loading DTC catalogue...";
-  try {
-    const response = await DtcApi.list({ status: "all", limit: 100, ...params });
-    state.faultCatalogue = (response.dtc_records || []).map(normalizeFaultCatalogueRecord);
-    if (document.querySelector("#settings-menu .active")?.dataset.setting === "Fault Catalogue") {
-      document.getElementById("settings-panel").innerHTML = renderAdminPanel("Fault Catalogue");
-      const nextMessage = document.getElementById("dtc-catalogue-message");
-      if (nextMessage) nextMessage.textContent = `${state.faultCatalogue.length} DTC records loaded.`;
-    }
-  } catch (err) {
-    if (message) message.textContent = err.message || "Could not load DTC catalogue.";
-  }
-}
-
-async function searchDtcCatalogue() {
-  const query = document.getElementById("dtc-search")?.value.trim() || "";
-  await loadDtcCatalogue(query ? { query } : {});
-}
-
-async function importDtcCatalogue(file) {
-  const message = document.getElementById("dtc-catalogue-message");
-  if (!file) return;
-  if (!/\.xlsx$/i.test(file.name)) {
-    if (message) message.textContent = "Upload a valid .xlsx DTC catalogue file.";
-    return;
-  }
-  if (message) message.textContent = "Importing DTC catalogue...";
-  try {
-    const response = await DtcApi.importWorkbook(file);
-    const summary = response.import_summary || {};
-    await loadDtcCatalogue();
-    const nextMessage = document.getElementById("dtc-catalogue-message");
-    if (nextMessage) nextMessage.textContent = `Import complete. New: ${summary.new_records || 0}. Updated: ${summary.updated_records || 0}. Skipped: ${summary.skipped_records || 0}.`;
-  } catch (err) {
-    if (message) message.textContent = err.message || "DTC import failed.";
-  }
-}
-
-function editDtcRecord(recordId) {
-  const record = state.faultCatalogue.find((item) => item.id === recordId);
-  if (!record) return;
-  openModal("faultCode", "edit");
-  document.getElementById("modal-form").dataset.dtcId = record.id;
-  document.getElementById("fault-code").value = record.faultCode;
-  document.getElementById("fault-name").value = record.faultName;
-  document.getElementById("meaning").value = record.meaning;
-  document.getElementById("severity").value = record.severity;
-  document.getElementById("recommended-action").value = record.recommendedAction;
-  document.getElementById("status").value = record.active ? "Active" : "Disabled";
-}
-
-async function changeDtcStatus(recordId, isActive) {
-  await DtcApi.updateStatus(recordId, isActive);
-  await loadDtcCatalogue();
 }
 
 function renderAdminPanel(selected) {
   const simpleTable = `<div class="table-wrap"><table><thead><tr><th>Name</th><th>Description</th><th>Owner</th><th>Actions</th></tr></thead><tbody><tr><td>Pending configuration</td><td>Backend controlled value</td><td>Administrator</td><td><button type="button">View</button></td></tr></tbody></table></div>`;
   const content = {
     "User Management": `<div class="settings-section"><div class="panel-head"><div><h2>User Management</h2><p>Create users and manage company-controlled account fields.</p></div></div>${renderUserManagementForm()}<div id="settings-users-table">${renderUserTable()}</div></div>`,
-    "Roles & Permissions": `<div class="settings-section"><h2>Roles & Permissions</h2><p>Role assignment and permission changes are restricted to administrators.</p>${simpleTable}</div>`,
     "Site & Charger Configuration": `<div class="settings-section"><div class="panel-head"><div><h2>Site & Charger Configuration</h2><p>Administrator-controlled operating assets.</p></div><div class="quick-actions compact"><button class="primary-button" data-modal="site" data-mode="create" type="button">Add Site</button><button class="secondary-button" data-modal="charger" data-mode="create" type="button">Add Charger</button></div></div>${simpleTable}</div>`,
-    "Fault Catalogue": renderFaultCatalogueTable(),
-    "Fault Categories": `<div class="settings-section"><h2>Fault Categories</h2><p>Maintain fault categories used by operations workflows.</p>${simpleTable}</div>`,
-    "Error Codes": `<div class="settings-section"><h2>Error Codes</h2><div class="table-wrap"><table><thead><tr><th>Code</th><th>Description</th><th>Category</th><th>Related charger type</th></tr></thead><tbody><tr><td>--</td><td>Pending Data</td><td>--</td><td>--</td></tr></tbody></table></div></div>`,
-    "Upload Permissions": `<div class="settings-section"><h2>Upload Permissions</h2><p>Document, report, photo, and guide upload permissions should be managed by role.</p>${simpleTable}</div>`,
-    "Data Backup": `<div class="settings-section"><h2>Data Backup</h2><p>Backups should run from the production backend and database layer.</p><div class="quick-actions compact settings-actions"><button class="secondary-button" type="button" disabled>Download Backup</button><button class="secondary-button" type="button" disabled>Import Data</button></div></div>`,
-    "Export Data": `<div class="settings-section"><h2>Export Data</h2><p>Exports should be permission-controlled and logged.</p><div class="quick-actions compact settings-actions"><button class="secondary-button" type="button" disabled>Export Operations Data</button></div></div>`,
-    "System Preferences": `<div class="settings-section"><h2>System Preferences</h2><p>Platform-level preferences belong in administrator-only configuration.</p>${simpleTable}</div>`,
+    "Archive": renderArchivePage(),
     "Audit Logs": `<div class="settings-section"><h2>Audit Logs</h2><p>Security and administrative changes should be written to a backend audit log.</p><div class="activity-list">${getRecentActivities(8).map((item) => `<div class="activity-row"><span class="activity-icon">${activityIcon(item.actionType)}</span><strong><b>${formatSettingValue(item.description)}</b><small>by ${formatSettingValue(item.userName)}</small></strong><time title="${formatDateTime(item.occurredAt)}">${relativeTime(item.occurredAt)}</time></div>`).join("") || `<div><span>Event</span><strong>No audit activity yet</strong></div>`}</div></div>`,
+    "Platform Health": renderPlatformHealthPlaceholder(),
   };
   return content[selected] || content["User Management"];
 }
@@ -354,11 +386,11 @@ function renderSettings(selected = "Profile") {
 
   const content = {
     "Profile": renderReadOnlyProfile(user),
-    "Account Security": `${renderSecurityInfo(user)}${renderPasswordPanel()}`,
-    "Session Management": renderSessionManagement(user),
+    "Security": `${renderSecurityInfo(user)}${renderPasswordPanel()}`,
   };
 
   panel.innerHTML = content[selected] || renderAdminPanel(selected);
   if (selected === "User Management" && isAdmin()) loadManagedUsers();
-  if (selected === "Fault Catalogue") loadDtcCatalogue();
+  if (selected === "Archive" && isAdmin()) loadArchiveData();
+  if (selected === "Platform Health" && isAdmin()) loadPlatformHealth();
 }

@@ -10,12 +10,17 @@ import {
   updateChargerStatus,
 } from "./chargers.service.js";
 import {
+  archiveReasonSchema,
   chargerIdParamsSchema,
   createChargerSchema,
   listChargersQuerySchema,
   updateChargerSchema,
   updateChargerStatusSchema,
 } from "./chargers.validation.js";
+
+function auditContext(req) {
+  return { ipAddress: req.ip, requestId: req.id };
+}
 
 export const listChargers = asyncHandler(async (req, res) => {
   const query = listChargersQuerySchema.parse(req.query);
@@ -82,7 +87,8 @@ export const updateChargerStatusRecord = asyncHandler(async (req, res) => {
 
 export const archiveChargerRecord = asyncHandler(async (req, res) => {
   const { id } = chargerIdParamsSchema.parse(req.params);
-  const charger = await archiveCharger(id, req.user.id);
+  const { reason } = archiveReasonSchema.parse(req.body || {});
+  const charger = await archiveCharger(id, req.user.id, reason, auditContext(req));
 
   res.json({
     success: true,
@@ -92,7 +98,7 @@ export const archiveChargerRecord = asyncHandler(async (req, res) => {
 
 export const restoreChargerRecord = asyncHandler(async (req, res) => {
   const { id } = chargerIdParamsSchema.parse(req.params);
-  const charger = await restoreCharger(id, req.user.id);
+  const charger = await restoreCharger(id, req.user.id, auditContext(req));
 
   res.json({
     success: true,
@@ -102,10 +108,6 @@ export const restoreChargerRecord = asyncHandler(async (req, res) => {
 
 export const deleteChargerRecord = asyncHandler(async (req, res) => {
   const { id } = chargerIdParamsSchema.parse(req.params);
-  const charger = await deleteArchivedCharger(id, req.user.id);
-
-  res.json({
-    success: true,
-    charger,
-  });
+  await deleteArchivedCharger(id, req.user.id, auditContext(req));
+  res.status(204).send();
 });

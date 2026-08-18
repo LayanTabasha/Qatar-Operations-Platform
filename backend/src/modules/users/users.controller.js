@@ -1,5 +1,5 @@
 import { asyncHandler } from "../../utils/async-handler.js";
-import { createNewUser, getUserById, getUsers, resetUserPassword, updateExistingUser, updateExistingUserStatus } from "./users.service.js";
+import { createNewUser, deleteExistingUser, getUserById, getUsers, resetUserPassword, updateExistingUser, updateExistingUserStatus } from "./users.service.js";
 import { createUserSchema, resetPasswordSchema, updateUserSchema, updateUserStatusSchema, userIdParamsSchema } from "./users.validation.js";
 
 export const listUsers = asyncHandler(async (_req, res) => {
@@ -45,7 +45,7 @@ export const updateUser = asyncHandler(async (req, res) => {
 export const updateUserStatus = asyncHandler(async (req, res) => {
   const { id } = userIdParamsSchema.parse(req.params);
   const input = updateUserStatusSchema.parse(req.body);
-  const user = await updateExistingUserStatus(req.user.id, id, input);
+  const user = await updateExistingUserStatus(req.user.id, id, input, { ipAddress: req.ip, requestId: req.id });
 
   res.json({
     success: true,
@@ -62,4 +62,10 @@ export const resetPassword = asyncHandler(async (req, res) => {
     success: true,
     user,
   });
+});
+
+export const deleteUser = asyncHandler(async (req, res) => {
+  const { id } = userIdParamsSchema.parse(req.params);
+  await deleteExistingUser(req.user.id, id, { ipAddress: req.ip, requestId: req.id });
+  res.status(204).send();
 });

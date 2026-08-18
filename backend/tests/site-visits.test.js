@@ -10,7 +10,11 @@ const siteVisitsRepositoryMocks = vi.hoisted(() => ({
   findSiteVisitById: vi.fn(),
   insertSiteVisit: vi.fn(),
   updateSiteVisitById: vi.fn(),
+  deleteSiteVisitById: vi.fn(),
 }));
+
+const relationshipMocks = vi.hoisted(() => ({ chargerBelongsToSite: vi.fn() }));
+const attachmentMocks = vi.hoisted(() => ({ getAttachments: vi.fn(), removeAttachment: vi.fn() }));
 
 vi.mock("../src/modules/auth/auth.repository.js", () => ({
   findUserWithPasswordByEmail: vi.fn(),
@@ -19,6 +23,8 @@ vi.mock("../src/modules/auth/auth.repository.js", () => ({
 }));
 
 vi.mock("../src/modules/site-visits/site-visits.repository.js", () => siteVisitsRepositoryMocks);
+vi.mock("../src/modules/operational-relations/operational-relations.repository.js", () => relationshipMocks);
+vi.mock("../src/modules/attachments/attachments.service.js", () => attachmentMocks);
 
 let app;
 let jwt;
@@ -31,6 +37,7 @@ const adminUser = {
   is_active: true,
 };
 const operationsUser = { ...adminUser, role: "operations_staff" };
+const hqUser = { ...adminUser, role: "hq_user" };
 const viewerUser = { ...adminUser, role: "viewer" };
 const siteVisitId = "77777777-7777-4777-8777-777777777777";
 const siteId = "33333333-3333-4333-8333-333333333333";
@@ -83,6 +90,9 @@ beforeEach(() => {
   siteVisitsRepositoryMocks.findSiteVisitById.mockResolvedValue(visitSummary);
   siteVisitsRepositoryMocks.insertSiteVisit.mockResolvedValue(visitSummary);
   siteVisitsRepositoryMocks.updateSiteVisitById.mockResolvedValue(visitSummary);
+  siteVisitsRepositoryMocks.deleteSiteVisitById.mockResolvedValue(true);
+  relationshipMocks.chargerBelongsToSite.mockResolvedValue(true);
+  attachmentMocks.getAttachments.mockResolvedValue([]);
 });
 
 function authCookie(user) {
@@ -137,6 +147,13 @@ describe("site visit routes", () => {
         updated_by: operationsUser.id,
       }),
     );
+  });
+
+  it("allows HQ users to create, edit, and delete site visits", async () => {
+    const input = { site_id: siteId, visit_date: "2026-06-22", time_in: "09:30", time_out: "11:15", visited_by: "HQ", purpose: "Inspection", status: "completed" };
+    await request(app).post("/api/v1/site-visits").set("Cookie", authCookie(hqUser)).send(input).expect(201);
+    await request(app).patch(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(hqUser)).send({ purpose: "Updated" }).expect(200);
+    await request(app).delete(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(hqUser)).expect(204);
   });
 
   it("allows ongoing visits without time out", async () => {
@@ -194,6 +211,7 @@ describe("site visit routes", () => {
         status: "completed",
         updated_by: operationsUser.id,
       }),
+      expect.any(Object),
     );
   });
 
@@ -214,6 +232,21 @@ describe("site visit routes", () => {
       .set("Cookie", authCookie(viewerUser))
       .send({ time_in: "10:00" })
       .expect(403);
+  });
+
+  it("rejects a charger that does not belong to the selected site", async () => {
+    relationshipMocks.chargerBelongsToSite.mockResolvedValue(false);
+    await request(app).patch(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(operationsUser))
+      .send({ site_id: siteId, charger_id: chargerId }).expect(400);
+    expect(siteVisitsRepositoryMocks.updateSiteVisitById).not.toHaveBeenCalled();
+  });
+
+  it("allows admin and operations deletion with attachment cleanup, but denies viewers", async () => {
+    attachmentMocks.getAttachments.mockResolvedValue([{ id: "88888888-8888-4888-8888-888888888888" }]);
+    await request(app).delete(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(operationsUser)).expect(204);
+    expect(attachmentMocks.removeAttachment).toHaveBeenCalledWith("88888888-8888-4888-8888-888888888888");
+    expect(siteVisitsRepositoryMocks.deleteSiteVisitById).toHaveBeenCalledWith(siteVisitId, operationsUser.id, visitSummary, expect.any(Object));
+    await request(app).delete(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(viewerUser)).expect(403);
   });
 
   it("rejects time out earlier than time in", async () => {

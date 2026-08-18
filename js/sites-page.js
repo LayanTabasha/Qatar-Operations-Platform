@@ -1,5 +1,53 @@
+const siteListFilters = { search: "", status: "" };
+const operationalRecordFilters = new Map();
+
+function normalizedFilterText(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function includesFilterText(values, query) {
+  const normalizedQuery = normalizedFilterText(query);
+  return !normalizedQuery || values.some((value) => normalizedFilterText(value).includes(normalizedQuery));
+}
+
+function sitesFilterControl(target) {
+  if (!target?.closest?.("#sites .site-header-tools")) return "";
+  if (target.matches?.('#sites .site-header-tools input[type="search"]')) return "search";
+  if (target.matches?.("#sites .site-header-tools select")) return "status";
+  return "";
+}
+
+function handleSitesFilterEvent(event) {
+  const filterName = sitesFilterControl(event.target);
+  if (!filterName) return;
+  siteListFilters[filterName] = event.target.value;
+  buildSites();
+}
+
+function bindSitesFilters() {
+  if (typeof document === "undefined" || document.documentElement?.dataset.sitesFiltersBound === "true") return;
+  if (document.documentElement) document.documentElement.dataset.sitesFiltersBound = "true";
+  document.addEventListener("input", (event) => {
+    if (sitesFilterControl(event.target) === "search") handleSitesFilterEvent(event);
+  });
+  document.addEventListener("change", (event) => {
+    if (sitesFilterControl(event.target) === "status") handleSitesFilterEvent(event);
+  });
+}
+
+bindSitesFilters();
+
 function buildSites() {
   const siteList = document.getElementById("site-list");
+  const searchInput = document.querySelector('#sites .site-header-tools input[type="search"]');
+  const statusFilter = document.querySelector("#sites .site-header-tools select");
+  if (searchInput && searchInput.value !== siteListFilters.search) searchInput.value = siteListFilters.search;
+  if (statusFilter) {
+    const selectedStatus = siteListFilters.status;
+    const statuses = Array.from(new Set(state.sites.map((site) => site.status).filter(Boolean))).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+    statusFilter.innerHTML = `<option value="">Filter by status</option>${statuses.map((status) => filterOption(status, selectedStatus)).join("")}`;
+  }
+  document.getElementById("add-site-button")?.classList.toggle("hidden", !isAdmin());
   if (state.backendLoading) {
     siteList.innerHTML = `<div class="empty-state"><h2>Loading sites...</h2><p>Fetching sites and chargers from the Qatar Operations backend.</p></div>`;
     return;
@@ -13,7 +61,17 @@ function buildSites() {
     return;
   }
 
-  siteList.innerHTML = state.sites.map((site) => `
+  const filteredSites = state.sites.filter((site) => {
+    const matchesSearch = includesFilterText([site.name, site.code, site.location, site.address, site.client, site.description], siteListFilters.search);
+    const matchesStatus = !siteListFilters.status || normalizedFilterText(site.status) === normalizedFilterText(siteListFilters.status);
+    return matchesSearch && matchesStatus;
+  });
+  if (!filteredSites.length) {
+    siteList.innerHTML = `<div class="empty-state"><h2>No sites match the selected filters</h2><p>Try a different search or status.</p></div>`;
+    return;
+  }
+
+  siteList.innerHTML = filteredSites.map((site) => `
     <article class="site-card">
       ${imageBlock(site.image, site.name)}
       <div class="site-content">
@@ -25,9 +83,10 @@ function buildSites() {
           ${placeholder("Open Faults", String(site.openFaultCount ?? state.faults.filter((fault) => fault.siteName === site.name && ["Open", "In Progress"].includes(fault.status)).length))}
           ${placeholder("Last Visit", site.lastSiteVisit ? formatDate(site.lastSiteVisit) : latestVisitForSite(site.name))}
         </div>
-        <div class="card-actions split-actions">
-          <button class="secondary-button" data-modal="site" data-mode="edit" data-site-context="${site.name}" type="button">Edit</button>
+        <div class="card-actions site-card-actions">
+          ${isAdmin() ? `<button class="secondary-button" data-modal="site" data-mode="edit" data-site-context="${site.name}" type="button">Edit</button>` : ""}
           <button class="primary-button open-site" data-site="${site.name}" type="button">Open Site</button>
+          ${isAdmin() ? `<button class="danger-button" data-archive-active="site" data-archive-id="${site.id}" data-archive-name="${formatSettingValue(site.name)}" type="button">Archive</button>` : ""}
         </div>
       </div>
     </article>`).join("");
@@ -60,6 +119,9 @@ function mapBackendCharger(charger) {
     code: charger.code,
     type: charger.type,
     manufacturer: charger.manufacturer || "",
+    operator: charger.operator || "",
+    administrator: charger.administrator || "",
+    installationDate: charger.installation_date || "",
     model: charger.model || "",
     serialNumber: charger.serial_number || "",
     capacity: formattedPower ? `${formattedPower} kW` : "",
@@ -81,31 +143,10 @@ function mapBackendCharger(charger) {
   };
 }
 
-function chargerDisplayRank(type) {
-  if (type === "DC") return 0;
-  if (type === "AC") return 1;
-  return 2;
-}
-
-function compareChargersForDisplay(a, b) {
-  const siteCompare = String(a.siteName || "").localeCompare(String(b.siteName || ""), undefined, { sensitivity: "base" });
-  if (siteCompare !== 0) return siteCompare;
-
-  const typeCompare = chargerDisplayRank(a.type) - chargerDisplayRank(b.type);
-  if (typeCompare !== 0) return typeCompare;
-
-  const codeA = a.code || a.name || "";
-  const codeB = b.code || b.name || "";
-  const codeCompare = String(codeA).localeCompare(String(codeB), undefined, { numeric: true, sensitivity: "base" });
-  if (codeCompare !== 0) return codeCompare;
-
-  return String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true, sensitivity: "base" });
-}
-
 function mapBackendSite(site, chargers) {
-  const siteChargers = chargers
-    .filter((charger) => charger.siteId === site.id || charger.siteName === site.name)
-    .sort(compareChargersForDisplay);
+  const siteChargers = sortChargersForDisplay(
+    chargers.filter((charger) => charger.siteId === site.id || charger.siteName === site.name),
+  );
   return {
     id: site.id,
     name: site.name,
@@ -131,38 +172,97 @@ async function loadOperationalData() {
   state.backendLoading = true;
   state.backendError = "";
   buildSites();
+  const homepageRequestsPromise = Promise.resolve().then(loadHomepageRequests).catch((error) => {
+    console.error("Homepage Requests loading failed", error);
+  });
 
   try {
-    const [sitesResponse, chargersResponse, archivedChargersResponse, siteVisitsResponse, dtcResponse] = await Promise.all([
-      SitesApi.list({ status: "active", limit: 100 }),
-      ChargersApi.list({ status: "active", limit: 100 }),
-      ChargersApi.list({ status: "archived", limit: 100 }),
-      SiteVisitsApi.list({ limit: 100 }),
-      DtcApi.list({ status: "all", limit: 100 }),
+    const [sitesResponse, activeChargersResponse, maintenanceChargersResponse, faultedChargersResponse, siteVisitsResponse, faultsResponse, dtcResponse, documentsResponse, weeklyReportsResponse, troubleshootingResponse, contactsResponse] = await Promise.all([
+      window.QatarOpsApi.Sites.list({ status: "active", limit: 100 }),
+      window.QatarOpsApi.Chargers.list({ status: "active", limit: 100 }),
+      window.QatarOpsApi.Chargers.list({ status: "maintenance", limit: 100 }),
+      window.QatarOpsApi.Chargers.list({ status: "faulted", limit: 100 }),
+      window.QatarOpsApi.SiteVisits.list({ limit: 100 }),
+      window.QatarOpsApi.Faults.list({ limit: 500 }),
+      window.QatarOpsApi.Dtc.list({ status: "all", limit: 100 }),
+      window.QatarOpsApi.ContentRecords.list("documents"), window.QatarOpsApi.ContentRecords.list("weekly-reports"), window.QatarOpsApi.ContentRecords.list("troubleshooting"), window.QatarOpsApi.Contacts.list({ limit: 500 }),
     ]);
-    const chargers = (chargersResponse.chargers || []).map(mapBackendCharger).sort(compareChargersForDisplay);
-    state.archivedChargers = (archivedChargersResponse.chargers || []).map(mapBackendCharger).sort(compareChargersForDisplay);
+    const chargers = sortChargersForDisplay((activeChargersResponse.chargers || []).map(mapBackendCharger));
+    state.dashboardChargers = sortChargersForDisplay([activeChargersResponse, maintenanceChargersResponse, faultedChargersResponse]
+      .flatMap((response) => response.chargers || [])
+      .map(mapBackendCharger));
     state.sites = (sitesResponse.sites || []).map((site) => mapBackendSite(site, chargers));
     state.visits = (siteVisitsResponse.site_visits || []).map(mapBackendSiteVisit);
+    state.faults = (faultsResponse.faults || []).map(normalizeFaultRecord);
     state.faultCatalogue = (dtcResponse.dtc_records || []).map(normalizeFaultCatalogueRecord);
+    state.contacts = contactsResponse.contacts || [];
+    const backendContentUploads = [
+      ...(documentsResponse.records || []).map((record) => mapContentRecord(record, "document")),
+      ...(weeklyReportsResponse.records || []).map((record) => mapContentRecord(record, "weeklyReport")),
+      ...(troubleshootingResponse.records || []).map((record) => mapContentRecord(record, "guide")),
+    ];
+    const faultUploads = state.faults.flatMap((fault) => (fault.attachmentRecords || []).map((attachment) => mapBackendAttachment(attachment, { module: "fault", kind: "fault", faultId: fault.faultId, parentId: fault.id, siteName: fault.siteName, chargerId: fault.chargerId, chargerName: fault.chargerName })));
+    const legacyContentUploads = state.uploads.filter((file) => !file.persisted && !file.recordPersisted && file.module !== "siteVisit" && file.module !== "fault" && !["siteVisit", "visitReport", "fault"].includes(file.kind));
+    const nonVisitUploads = reconcileLegacyContentUploads(backendContentUploads, legacyContentUploads);
+    state.uploads = deduplicateSiteVisitAttachments(state.visits.flatMap((visit) => visit.attachmentRecords || []), "")
+      .concat(faultUploads, backendContentUploads, nonVisitUploads);
     state.counts.chargers = chargers.length || null;
-    state.counts.faults = state.sites.reduce((total, site) => total + (Number(site.openFaultCount) || 0), 0) || null;
+    state.counts.faults = state.faults.filter((fault) => ["Open", "In Progress"].includes(fault.status)).length;
     state.backendLoading = false;
     buildSites();
+    renderContactsPage();
     renderCounts();
     renderDashboardCharts();
     refreshOpenProfiles();
+    await homepageRequestsPromise;
     return true;
   } catch (err) {
     state.backendLoading = false;
     state.backendError = err.message || "The backend could not be reached.";
     buildSites();
     renderCounts();
+    await homepageRequestsPromise;
     return false;
   }
 }
 
+function contentIdentityValue(value = "") {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function contentRecordIdentity(file) {
+  const filename = contentIdentityValue(file.originalFileName || file.fileName || file.name);
+  if (filename && filename !== "uploaded file") return `${file.kind}|file|${filename}`;
+  return [file.kind, "meta", file.title, file.siteName, file.chargerName, file.weekStart, file.weekEnd, file.guideCategory]
+    .map(contentIdentityValue).join("|");
+}
+
+function reconcileLegacyContentUploads(backendUploads, legacyUploads) {
+  const persistedIdentities = new Set(backendUploads.map(contentRecordIdentity));
+  return legacyUploads.filter((file) => !persistedIdentities.has(contentRecordIdentity(file)));
+}
+
+function mapContentRecord(record, kind) {
+  const attachment = record.attachments?.[0];
+  const context = {
+    kind, recordId: record.id, siteName: record.site_name || "", chargerId: record.charger_id || "", chargerName: record.charger_name || "",
+    title: record.title, description: record.description || record.notes || "", documentType: record.document_type || "",
+    weeklyReportId: kind === "weeklyReport" ? record.id : "", troubleshootingGuideId: kind === "guide" ? record.id : "",
+    weekStart: record.period_start || "", weekEnd: record.period_end || "", guideCategory: record.issue_category || "",
+    symptoms: record.symptoms || "", possibleCause: record.possible_cause || "", troubleshootingSteps: record.troubleshooting_steps || "",
+    resolution: record.resolution || "", notes: record.notes || "", documentDate: record.document_date || "",
+    uploadedBy: record.uploaded_by_name || "", uploadedAt: record.created_at, recordPersisted: true,
+  };
+  return attachment
+    ? mapBackendAttachment(attachment, { ...context, attachmentPersisted: true })
+    : normalizeUploadRecord({ ...context, id: `record-${record.id}`, name: "", persisted: false, attachmentPersisted: false });
+}
+
 function mapBackendSiteVisit(visit) {
+  const attachmentRecords = deduplicateSiteVisitAttachments((visit.attachments || []).map((attachment) => mapBackendAttachment(attachment, {
+    kind: "siteVisit", module: "siteVisit", category: "Site Visit Report", documentType: "site_visit_report",
+    siteVisitId: visit.id, siteName: visit.site_name, chargerId: visit.charger_id, chargerName: visit.charger_name,
+  })), visit.id);
   return {
     id: visit.id,
     siteId: visit.site_id,
@@ -178,7 +278,8 @@ function mapBackendSiteVisit(visit) {
     purpose: visit.purpose || "",
     notes: visit.observations || "",
     workCompleted: visit.actions_taken || "",
-    attachments: [],
+    attachments: attachmentRecords.map((file) => file.id),
+    attachmentRecords,
     createdBy: visit.visited_by || "",
     recordedOn: visit.created_at || "",
     recordedBy: visit.recorded_by_name || "",
@@ -187,6 +288,37 @@ function mapBackendSiteVisit(visit) {
     createdAt: visit.created_at,
     updatedAt: visit.updated_at,
   };
+}
+
+function mapBackendAttachment(attachment, context = {}) {
+  return normalizeUploadRecord({
+    id: attachment.id, ...context, name: attachment.original_filename, fileName: attachment.original_filename,
+    originalFileName: attachment.original_filename, type: attachment.mime_type, mimeType: attachment.mime_type,
+    size: Number(attachment.file_size_bytes), fileSize: Number(attachment.file_size_bytes), uploadedBy: attachment.uploaded_by_name,
+    uploadedAt: attachment.created_at, updatedAt: attachment.updated_at,
+    extension: attachment.file_extension || extensionFromName(attachment.original_filename),
+    previewAvailable: attachment.preview_available !== false,
+    previewUrl: attachment.preview_url, downloadUrl: attachment.download_url, persisted: true,
+  });
+}
+
+function extensionFromName(filename = "") {
+  const match = String(filename).toLowerCase().match(/(\.[a-z0-9]+)$/);
+  return match ? match[1] : "";
+}
+
+function deduplicateSiteVisitAttachments(files = [], parentId = "") {
+  const seen = new Set();
+  return files.filter((file) => {
+    if (!file) return false;
+    const idKey = file.id ? `id:${file.id}` : "";
+    const storageKey = file.storagePath || file.storage_path || file.storedFilename || file.stored_filename;
+    const fallbackKey = `file:${file.name || file.original_filename || ""}:${Number(file.size ?? file.fileSize ?? file.file_size_bytes ?? 0)}:${file.siteVisitId || parentId}`;
+    const keys = [idKey, storageKey ? `storage:${storageKey}` : "", fallbackKey].filter(Boolean);
+    if (keys.some((key) => seen.has(key))) return false;
+    keys.forEach((key) => seen.add(key));
+    return true;
+  });
 }
 
 function siteVisitStatusLabel(status) {
@@ -223,9 +355,13 @@ function uploadKindForTitle(title) {
 }
 
 function fileIcon(type) {
-  return type === "download"
-    ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 19h14"/></svg>`
-    : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+  const paths = {
+    download: `<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 19h14"/>`,
+    edit: `<path d="m4 16-.8 4 4-.8L18.5 7.9l-3.4-3.4L4 16Z"/><path d="m13.8 5.8 3.4 3.4"/>`,
+    delete: `<path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/>`,
+    preview: `<path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="3"/>`,
+  };
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[type] || paths.preview}</svg>`;
 }
 
 function formatFileSize(bytes) {
@@ -234,9 +370,36 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function fileRows(title) {
+function moduleFilterKey(title) {
+  return [state.currentSiteName || "all-sites", state.currentChargerId || "all-chargers", title].join("::");
+}
+
+function moduleFilters(title) {
+  const key = moduleFilterKey(title);
+  if (!operationalRecordFilters.has(key)) operationalRecordFilters.set(key, { search: "", charger: "", date: "", status: "", faultCode: "", documentType: "", category: "" });
+  return operationalRecordFilters.get(key);
+}
+
+function baseFilesForTitle(title) {
   const allowedKinds = uploadKindForTitle(title);
-  const files = getValidUploads().filter((file) => allowedKinds.includes(file.kind) && (!state.currentSiteName || file.siteName === state.currentSiteName) && (!state.currentChargerId || file.chargerId === state.currentChargerId));
+  return getValidUploads().filter((file) => allowedKinds.includes(file.kind) && (!state.currentSiteName || file.siteName === state.currentSiteName) && (!state.currentChargerId || file.chargerId === state.currentChargerId));
+}
+
+function filteredFiles(title) {
+  const filters = moduleFilters(title);
+  return baseFilesForTitle(title).filter((file) => {
+    const matchesSearch = includesFilterText([file.title, file.name, file.category, file.documentType, file.guideCategory, file.guideVersion, file.siteName, file.chargerName, file.uploadedBy, file.weekStart, file.weekEnd], filters.search);
+    const matchesCharger = !filters.charger || String(file.chargerId || file.chargerName || "") === filters.charger;
+    const matchesDate = !filters.date || String(file.uploadedAt || file.weekStart || "").slice(0, 10) === filters.date;
+    const matchesStatus = !filters.status || normalizedFilterText(file.status) === normalizedFilterText(filters.status);
+    const matchesDocumentType = !filters.documentType || normalizedFilterText(file.documentType || file.category) === normalizedFilterText(filters.documentType);
+    const matchesCategory = !filters.category || normalizedFilterText(file.guideCategory || file.category) === normalizedFilterText(filters.category);
+    return matchesSearch && matchesCharger && matchesDate && matchesStatus && matchesDocumentType && matchesCategory;
+  });
+}
+
+function fileRows(title) {
+  const files = filteredFiles(title);
   if (!files.length) return `<tr><td colspan="7">No ${title.toLowerCase()} uploaded yet.</td></tr>`;
   if (title === "Weekly Reports") {
     return files.map((file) => `<tr><td>${valueOrPlaceholder(file.title)}</td><td>${formatDate(file.weekStart)} - ${formatDate(file.weekEnd)}</td><td>${valueOrPlaceholder(file.chargerName)}</td><td>${valueOrPlaceholder(file.name)}</td><td>${formatDate(file.uploadedAt)}</td><td>${valueOrPlaceholder(file.uploadedBy)}</td><td>${fileActionButtons(file, "weekly report")}</td></tr>`).join("");
@@ -244,38 +407,173 @@ function fileRows(title) {
   if (title === "Troubleshooting") {
     return files.map((file) => `<tr><td>${valueOrPlaceholder(file.title)}</td><td>${valueOrPlaceholder(file.guideCategory)}</td><td>${valueOrPlaceholder(file.guideVersion)}</td><td>${valueOrPlaceholder(file.chargerName)}</td><td>${valueOrPlaceholder(file.name)}</td><td>${formatDate(file.uploadedAt)}</td><td>${fileActionButtons(file, "troubleshooting guide")}</td></tr>`).join("");
   }
-  return files.map((file) => `<tr><td>${valueOrPlaceholder(file.title)}</td><td>${valueOrPlaceholder(file.category)}</td><td>${valueOrPlaceholder(file.documentType)}</td><td>${valueOrPlaceholder(file.name)}</td><td>${valueOrPlaceholder(file.chargerName)}</td><td>${formatDate(file.uploadedAt)}</td><td>${fileActionButtons(file, file.category || "file")}</td></tr>`).join("");
+  return files.map((file) => `<tr><td>${valueOrPlaceholder(file.title)}</td><td>${valueOrPlaceholder(file.category)}</td><td>${valueOrPlaceholder(file.documentType)}</td><td>${valueOrPlaceholder(file.name)}</td><td>${valueOrPlaceholder(file.chargerName)}</td><td>${formatDate(file.uploadedAt)}</td><td>${fileActionButtons(file, "document")}</td></tr>`).join("");
 }
 
 function fileActionButtons(file, label = "file") {
-  return `<div class="file-actions"><button class="file-icon-button" data-file-preview="${file.id}" aria-label="Preview ${label}" data-tooltip="Preview" type="button">${fileIcon("preview")}</button><button class="file-icon-button" data-file-download="${file.id}" aria-label="Download ${label}" data-tooltip="Download" type="button">${fileIcon("download")}</button></div>`;
+  const hasPersistedRecord = Boolean(file.recordId) && file.recordPersisted === true;
+  if (hasPersistedRecord) {
+    const type = file.kind === "document" ? "documents" : file.kind === "weeklyReport" ? "weekly-reports" : "troubleshooting";
+    const hasAttachment = file.attachmentPersisted === true && file.persisted === true;
+    const view = `<button class="file-icon-button" data-content-view="${file.recordId}" data-content-type="${type}" aria-label="View ${label}" title="View" type="button">${fileIcon("preview")}</button>${hasAttachment ? `<button class="file-icon-button" data-file-download="${file.id}" aria-label="Download ${label}" title="Download" type="button">${fileIcon("download")}</button>` : ""}`;
+    const manage = canManageOperations() ? `<button class="file-icon-button" data-content-edit="${file.recordId}" data-content-type="${type}" aria-label="Edit ${label}" title="Edit" type="button">${fileIcon("edit")}</button><button class="file-icon-button danger-button" data-content-delete="${file.recordId}" data-content-type="${type}" aria-label="Delete ${label}" title="Delete" type="button">${fileIcon("delete")}</button>` : "";
+    return `<div class="file-actions">${view}${manage}</div>`;
+  }
+  const remove = file.persisted && file.siteVisitId && canManageOperations()
+    ? `<button class="file-icon-button danger-button" data-attachment-remove="${file.id}" aria-label="Remove ${label}" data-tooltip="Remove" type="button">×</button>` : "";
+  const legacyKind = file.kind === "document" ? "document" : file.kind === "weeklyReport" ? "weeklyReport" : file.kind === "guide" ? "guide" : "";
+  const legacyManage = legacyKind && canManageOperations()
+    ? `<button class="file-icon-button" data-legacy-content-edit="${file.id}" data-legacy-content-kind="${legacyKind}" aria-label="Edit ${label}" title="Edit" type="button">${fileIcon("edit")}</button><button class="file-icon-button danger-button" data-legacy-content-delete="${file.id}" aria-label="Delete ${label}" title="Delete" type="button">${fileIcon("delete")}</button>`
+    : "";
+  return `<div class="file-actions"><button class="file-icon-button" data-file-preview="${file.id}" aria-label="View ${label}" title="View" type="button">${fileIcon("preview")}</button><button class="file-icon-button" data-file-download="${file.id}" aria-label="Download ${label}" title="Download" type="button">${fileIcon("download")}</button>${legacyManage}${remove}</div>`;
+}
+
+function contentRecord(type, recordId) {
+  return state.uploads.find((file) => file.recordId === recordId && ({ document: "documents", weeklyReport: "weekly-reports", guide: "troubleshooting" })[file.kind] === type);
+}
+
+function contentTypeLabel(type) {
+  return ({ documents: "Document", "weekly-reports": "Weekly Report", troubleshooting: "Troubleshooting Record" })[type] || "Record";
+}
+
+function openContentRecordDetail(type, recordId) {
+  const record = contentRecord(type, recordId);
+  if (!record) return alert("This record is no longer available.");
+  const attachment = record.persisted
+    ? `<div class="attached-file"><span>${safeDetailValue(record.name)}</span><div class="file-actions"><button class="secondary-button" data-file-preview="${record.id}" type="button">Preview</button><button class="secondary-button" data-file-download="${record.id}" type="button">Download</button></div></div>`
+    : "—";
+  const moduleRows = type === "documents"
+    ? detailRow("Category / type", record.documentType) + detailRow("Document date", record.documentDate) + detailRow("Description", record.description)
+    : type === "weekly-reports"
+      ? detailRow("Week start", record.weekStart) + detailRow("Week end", record.weekEnd) + detailRow("Summary / notes", record.notes || record.description)
+      : detailRow("Category", record.guideCategory) + detailRow("Symptoms", record.symptoms) + detailRow("Possible cause", record.possibleCause) + detailRow("Troubleshooting steps", record.troubleshootingSteps) + detailRow("Resolution", record.resolution) + detailRow("Notes", record.notes);
+  document.querySelector(".modal")?.classList.remove("preview-modal");
+  document.getElementById("modal-title").textContent = record.title || contentTypeLabel(type);
+  document.getElementById("modal-eyebrow").textContent = `${contentTypeLabel(type)} Details`;
+  document.getElementById("modal-form").innerHTML = `<div class="data-list">${detailRow("Title", record.title)}${detailRow("Related site", record.siteName)}${type === "weekly-reports" ? "" : detailRow("Charger", record.chargerName)}${moduleRows}<div class="data-row"><span>Attachment</span><strong>${attachment}</strong></div></div><div class="modal-actions"><button class="secondary-button" type="button" id="cancel-modal">Close</button>${canManageOperations() ? `<button class="primary-button" data-content-edit="${recordId}" data-content-type="${type}" type="button">Edit</button>` : ""}</div>`;
+  document.getElementById("modal-backdrop").classList.remove("hidden");
+  resetModalScroll();
+}
+
+function openContentDeleteConfirmation(type, recordId) {
+  if (!canManageOperations()) return alert("Your account cannot delete this record.");
+  const record = contentRecord(type, recordId);
+  if (!record) return alert("This record is no longer available.");
+  const form = document.getElementById("modal-form");
+  document.querySelector(".modal")?.classList.remove("preview-modal");
+  document.getElementById("modal-title").textContent = `Delete ${contentTypeLabel(type)}`;
+  document.getElementById("modal-eyebrow").textContent = "Permanent deletion";
+  form.dataset.type = "contentDelete";
+  form.dataset.contentType = type;
+  form.dataset.recordId = recordId;
+  form.innerHTML = `<p class="modal-note">This permanently deletes the record${record.persisted ? " and its managed attachment" : ""}. This action cannot be undone.</p><div class="data-list">${detailRow("Record title", record.title)}${detailRow("Record type", contentTypeLabel(type))}${detailRow("Related site", record.siteName)}${detailRow("Attachment removed", record.persisted ? `Yes — ${record.name}` : "No attachment")}</div><label class="full"><span>Type DELETE to confirm</span><input id="content-delete-confirmation" autocomplete="off" data-required="true" /></label><div class="modal-actions"><button class="secondary-button" type="button" id="cancel-modal">Cancel</button><button class="danger-button" type="submit" data-loading-text="Deleting...">Permanently Delete</button></div>`;
+  document.getElementById("modal-backdrop").classList.remove("hidden");
+  resetModalScroll();
+}
+
+function openLegacyContentDeleteConfirmation(fileId) {
+  if (!canManageOperations()) return alert("Your account cannot delete this record.");
+  const record = state.uploads.find((file) => file.id === fileId && !file.recordPersisted);
+  if (!record) return alert("This record is no longer available.");
+  const form = document.getElementById("modal-form");
+  document.querySelector(".modal")?.classList.remove("preview-modal");
+  document.getElementById("modal-title").textContent = `Delete ${record.kind === "weeklyReport" ? "Weekly Report" : record.kind === "guide" ? "Troubleshooting Record" : "Document"}`;
+  document.getElementById("modal-eyebrow").textContent = "Legacy browser record";
+  form.dataset.type = "legacyContentDelete";
+  form.dataset.fileId = fileId;
+  form.innerHTML = `<div class="modal-error" id="modal-error"></div><p class="modal-note">This permanently removes this early-testing record and its browser-stored file from this browser. It has no backend record ID, so no server record or server file will be deleted.</p><div class="data-list">${detailRow("Record title", record.title)}${detailRow("File", record.name)}${detailRow("Related site", record.siteName)}</div><label class="full"><span>Type DELETE to confirm</span><input id="content-delete-confirmation" autocomplete="off" data-required="true" /></label><div class="modal-actions"><button class="secondary-button" type="button" id="cancel-modal">Cancel</button><button class="danger-button" type="submit" data-loading-text="Deleting...">Delete</button></div>`;
+  document.getElementById("modal-backdrop").classList.remove("hidden");
+  resetModalScroll();
+}
+
+function openOperationalDeleteConfirmation(type, recordId) {
+  if (!canManageOperations()) return alert("Your account cannot delete this record.");
+  const record = type === "siteVisit" ? state.visits.find((item) => item.id === recordId) : state.faults.find((item) => item.id === recordId);
+  if (!record) return alert("This record is no longer available.");
+  const title = type === "siteVisit" ? record.purpose : record.faultId || record.faultName;
+  const attachments = type === "siteVisit" ? deduplicateSiteVisitAttachments(record.attachmentRecords || [], record.id) : record.attachmentRecords || [];
+  const form = document.getElementById("modal-form");
+  document.querySelector(".modal")?.classList.remove("preview-modal");
+  document.getElementById("modal-title").textContent = `Delete ${type === "siteVisit" ? "Site Visit" : "Fault"}`;
+  document.getElementById("modal-eyebrow").textContent = type === "fault" ? "Archive operational record" : "Permanent deletion";
+  form.dataset.type = "operationalDelete";
+  form.dataset.deleteType = type;
+  form.dataset.recordId = recordId;
+  form.innerHTML = `<p class="modal-note">${type === "fault" ? "This removes the fault from normal operational views while preserving audit history." : "This permanently deletes the Site Visit and its managed report."}</p><div class="data-list">${detailRow("Record type", type === "siteVisit" ? "Site Visit" : "Fault")}${detailRow("Record title / reference", title)}${detailRow("Related site", record.siteName)}${detailRow("Related charger", record.chargerName || "No charger")}${detailRow("Attachment removed", attachments.length ? `Yes — ${attachments.length} managed file(s)` : type === "fault" ? "Photos retained with archived history and hidden from normal access" : "No attachment")}</div><label class="full"><span>Type DELETE to confirm</span><input id="operational-delete-confirmation" autocomplete="off" data-required="true" /></label><div class="modal-actions"><button class="secondary-button" type="button" id="cancel-modal">Cancel</button><button class="danger-button" type="submit" data-loading-text="Deleting...">Delete</button></div>`;
+  document.getElementById("modal-backdrop").classList.remove("hidden");
+  resetModalScroll();
+}
+
+if (typeof document !== "undefined") document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-operational-delete]");
+  if (button) openOperationalDeleteConfirmation(button.dataset.deleteType, button.dataset.operationalDelete);
+});
+
+function hasBackendAttachmentId(file) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(file?.id || ""));
+}
+
+function canRemoveSiteVisitAttachment(file) {
+  return hasBackendAttachmentId(file) && canManageOperations();
+}
+
+function siteVisitRemoveControl(file, label = "Remove") {
+  if (canRemoveSiteVisitAttachment(file)) return `<button class="danger-button" data-site-visit-report-remove="${file.id}" type="button">${label}</button>`;
+  const reason = hasBackendAttachmentId(file) ? "Your account cannot remove Site Visit reports" : "Remove unavailable: backend attachment ID is missing";
+  return `<button class="danger-button" type="button" disabled title="${reason}">${label}</button>`;
+}
+
+function baseFaultRecords() {
+  return state.faults.filter((fault) => (!state.currentSiteName || fault.siteName === state.currentSiteName) && (!state.currentChargerId || fault.chargerId === state.currentChargerId));
+}
+
+function filteredFaultRecords() {
+  const filters = moduleFilters("Faults");
+  return baseFaultRecords().filter((fault) => includesFilterText([fault.faultId, fault.faultCode, fault.faultName, fault.title, fault.description, fault.siteName, fault.chargerName, fault.severity, fault.status], filters.search)
+    && (!filters.charger || String(fault.chargerId || fault.chargerName || "") === filters.charger)
+    && (!filters.date || String(fault.reportedAt || "").slice(0, 10) === filters.date)
+    && (!filters.status || normalizedFilterText(fault.status) === normalizedFilterText(filters.status))
+    && (!filters.faultCode || normalizedFilterText(fault.faultCode) === normalizedFilterText(filters.faultCode)));
 }
 
 function faultRecordRows() {
-  const records = state.faults.filter((fault) => (!state.currentSiteName || fault.siteName === state.currentSiteName) && (!state.currentChargerId || fault.chargerId === state.currentChargerId));
-  if (!records.length) return `<tr><td colspan="9">No fault records entered yet.</td></tr>`;
+  const records = filteredFaultRecords();
+  if (!records.length) return `<tr><td colspan="10">No fault records entered yet.</td></tr>`;
   return records.map((fault) => `<tr>
     <td>${valueOrPlaceholder(fault.faultId)}</td>
     <td>${formatDate(fault.reportedAt)}</td>
     <td>${valueOrPlaceholder(fault.siteName)}</td>
     <td>${valueOrPlaceholder(fault.chargerName)}</td>
-    <td>${valueOrPlaceholder(fault.faultCode)}</td>
+    <td>${fault.faultCode ? safeDetailValue(fault.faultCode) : "—"}</td>
     <td>${valueOrPlaceholder(fault.faultName)}</td>
-    <td>${valueOrPlaceholder(fault.severity)}</td>
-    <td><select class="inline-select" data-fault-status="${fault.id}">${["Open", "In Progress", "Resolved", "Closed"].map((status) => `<option${status === fault.status ? " selected" : ""}>${status}</option>`).join("")}</select></td>
+    <td>${normalizedFaultSeverity(fault.severity)}</td>
+    <td>${canManageOperations() ? `<select class="inline-select" data-fault-status="${fault.id}">${FAULT_STATUS_OPTIONS.map((status) => `<option${status === fault.status ? " selected" : ""}>${status}</option>`).join("")}</select>` : safeDetailValue(fault.status)}</td>
     <td>${faultPhotosMarkup(fault)}</td>
+    <td><div class="file-actions"><button class="secondary-button" data-fault-detail="${fault.id}" type="button">View Details</button>${canManageOperations() ? `<button class="secondary-button" data-modal="fault" data-mode="edit" data-fault-id="${fault.id}" type="button">Edit</button><button class="danger-button" data-operational-delete="${fault.id}" data-delete-type="fault" type="button">Delete</button>` : ""}</div></td>
   </tr>`).join("");
 }
 
 function faultPhotosMarkup(fault) {
   const files = getValidUploads().filter((file) => file.faultId === fault.faultId && file.module === "fault");
   if (!files.length) return "No photos attached";
-  return `<div class="fault-photo-strip">${files.map((file) => `<button class="fault-photo-thumb" data-file-preview="${file.id}" aria-label="Preview fault photo" data-tooltip="Preview" type="button"><img src="${file.dataUrl}" alt="${file.name}" /></button>`).join("")}</div>`;
+  return `<div class="fault-photo-list">${files.map((file) => `<div class="fault-photo-item">${file.dataUrl ? `<img src="${file.dataUrl}" alt="${safeDetailValue(file.name || "Fault photo")}" />` : ""}<span>${safeDetailValue(file.name || "Fault photo")}</span><div class="file-actions"><button class="secondary-button" data-file-preview="${file.id}" type="button">View</button><button class="secondary-button" data-file-download="${file.id}" type="button">Download</button></div></div>`).join("")}</div>`;
+}
+
+function baseVisitRecords() {
+  return state.visits.filter((visit) => (!state.currentSiteName || visit.siteName === state.currentSiteName) && (!state.currentChargerId || visit.chargerId === state.currentChargerId));
+}
+
+function filteredVisitRecords() {
+  const filters = moduleFilters("Site Visits");
+  return baseVisitRecords().filter((visit) => includesFilterText([visit.id, visit.siteName, visit.chargerName, visit.createdBy, visit.purpose, visit.notes, visit.status, visit.recordedBy], filters.search)
+    && (!filters.charger || String(visit.chargerId || visit.chargerName || "") === filters.charger)
+    && (!filters.date || String(visit.visitDate || "").slice(0, 10) === filters.date)
+    && (!filters.status || normalizedFilterText(visit.status) === normalizedFilterText(filters.status)));
 }
 
 function visitRecordRows() {
-  const records = state.visits.filter((visit) => (!state.currentSiteName || visit.siteName === state.currentSiteName) && (!state.currentChargerId || visit.chargerId === state.currentChargerId));
-  if (!records.length) return `<tr><td colspan="10">No site visits entered yet.</td></tr>`;
+  const records = filteredVisitRecords();
+  if (!records.length) return `<tr><td colspan="11">No site visits entered yet.</td></tr>`;
   return records.map((visit) => `<tr>
     <td>${formatMediumDate(visit.visitDate)}</td>
     <td>${visit.timeIn ? visit.timeIn : "Not Available Yet"}</td>
@@ -284,58 +582,111 @@ function visitRecordRows() {
     <td>${valueOrPlaceholder(visit.createdBy)}</td>
     <td>${valueOrPlaceholder(visit.purpose)}</td>
     <td>${valueOrPlaceholder(visit.status)}</td>
+    <td>${visitAttachmentsMarkup(visit)}</td>
     <td>${formatMediumDate(visit.recordedOn)}</td>
     <td>${valueOrPlaceholder(visit.recordedBy)}</td>
-    <td><div class="file-actions"><button class="secondary-button" data-visit-detail="${visit.id}" type="button">View</button>${canManageOperations() ? `<button class="secondary-button" data-modal="siteVisit" data-mode="edit" data-visit-id="${visit.id}" type="button">Edit</button>` : ""}</div></td>
+    <td><div class="file-actions"><button class="secondary-button" data-visit-detail="${visit.id}" type="button">View</button>${canManageOperations() ? `<button class="secondary-button" data-modal="siteVisit" data-mode="edit" data-visit-id="${visit.id}" type="button">Edit</button><button class="danger-button" data-operational-delete="${visit.id}" data-delete-type="siteVisit" type="button">Delete</button>` : ""}</div></td>
   </tr>`).join("");
 }
 
 function visitAttachmentsMarkup(visit) {
-  const files = getValidUploads().filter((file) => file.siteVisitId === visit.id && file.documentType === "site_visit_report");
+  const files = deduplicateSiteVisitAttachments(visit.attachmentRecords || [], visit.id);
   if (!files.length) return "No report attached";
-  return `<div class="attached-files">${files.map((file) => `<div class="attached-file"><span>${valueOrPlaceholder(file.name)}</span>${fileActionButtons(file, file.category === "Site Visit Report" ? "site visit report" : "site visit attachment")}</div>`).join("")}</div>`;
+  return `<div class="attached-files">${files.map((file) => `<div class="attached-file"><span>${valueOrPlaceholder(file.name)} <small>${valueOrPlaceholder(file.type)}</small></span><div class="file-actions"><button class="secondary-button" data-file-preview="${file.id}" type="button">View</button><button class="secondary-button" data-file-download="${file.id}" type="button">Download</button>${siteVisitRemoveControl(file)}</div></div>`).join("")}</div>`;
 }
 
-function archivedChargerRows(siteName) {
-  const archivedChargers = state.archivedChargers.filter((charger) => charger.siteName === siteName);
-  if (!archivedChargers.length) return `<tr><td colspan="8">No archived chargers for this site.</td></tr>`;
-  return archivedChargers.map((charger) => `<tr>
-    <td>${valueOrPlaceholder(charger.name)}</td>
-    <td>${valueOrPlaceholder(charger.code)}</td>
-    <td>${valueOrPlaceholder(charger.siteName)}</td>
-    <td>${valueOrPlaceholder(charger.type)}</td>
-    <td>${valueOrPlaceholder(charger.previousStatus)}</td>
-    <td>${formatMediumDate(charger.archivedAt)}</td>
-    <td>${valueOrPlaceholder(charger.archivedBy)}</td>
-    <td><div class="file-actions"><button class="secondary-button" data-charger-restore="${charger.id}" type="button">Restore</button>${isAdmin() ? `<button class="danger-button" data-charger-delete="${charger.id}" data-charger-name="${charger.name}" data-charger-code="${charger.code}" type="button">Permanently Delete</button>` : ""}</div></td>
-  </tr>`).join("");
+async function removeSiteVisitReportAttachment(attachmentId) {
+  await window.QatarOpsApi.Attachments.remove(attachmentId);
+  let affectedVisit = null;
+  state.visits.forEach((visit) => {
+    if ((visit.attachmentRecords || []).some((file) => file.id === attachmentId)) affectedVisit = visit;
+    visit.attachmentRecords = (visit.attachmentRecords || []).filter((file) => file.id !== attachmentId);
+    visit.attachments = (visit.attachments || []).filter((id) => id !== attachmentId);
+  });
+  state.uploads = state.uploads.filter((file) => file.id !== attachmentId);
+  refreshOpenProfiles();
+  const modalType = document.getElementById("modal-form")?.dataset.type;
+  if (modalType === "siteVisitDetail" && affectedVisit) openSiteVisitDetail(affectedVisit.id);
+  if (modalType === "siteVisit") renderCurrentAttachment("siteVisit");
 }
 
-function archivedChargersSection(siteName) {
-  const archivedCount = state.archivedChargers.filter((charger) => charger.siteName === siteName).length;
-  return `<div class="module-header"><div><h2>Archived Chargers</h2><p>Archived Chargers: ${archivedCount}</p></div></div>
-    <div class="table-wrap"><table><thead><tr><th>Charger Name</th><th>Code</th><th>Site</th><th>Type</th><th>Previous Status</th><th>Archived Date</th><th>Archived By</th><th>Actions</th></tr></thead><tbody>${archivedChargerRows(siteName)}</tbody></table></div>`;
+function uniqueFilterOptions(values) {
+  return Array.from(new Map(values.filter(Boolean).map((value) => [normalizedFilterText(value), String(value)])).values()).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
 }
 
-function recordsModule(title, actions, columns, filters, note = "") {
+function filterOption(value, selected) {
+  return `<option value="${safeDetailValue(value)}"${String(value) === String(selected) ? " selected" : ""}>${safeDetailValue(value)}</option>`;
+}
+
+function moduleFilterControls(title, requestedFilters) {
+  const filters = moduleFilters(title);
+  const records = title === "Faults" ? baseFaultRecords() : title === "Site Visits" ? baseVisitRecords() : baseFilesForTitle(title);
+  const chargerOptions = Array.from(new Map(records.filter((item) => item.chargerId || item.chargerName).map((item) => [String(item.chargerId || item.chargerName), String(item.chargerName || item.chargerId)])).entries()).sort((left, right) => left[1].localeCompare(right[1], undefined, { numeric: true, sensitivity: "base" }));
+  const statusOptions = title === "Faults" ? FAULT_STATUS_OPTIONS : uniqueFilterOptions(records.map((item) => item.status));
+  const faultCodeOptions = uniqueFilterOptions(records.map((item) => item.faultCode));
+  const documentTypeOptions = uniqueFilterOptions(records.map((item) => item.documentType || item.category));
+  const categoryOptions = uniqueFilterOptions(records.map((item) => item.guideCategory || item.category));
+  return requestedFilters.map((label) => {
+    const lower = label.toLowerCase();
+    if (lower.includes("charger")) return `<select data-record-filter="charger" aria-label="${label}"><option value="">${label}</option>${chargerOptions.map(([value, optionLabel]) => `<option value="${safeDetailValue(value)}"${value === filters.charger ? " selected" : ""}>${safeDetailValue(optionLabel)}</option>`).join("")}</select>`;
+    if (lower.includes("fault code")) return `<select data-record-filter="faultCode" aria-label="${label}"><option value="">${label}</option>${faultCodeOptions.map((value) => filterOption(value, filters.faultCode)).join("")}</select>`;
+    if (lower.includes("document type")) return `<select data-record-filter="documentType" aria-label="${label}"><option value="">${label}</option>${documentTypeOptions.map((value) => filterOption(value, filters.documentType)).join("")}</select>`;
+    if (lower.includes("category")) return `<select data-record-filter="category" aria-label="${label}"><option value="">${label}</option>${categoryOptions.map((value) => filterOption(value, filters.category)).join("")}</select>`;
+    if (lower.includes("status")) return `<select data-record-filter="status" aria-label="${label}"><option value="">${title === "Faults" ? "All Statuses" : label}</option>${statusOptions.map((value) => filterOption(value, filters.status)).join("")}</select>`;
+    if (lower.includes("date")) return `<input data-record-filter="date" type="date" value="${safeDetailValue(filters.date)}" aria-label="${label}" />`;
+    return `<input data-record-filter="search" type="search" value="${safeDetailValue(filters.search)}" placeholder="${label}" />`;
+  }).join("");
+}
+
+function moduleTableBody(title) {
+  return title === "Faults" ? faultRecordRows() : title === "Site Visits" ? visitRecordRows() : fileRows(title);
+}
+
+function recordsModule(title, actions, columns, filters, note = "", context = {}) {
   const uploadActions = actions.filter(([label]) => !/preview|download/i.test(label));
   const isFaults = title === "Faults";
   const isVisits = title === "Site Visits";
   const headers = isFaults
-    ? ["Fault ID", "Reported", "Site", "Charger", "Fault Code", "Fault Name", "Severity", "Status", "Fault Photos"]
+    ? ["Fault ID", "Reported", "Site", "Charger", "Fault Code", "Fault Name", "Severity", "Status", "Fault Photos", "Actions"]
     : isVisits
-      ? ["Visit Date", "Time In", "Time Out", "Site", "Engineer", "Purpose", "Status", "Recorded On", "Recorded By", "Actions"]
+      ? ["Visit Date", "Time In", "Time Out", "Site", "Engineer", "Purpose", "Status", "Report / Attachment", "Recorded On", "Recorded By", "Actions"]
       : title === "Weekly Reports"
         ? ["Report Title", "Week", "Charger", "File name", "Uploaded", "Uploaded by", "Actions"]
         : title === "Troubleshooting"
           ? ["Guide Title", "Category", "Version", "Charger", "File name", "Uploaded", "Actions"]
           : ["Title", "Module Category", "Document Type", "File name", "Charger", "Uploaded", "Actions"];
-  const body = isFaults ? faultRecordRows() : isVisits ? visitRecordRows() : fileRows(title);
+  const body = moduleTableBody(title);
+  const actionContext = (modal) => {
+    if (!context.siteId) return "";
+    const supportsCharger = ["siteVisit", "fault", "document", "guide"].includes(modal);
+    const chargerId = supportsCharger ? context.chargerId || "" : "";
+    return ` data-site-id="${context.siteId}"${chargerId ? ` data-charger-id="${chargerId}" data-lock-location="true"` : " data-lock-site=\"true\""}`;
+  };
   return `<div class="module-header"><div><h2>${title}</h2>${note ? `<p>${note}</p>` : ""}</div>
-    <div class="quick-actions compact">${uploadActions.map(([label, modal]) => `<button class="secondary-button" data-modal="${modal}" type="button">${label}</button>`).join("")}</div></div>
-    <div class="toolbar">${filters.map((filter) => `<input placeholder="${filter}" />`).join("")}</div>
+    <div class="quick-actions compact">${uploadActions.map(([label, modal]) => `<button class="secondary-button" data-modal="${modal}" data-mode="create"${actionContext(modal)} type="button">${label}</button>`).join("")}</div></div>
+    <div class="toolbar" data-record-module="${title}">${moduleFilterControls(title, filters)}</div>
     <div class="table-wrap"><table><thead><tr>${headers.map((header) => `<th>${header}</th>`).join("")}</tr></thead>
-    <tbody>${body}</tbody></table></div>`;
+    <tbody data-record-results="${title}">${body}</tbody></table></div>`;
+}
+
+function updateOperationalRecordResults(control) {
+  const toolbar = control.closest("[data-record-module]");
+  if (!toolbar) return;
+  const title = toolbar.dataset.recordModule;
+  const filterName = control.dataset.recordFilter;
+  if (!filterName) return;
+  moduleFilters(title)[filterName] = control.value;
+  const results = toolbar.parentElement.querySelector(`[data-record-results="${title}"]`);
+  if (results) results.innerHTML = moduleTableBody(title);
+}
+
+if (typeof document !== "undefined") {
+  document.addEventListener("input", (event) => {
+    if (event.target.matches('[data-record-filter="search"], [data-record-filter="date"]')) updateOperationalRecordResults(event.target);
+  });
+  document.addEventListener("change", (event) => {
+    if (event.target.matches("select[data-record-filter], input[data-record-filter='date']")) updateOperationalRecordResults(event.target);
+  });
 }
 
 function siteTab(tab, site) {
@@ -345,18 +696,21 @@ function siteTab(tab, site) {
       <div class="summary-grid"><article>${placeholder("Chargers", siteRecord?.chargers?.length ? String(siteRecord.chargers.length) : "Not Available Yet")}</article><article>${placeholder("Open Faults", String(state.faults.filter((fault) => fault.siteName === site && ["Open", "In Progress"].includes(fault.status)).length))}</article><article>${placeholder("Last Visit", latestVisitForSite(site))}</article><article>${placeholder("Uploaded Files", String(getValidUploads().filter((file) => file.siteName === site).length))}</article></div>`;
   }
   if (tab === "Chargers") {
-    const chargers = siteRecord?.chargers?.length ? siteRecord.chargers : [];
-    const archivedSection = archivedChargersSection(site);
+    const chargers = sortChargersForDisplay(siteRecord?.chargers || []);
+    const addCharger = isAdmin() && siteRecord?.id
+      ? `<button class="primary-button" data-modal="charger" data-mode="create" data-site-context="${site}" data-site-id="${siteRecord.id}" data-lock-site="true" type="button">+ Add Charger</button>`
+      : "";
     if (!chargers.length) {
-      return `<div class="empty-state"><h2>No active chargers added yet</h2><p>Use Add Charger to create editable charger records for ${site}.</p><button class="primary-button" data-modal="charger" data-mode="create" type="button">Add Charger</button></div>${archivedSection}`;
+      return `<div class="empty-state"><h2>No active chargers added yet</h2><p>Use Add Charger to create editable charger records for ${site}.</p>${addCharger}</div>`;
     }
-    return `<div class="charger-grid">${chargers.map((charger) => `<article class="charger-card">${imageBlock(charger.image, valueOrPlaceholder(charger.name), "charger-photo")}<h2>${valueOrPlaceholder(charger.name)}</h2><div class="data-list">${placeholder("Charger Type", valueOrPlaceholder(charger.type))}${placeholder("Status", valueOrPlaceholder(charger.status))}${placeholder("Manufacturer", valueOrPlaceholder(charger.manufacturer))}${placeholder("Capacity", valueOrPlaceholder(charger.capacity))}${placeholder("Operator", valueOrPlaceholder(charger.operator))}${placeholder("Administrator", valueOrPlaceholder(charger.administrator))}${placeholder("Model", valueOrPlaceholder(charger.model))}${placeholder("Serial Number", valueOrPlaceholder(charger.serialNumber))}${placeholder("Installation Date", formatDate(charger.installationDate))}${placeholder("Faults")}${placeholder("Last Visit")}</div><button class="primary-button open-charger" data-site="${site}" data-charger="${charger.id}" type="button">Open Charger</button></article>`).join("")}</div>${archivedSection}`;
+    return `<div class="module-header"><div><h2>Chargers</h2></div><div class="quick-actions compact">${addCharger}</div></div><div class="charger-grid">${chargers.map((charger) => `<article class="charger-card">${imageBlock(charger.image, valueOrPlaceholder(charger.name), "charger-photo")}<h2>${valueOrPlaceholder(charger.name)}</h2><div class="data-list">${placeholder("Charger Type", valueOrPlaceholder(charger.type))}${placeholder("Status", valueOrPlaceholder(charger.status))}${placeholder("Manufacturer", valueOrPlaceholder(charger.manufacturer))}${placeholder("Capacity", valueOrPlaceholder(charger.capacity))}${placeholder("Operator", valueOrPlaceholder(charger.operator))}${placeholder("Administrator", valueOrPlaceholder(charger.administrator))}${placeholder("Model", valueOrPlaceholder(charger.model))}${placeholder("Serial Number", valueOrPlaceholder(charger.serialNumber))}${placeholder("Installation Date", formatDate(charger.installationDate))}${placeholder("Faults")}${placeholder("Last Visit")}</div><div class="card-actions split-actions"><button class="primary-button open-charger" data-site="${site}" data-charger="${charger.id}" type="button">Open Charger</button>${isAdmin() ? `<button class="danger-button" data-archive-active="charger" data-archive-id="${charger.id}" data-archive-name="${formatSettingValue(charger.name)}" type="button">Archive</button>` : ""}</div></article>`).join("")}</div>`;
   }
-  if (tab === "Site Visits") return recordsModule("Site Visits", [["Add new site visit", "siteVisit"], ["Upload visit report", "visitReport"]], ["Date", "Time in", "Time out", "Site", "Charger", "Purpose", "Notes", "Report file"], ["Search visits", "Filter by charger", "Filter by date"]);
-  if (tab === "Faults") return recordsModule("Faults", [["Report fault", "fault"]], ["Fault ID", "Date", "Site", "Charger", "Fault Code", "Fault Name", "Severity", "Status", "Photos"], ["Search by Fault ID", "Filter by charger", "Filter by fault code", "Filter by status"], "Fault records support photo evidence only. General documents and reports belong in their own modules.");
-  if (tab === "Documents") return recordsModule("Documents", [["Upload charger document", "document"]], ["Document title", "Category", "Related site", "Related charger", "Uploaded by", "Upload date", "Actions"], ["Search charger documents", "Filter by document type", "Filter by charger"]);
-  if (tab === "Weekly Reports") return recordsModule("Weekly Reports", [["Upload weekly report", "weeklyReport"]], ["Week number", "Date range", "Related site", "Related charger", "Uploaded by", "Upload date", "Summary", "Attachment", "Actions"], ["View reports by week", "Filter by charger"]);
-  return recordsModule("Troubleshooting", [["Add troubleshooting guide", "guide"]], ["Guide title", "Category", "Version", "Related charger", "Uploaded by", "Upload date", "Actions"], ["Search guides", "Filter by charger", "Filter by category"]);
+  const siteContext = { siteId: siteRecord?.id || "" };
+  if (tab === "Site Visits") return recordsModule("Site Visits", [["Add new site visit", "siteVisit"]], ["Date", "Time in", "Time out", "Site", "Charger", "Purpose", "Notes", "Report file"], ["Search visits", "Filter by charger", "Filter by date"], "", siteContext);
+  if (tab === "Faults") return recordsModule("Faults", [["Report fault", "fault"]], ["Fault ID", "Date", "Site", "Charger", "Fault Code", "Fault Name", "Severity", "Status", "Photos"], ["Search by Fault ID", "Filter by charger", "Filter by fault code", "Filter by status"], "Fault records support photo evidence only. General documents and reports belong in their own modules.", siteContext);
+  if (tab === "Documents") return recordsModule("Documents", [["Upload charger document", "document"]], ["Document title", "Category", "Related site", "Related charger", "Uploaded by", "Upload date", "Actions"], ["Search charger documents", "Filter by document type", "Filter by charger"], "", siteContext);
+  if (tab === "Weekly Reports") return recordsModule("Weekly Reports", [["Upload weekly report", "weeklyReport"]], ["Week number", "Date range", "Related site", "Related charger", "Uploaded by", "Upload date", "Summary", "Attachment", "Actions"], ["View reports by week", "Filter by charger"], "", siteContext);
+  return recordsModule("Troubleshooting", [["Add troubleshooting guide", "guide"]], ["Guide title", "Category", "Version", "Related charger", "Uploaded by", "Upload date", "Actions"], ["Search guides", "Filter by charger", "Filter by category"], "", siteContext);
 }
 
 function openSite(site, initialTab = "Overview") {
@@ -370,12 +724,13 @@ function openSite(site, initialTab = "Overview") {
   state.currentSiteTab = initialTab;
   const siteRecord = getSite(site);
   profile.classList.remove("hidden");
+  if (initialTab === "Site Visits") closeModal();
   profile.innerHTML = `<div class="profile-head compact-profile-head">
     <div><p class="eyebrow">Site Profile</p><h1>${site}</h1></div>
     <div class="profile-meta">
       <span>Status: ${valueOrPlaceholder(siteRecord?.status)}</span><span>Location: ${valueOrPlaceholder(siteRecord?.location)}</span><span>Last updated: To Be Updated</span>
     </div>
-    <div class="charger-profile-actions"><button class="secondary-button" data-modal="site" data-mode="edit" data-site-context="${site}" type="button">Edit Site</button></div>
+    <div class="charger-profile-actions">${isAdmin() ? `<button class="secondary-button" data-modal="site" data-mode="edit" data-site-context="${site}" type="button">Edit Site</button>` : ""}${isAdmin() ? `<button class="danger-button" data-archive-active="site" data-archive-id="${siteRecord?.id}" data-archive-name="${formatSettingValue(site)}" type="button">Archive</button>` : ""}</div>
   </div><div class="subtabs">${tabs.map((tab) => `<button class="${tab === initialTab ? "active" : ""}" data-tab="${tab}" type="button">${tab}</button>`).join("")}</div><div class="tab-body">${siteTab(initialTab, site)}</div>`;
   profile.querySelector(".subtabs").addEventListener("click", (event) => {
     const button = event.target.closest("button");
@@ -383,21 +738,36 @@ function openSite(site, initialTab = "Overview") {
     profile.querySelectorAll(".subtabs button").forEach((item) => item.classList.remove("active"));
     button.classList.add("active");
     state.currentSiteTab = button.dataset.tab;
-    profile.querySelector(".tab-body").innerHTML = siteTab(button.dataset.tab, site);
+    const tabBody = profile.querySelector(".tab-body");
+    try {
+      if (button.dataset.tab === "Site Visits") closeModal();
+      tabBody.innerHTML = siteTab(button.dataset.tab, site);
+    } catch (error) {
+      console.error("Site tab render failed", error);
+      tabBody.innerHTML = `<div class="empty-state"><h2>Site Visits could not be displayed</h2><p>${safeDetailValue(error.message || "Unexpected rendering error")}</p></div>`;
+    } finally {
+      if (button.dataset.tab === "Site Visits") {
+        document.getElementById("modal-backdrop")?.classList.add("hidden");
+        document.body.classList.remove("modal-open", "is-loading");
+      }
+    }
     saveViewContext({ route: "sites", siteName: state.currentSiteName, chargerId: "", siteTab: state.currentSiteTab });
   });
   saveViewContext({ route: "sites", siteName: state.currentSiteName, chargerId: "", siteTab: state.currentSiteTab });
   profile.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function chargerTab(tab, site) {
-  const charger = getCharger(site);
+function chargerTab(tab, site, chargerId = state.currentChargerId) {
+  const charger = getCharger(site, chargerId);
   if (tab === "Overview") {
     return `<div class="overview-grid compact-overview">${imageBlock(charger?.image, "Charger Photo", "compact-image charger-overview-image")}<div class="panel flat"><h2>Charger Snapshot</h2><div class="data-list">${placeholder("Site", site)}${placeholder("Charger Name", valueOrPlaceholder(charger?.name))}${placeholder("Charger Type", valueOrPlaceholder(charger?.type))}${placeholder("Status", valueOrPlaceholder(charger?.status))}${placeholder("Manufacturer", valueOrPlaceholder(charger?.manufacturer))}${placeholder("Capacity", valueOrPlaceholder(charger?.capacity))}${placeholder("Installation Date", formatDate(charger?.installationDate))}${placeholder("Operator", valueOrPlaceholder(charger?.operator))}${placeholder("Administrator", valueOrPlaceholder(charger?.administrator))}${placeholder("Model", valueOrPlaceholder(charger?.model))}${placeholder("Serial Number", valueOrPlaceholder(charger?.serialNumber))}${placeholder("Notes", valueOrPlaceholder(charger?.notes))}${placeholder("Faults")}${placeholder("Last Visit")}</div></div></div>`;
   }
   const modal = tab === "Faults" ? "fault" : tab === "Documents" ? "document" : tab === "Weekly Reports" ? "weeklyReport" : tab === "Troubleshooting" ? "guide" : "siteVisit";
   const label = tab === "Faults" ? "Report fault" : tab === "Site Visits" ? "Add site visit" : "Upload";
-  return recordsModule(tab, [[label, modal]], ["Date", "Site", "Charger", "Uploaded by", "Status", "Attachments", "Actions"], ["Search", "Filter by date", "Filter by status"]);
+  return recordsModule(tab, [[label, modal]], ["Date", "Site", "Charger", "Uploaded by", "Status", "Attachments", "Actions"], ["Search", "Filter by date", "Filter by status"], "", {
+    siteId: getSite(site)?.id || "",
+    chargerId: charger?.id || chargerId,
+  });
 }
 
 function openCharger(site, chargerId, initialTab = "Overview") {
@@ -410,14 +780,14 @@ function openCharger(site, chargerId, initialTab = "Overview") {
   state.currentChargerTab = initialTab;
   const charger = getCharger(site, chargerId);
   profile.classList.remove("hidden");
-  profile.innerHTML = `<div class="profile-head compact-profile-head"><div><p class="eyebrow">Charger Profile</p><h1>${valueOrPlaceholder(charger?.name)}</h1></div><div class="profile-meta"><span>Site: ${site}</span><span>Status: ${valueOrPlaceholder(charger?.status)}</span><span>Type: ${valueOrPlaceholder(charger?.type)}</span></div><div class="charger-profile-actions"><button class="secondary-button" data-modal="charger" type="button">Edit Charger Information</button><button class="danger-button" data-modal="deleteCharger" type="button">Remove Charger</button></div></div><div class="subtabs">${tabs.map((tab) => `<button class="${tab === initialTab ? "active" : ""}" data-tab="${tab}" type="button">${tab}</button>`).join("")}</div><div class="tab-body">${chargerTab(initialTab, site)}</div>`;
+  profile.innerHTML = `<div class="profile-head compact-profile-head"><div><p class="eyebrow">Charger Profile</p><h1>${valueOrPlaceholder(charger?.name)}</h1></div><div class="profile-meta"><span>Site: ${site}</span><span>Status: ${valueOrPlaceholder(charger?.status)}</span><span>Type: ${valueOrPlaceholder(charger?.type)}</span></div><div class="charger-profile-actions">${isAdmin() ? `<button class="secondary-button" data-modal="charger" type="button">Edit Charger Information</button>` : ""}${isAdmin() ? `<button class="danger-button" data-archive-active="charger" data-archive-id="${charger?.id}" data-archive-name="${formatSettingValue(charger?.name)}" type="button">Archive</button>` : ""}</div></div><div class="subtabs">${tabs.map((tab) => `<button class="${tab === initialTab ? "active" : ""}" data-tab="${tab}" type="button">${tab}</button>`).join("")}</div><div class="tab-body">${chargerTab(initialTab, site, chargerId)}</div>`;
   profile.querySelector(".subtabs").addEventListener("click", (event) => {
     const button = event.target.closest("button");
     if (!button) return;
     profile.querySelectorAll(".subtabs button").forEach((item) => item.classList.remove("active"));
     button.classList.add("active");
     state.currentChargerTab = button.dataset.tab;
-    profile.querySelector(".tab-body").innerHTML = chargerTab(button.dataset.tab, site);
+    profile.querySelector(".tab-body").innerHTML = chargerTab(button.dataset.tab, site, chargerId);
     saveViewContext({ route: "sites", siteName: state.currentSiteName, chargerId: state.currentChargerId, chargerTab: state.currentChargerTab });
   });
   saveViewContext({ route: "sites", siteName: state.currentSiteName, chargerId: state.currentChargerId, chargerTab: state.currentChargerTab });
@@ -443,7 +813,7 @@ function removeCurrentCharger() {
 
 async function restoreArchivedCharger(chargerId) {
   try {
-    await ChargersApi.restore(chargerId);
+    await window.QatarOpsApi.Chargers.restore(chargerId);
     await loadOperationalData();
     if (state.currentSiteName) openSite(state.currentSiteName, "Chargers");
   } catch (err) {
@@ -459,7 +829,7 @@ async function permanentlyDeleteArchivedCharger(chargerId, chargerName, chargerC
   const confirmation = window.prompt(`Permanently delete this charger? This action cannot be undone.\n\nType ${chargerCode || chargerName} to confirm.`);
   if (confirmation !== (chargerCode || chargerName)) return;
   try {
-    await ChargersApi.deleteArchived(chargerId);
+    await window.QatarOpsApi.Chargers.deleteArchived(chargerId);
     await loadOperationalData();
     if (state.currentSiteName) openSite(state.currentSiteName, "Chargers");
   } catch (err) {
@@ -473,14 +843,15 @@ function refreshOpenProfiles() {
   const chargerProfile = document.getElementById("charger-profile");
   const siteTab = state.currentSiteTab;
   const chargerTab = state.currentChargerTab;
-  if (!siteProfile.classList.contains("hidden")) {
-    openSite(state.currentSiteName);
-    const tabButton = Array.from(siteProfile.querySelectorAll(".subtabs button")).find((button) => button.dataset.tab === siteTab);
-    if (tabButton) tabButton.click();
-  }
   if (state.currentChargerId && !chargerProfile.classList.contains("hidden")) {
     openCharger(state.currentSiteName, state.currentChargerId);
     const tabButton = Array.from(chargerProfile.querySelectorAll(".subtabs button")).find((button) => button.dataset.tab === chargerTab);
+    if (tabButton) tabButton.click();
+    return;
+  }
+  if (!siteProfile.classList.contains("hidden")) {
+    openSite(state.currentSiteName);
+    const tabButton = Array.from(siteProfile.querySelectorAll(".subtabs button")).find((button) => button.dataset.tab === siteTab);
     if (tabButton) tabButton.click();
   }
 }

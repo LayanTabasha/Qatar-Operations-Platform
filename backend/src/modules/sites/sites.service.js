@@ -1,7 +1,11 @@
 import { ApiError } from "../../utils/api-error.js";
 import {
   findSiteById,
+  findActiveSiteById,
+  archiveSiteById,
   insertSite,
+  permanentlyDeleteSiteById,
+  restoreSiteById,
   listSites,
   updateSiteById,
   updateSiteImagePathById,
@@ -21,7 +25,7 @@ export async function getSites(options) {
 }
 
 export async function getSite(id) {
-  const site = await findSiteById(id);
+  const site = await findActiveSiteById(id);
 
   if (!site) {
     throw new ApiError(404, "SITE_NOT_FOUND", "Site not found");
@@ -53,6 +57,11 @@ export async function updateSite(id, input) {
 }
 
 export async function updateSiteStatus(id, status) {
+  const existing = await findSiteById(id);
+  if (!existing) throw new ApiError(404, "SITE_NOT_FOUND", "Site not found");
+  if (existing.status === "archived") {
+    throw new ApiError(409, "SITE_ARCHIVED", "Use the administrator restore endpoint to restore an archived site");
+  }
   const site = await updateSiteStatusById(id, status);
 
   if (!site) {
@@ -70,4 +79,30 @@ export async function updateSiteImage(id, imagePath) {
   }
 
   return site;
+}
+
+export async function archiveSite(id, userId, reason, audit) {
+  const existing = await findSiteById(id);
+  if (!existing) throw new ApiError(404, "SITE_NOT_FOUND", "Site not found");
+  if (existing.status === "archived") throw new ApiError(409, "SITE_ALREADY_ARCHIVED", "Site is already archived");
+  return archiveSiteById(id, userId, reason, audit);
+}
+
+export async function restoreSite(id, userId, audit) {
+  const existing = await findSiteById(id);
+  if (!existing) throw new ApiError(404, "SITE_NOT_FOUND", "Site not found");
+  if (existing.status !== "archived") throw new ApiError(409, "SITE_NOT_ARCHIVED", "Only archived sites can be restored");
+  return restoreSiteById(id, userId, audit);
+}
+
+export async function permanentlyDeleteSite(id, userId, audit) {
+  const result = await permanentlyDeleteSiteById(id, userId, audit);
+  if (result.state === "not_found") throw new ApiError(404, "SITE_NOT_FOUND", "Site not found");
+  if (result.state === "not_archived") throw new ApiError(409, "SITE_NOT_ARCHIVED", "Only archived sites can be permanently deleted");
+  if (result.state === "dependencies") {
+    const error = new ApiError(409, "SITE_HAS_DEPENDENCIES", "Site cannot be permanently deleted while linked records exist");
+    error.details = { dependencies: result.dependencies };
+    throw error;
+  }
+  return result.site;
 }

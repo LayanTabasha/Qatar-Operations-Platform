@@ -1,8 +1,43 @@
 const sites = ["Musheireb", "Mowasalat", "Al Mana"];
-const routes = ["home", "sites", "contacts", "settings"];
+const routes = ["home", "sites", "requests", "contacts", "settings"];
 const STORAGE_KEY = "zeeda-qatar-ops-state";
 const USERS_KEY = "zeeda-qatar-ops-users";
 const VIEW_CONTEXT_KEY = "zeeda-qatar-ops-view-context";
+
+const chargerNameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+const FAULT_STATUS_OPTIONS = Object.freeze(["Open", "In Progress", "Resolved"]);
+
+function chargerTypeForDisplay(charger = {}) {
+  const explicitType = String(charger.type || "").trim().toUpperCase();
+  if (explicitType === "AC" || explicitType === "DC") return explicitType;
+  const nameType = String(charger.name || "").match(/(?:^|\s)(AC|DC)(?=\s|$)/i);
+  return nameType ? nameType[1].toUpperCase() : "";
+}
+
+function chargerTypeDisplayRank(charger) {
+  const type = chargerTypeForDisplay(charger);
+  if (type === "AC") return 0;
+  if (type === "DC") return 1;
+  return 2;
+}
+
+function compareChargersForDisplay(a = {}, b = {}) {
+  const siteCompare = chargerNameCollator.compare(String(a.siteName || ""), String(b.siteName || ""));
+  if (siteCompare !== 0) return siteCompare;
+
+  const typeCompare = chargerTypeDisplayRank(a) - chargerTypeDisplayRank(b);
+  if (typeCompare !== 0) return typeCompare;
+
+  const nameCompare = chargerNameCollator.compare(String(a.name || ""), String(b.name || ""));
+  if (nameCompare !== 0) return nameCompare;
+
+  const codeCompare = chargerNameCollator.compare(String(a.code || ""), String(b.code || ""));
+  return codeCompare || 0;
+}
+
+function sortChargersForDisplay(chargers = []) {
+  return [...chargers].sort(compareChargersForDisplay);
+}
 
 const state = {
   authenticated: false,
@@ -16,30 +51,52 @@ const state = {
   currentSiteName: "",
   currentChargerId: "",
   currentVisitId: "",
+  currentFaultId: "",
+  pendingLegacyReplacementId: "",
+  currentContentRecordId: "",
+  currentLegacyContentId: "",
+  currentContactId: "",
   currentSiteTab: "Overview",
   currentChargerTab: "Overview",
   backendLoading: false,
   backendError: "",
   sites: sites.map((name) => ({ name, location: "To Be Updated", status: "Pending Data", client: "Not Available Yet", notes: "", image: "", chargers: [] })),
-  archivedChargers: [],
+  dashboardChargers: [],
+  archive: { tab: "sites", sites: [], chargers: [], loading: false, error: "", search: "", feedback: "" },
   uploads: [],
   faults: [],
   visits: [],
+  requests: [],
+  contacts: [],
+  homepageRequestsLoading: false,
+  homepageRequestsError: "",
+  requestUsers: [],
   faultCatalogue: [],
-  counts: { faults: null, visits: null, documents: null, chargers: null },
+  counts: { faults: null, visits: null, chargers: null },
   recent: [],
 };
 
+window.QatarOpsRequests = Object.freeze({
+  statuses: Object.freeze([
+    Object.freeze({ value: "open", label: "Open", color: "#4f8dff" }),
+    Object.freeze({ value: "in_progress", label: "In Progress", color: "#dca94b" }),
+    Object.freeze({ value: "completed", label: "Completed", color: "#37c985" }),
+  ]),
+  canAccess() {
+    return ["admin", "hq_user"].includes(normalizedRoleKey(state.currentUserRoleKey || state.currentUserRole));
+  },
+});
+
 const modalConfigs = {
-  site: { title: "Site Details", fields: [["Site name", "text"], ["Location", "text"], ["Client / organization", "text"], ["Status", "select:Active,Archived"], ["Description", "textarea"], ["Notes", "textarea"], ["Upload site image", "file"]] },
-  charger: { title: "Charger Details", fields: [["Charger name", "text"], ["Charger type", "select:AC,DC"], ["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Operator", "text"], ["Administrator", "text"], ["Manufacturer", "text"], ["Model", "text"], ["Serial number", "text"], ["Capacity", "text"], ["Installation date", "date"], ["Status", "select:Active,Maintenance,Faulted,Archived"], ["Notes", "textarea"], ["Upload charger image", "file"]] },
+  site: { title: "Site Details", fields: [["Site name", "text"], ["Location", "text"], ["Client / organization", "text"], ["Status", "select:Active"], ["Description", "textarea"], ["Notes", "textarea"], ["Upload site image", "file"]] },
+  charger: { title: "Charger Details", fields: [["Charger name", "text"], ["Charger type", "select:AC,DC"], ["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Operator", "text"], ["Administrator", "text"], ["Manufacturer", "text"], ["Model", "text"], ["Serial number", "text"], ["Capacity", "text"], ["Installation date", "date"], ["Status", "select:Active,Maintenance,Faulted"], ["Notes", "textarea"], ["Upload charger image", "file"]] },
   siteVisit: { title: "Add Site Visit", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Visit date", "date"], ["Visit status", "select:Scheduled,Ongoing,Completed,Cancelled,Follow-Up Required"], ["Time in", "time"], ["Time out", "time"], ["Visit type", "text"], ["Engineer name", "text"], ["Technician name", "text"], ["Purpose", "textarea"], ["Work completed", "textarea"], ["Findings", "textarea"], ["Notes", "textarea"], ["Site Visit Report upload", "file"]] },
   visitReport: { title: "Upload Site Visit Report", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Visit date", "date"], ["Report title", "text"], ["File upload", "file"], ["Notes", "textarea"]] },
-  fault: { title: "Report Fault", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Generated Fault ID", "fault-id"], ["Fault Code", "fault-code-select"], ["Fault details", "fault-code-details"], ["Fault status", "select:Open,In Progress,Resolved,Closed"], ["Date reported", "date"], ["Time reported", "time"], ["Description", "textarea"], ["Photo evidence", "image-file"], ["Comments", "textarea"]] },
-  document: { title: "Upload Charger Document", fields: [["Related site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Document title", "text"], ["Document category", "select:Specification,Warranty,Installation,Commissioning,Electrical Drawing,Certificate,Manual,Asset Record,Inspection Certificate,Other"], ["Description", "textarea"], ["File upload", "file"]] },
-  weeklyReport: { title: "Upload Weekly Report", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Week start", "date"], ["Week end", "date"], ["Report title", "text"], ["Summary", "textarea"], ["File upload", "file"]] },
-  guide: { title: "Add Troubleshooting Guide", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Relevant fault code", "fault-code-select-optional"], ["Guide title", "text"], ["Category", "select:Reset Procedure,Replacement Guide,Error-Code Troubleshooting,Communication Failure,Preventive Maintenance,Manufacturer Repair,Other"], ["Version", "text"], ["Description", "textarea"], ["File upload", "file"]] },
-  contact: { title: "Contact", fields: [["Name", "text"], ["Role", "text"], ["Company / Department", "text"], ["Phone", "tel"], ["Email", "email"], ["Related site", "select:Musheireb,Mowasalat,Al Mana"], ["Notes", "textarea"]] },
+  fault: { title: "Report Fault", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Generated Fault ID", "fault-id"], ["DTC Catalogue", "fault-catalogue-search"], ["DTC code", "text"], ["FTB code", "text"], ["Component ECU", "text"], ["Fault title", "text"], ["Catalogue description", "textarea"], ["Possible causes", "textarea"], ["Recommended actions", "textarea"], ["Severity", "text"], ["Category", "text"], ["Fault status", "select:Open,In Progress,Resolved"], ["Date reported", "date"], ["Time reported", "time"], ["Description", "textarea"], ["Photo evidence", "image-file"], ["Comments", "textarea"]] },
+  document: { title: "Document", fields: [["Related site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Document title", "text"], ["Document category", "select:Specification,Warranty,Installation,Commissioning,Electrical Drawing,Certificate,Manual,Asset Record,Inspection Certificate,Other"], ["Document date", "date"], ["Description", "textarea"], ["File upload", "file"]] },
+  weeklyReport: { title: "Upload Weekly Report", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Week start", "date"], ["Week end", "date"], ["Report title", "text"], ["Summary", "textarea"], ["File upload", "file"]] },
+  guide: { title: "Troubleshooting Record", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Guide title", "text"], ["Category", "select:Reset Procedure,Replacement Guide,Error-Code Troubleshooting,Communication Failure,Preventive Maintenance,Manufacturer Repair,Other"], ["Symptoms", "textarea"], ["Possible cause", "textarea"], ["Troubleshooting steps", "textarea"], ["Resolution", "textarea"], ["Notes", "textarea"], ["File upload", "file"]] },
+  contact: { title: "Contact", fields: [["Name", "text"], ["Role", "text"], ["Organization / Department", "text"], ["Phone", "tel"], ["Email", "email"], ["Assigned Site", "select:Not site-specific"], ["Notes", "textarea"]] },
   profile: { title: "Profile", fields: [["Name", "text"], ["Department", "text"]] },
   user: { title: "Add User", fields: [["Full Name", "text"], ["Work Email", "email"], ["Role", "select:Operations Staff,Viewer,Administrator"], ["Department", "select:Operations,Maintenance,Administration,Management"], ["Account Status", "select:Active,Invited,Disabled,Locked"], ["Temporary Password", "text"], ["Require Password Change on First Login", "select:Yes,No"]] },
   faultCode: { title: "Fault Catalogue Entry", fields: [["Fault code", "text"], ["Fault name", "text"], ["Meaning", "textarea"], ["Severity", "select:Low,Medium,High,Critical,Not Classified"], ["Recommended action", "textarea"], ["Status", "select:Active,Disabled"]] },
@@ -47,9 +104,10 @@ const modalConfigs = {
   confirmDelete: { title: "Delete Record", fields: [["Confirmation notes", "textarea"]] },
 };
 
-const personalSettingsItems = ["Profile", "Account Security", "Session Management"];
-const administrationSettingsItems = ["User Management", "Roles & Permissions", "Site & Charger Configuration", "Fault Catalogue", "Fault Categories", "Error Codes", "Upload Permissions", "Data Backup", "Export Data", "System Preferences", "Audit Logs"];
-const settingsItems = [...personalSettingsItems, ...administrationSettingsItems];
+const personalSettingsItems = ["Profile", "Security"];
+const administrationSettingsItems = ["User Management", "Site & Charger Configuration", "Archive", "Audit Logs"];
+const systemSettingsItems = ["Platform Health"];
+const settingsItems = [...personalSettingsItems, ...administrationSettingsItems, ...systemSettingsItems];
 
 function normalizeUser(user, fallbackName = "User") {
   if (!user.id) user.id = `user-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -70,14 +128,13 @@ function loadStoredState() {
     let migrated = false;
     if (saved.counts) state.counts = { ...state.counts, ...saved.counts };
     if (Array.isArray(saved.recent)) state.recent = normalizeActivityLog(saved.recent);
-    if (Array.isArray(saved.uploads)) state.uploads = saved.uploads.map(normalizeUploadRecord);
-    if (Array.isArray(saved.faults)) state.faults = saved.faults.map((fault, index) => normalizeFaultRecord(fault, index));
+    if (Array.isArray(saved.uploads)) state.uploads = saved.uploads.filter((file) => file.module !== "fault" && file.kind !== "fault").map(normalizeUploadRecord);
     if (Array.isArray(saved.visits)) state.visits = saved.visits.map(normalizeVisitRecord);
     if (Array.isArray(saved.faultCatalogue)) state.faultCatalogue = saved.faultCatalogue.map(normalizeFaultCatalogueRecord);
     migrated = recoverUnlinkedSiteVisitReports() || migrated;
     if (migrated) saveState();
   } catch {
-    localStorage.removeItem(STORAGE_KEY);
+    // Leave malformed or legacy browser data untouched for supervised recovery.
   }
 }
 
@@ -107,17 +164,30 @@ function getCurrentUserRecord() {
 }
 
 function isAdmin() {
-  return state.currentUserRoleKey === "admin" || state.currentUserRole === "Administrator";
+  return [state.currentUserRoleKey, state.currentUserRole].some((role) => normalizedRoleKey(role) === "admin");
 }
 
 function canManageOperations() {
-  return ["admin", "operations_staff"].includes(state.currentUserRoleKey) || ["Administrator", "Operations Staff"].includes(state.currentUserRole);
+  return [state.currentUserRoleKey, state.currentUserRole]
+    .map(normalizedRoleKey)
+    .some((role) => ["admin", "hq_user", "operations_staff"].includes(role));
+}
+
+function normalizedRoleKey(role) {
+  const normalized = String(role || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (["admin", "administrator"].includes(normalized)) return "admin";
+  if (["operations", "operations_staff", "operation_staff"].includes(normalized)) return "operations_staff";
+  if (normalized === "viewer") return "viewer";
+  return normalized;
 }
 
 function saveState() {
+  let existing = {};
+  try { existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return; }
+  const preservedFaultUploads = Array.isArray(existing.uploads) ? existing.uploads.filter((file) => file.module === "fault" || file.kind === "fault") : [];
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
-    uploads: state.uploads,
-    faults: state.faults,
+    ...existing,
+    uploads: [...preservedFaultUploads, ...state.uploads.filter((file) => file.module !== "fault" && file.kind !== "fault")],
     visits: state.visits,
     faultCatalogue: state.faultCatalogue,
     counts: state.counts,
@@ -314,19 +384,34 @@ function normalizeVisitRecord(visit) {
 }
 
 function normalizeFaultRecord(fault, index = 0) {
-  const year = new Date(fault.reportedAt || fault.createdAt || Date.now()).getFullYear();
-  const faultId = fault.faultId || `FLT-${year}-${String(index + 1).padStart(4, "0")}`;
+  const year = new Date(fault.reportedAt || fault.reported_at || fault.createdAt || fault.created_at || Date.now()).getFullYear();
+  const faultId = fault.faultId || fault.fault_reference || `FLT-${year}-${String(index + 1).padStart(4, "0")}`;
   return {
     ...fault,
     faultId,
-    faultCatalogueId: fault.faultCatalogueId || "",
-    faultCode: fault.faultCode || fault.errorCode || "",
-    faultName: fault.faultName || fault.category || "Needs Catalogue Classification",
-    faultDescription: fault.faultDescription || "",
-    severity: fault.severity || fault.priority || "Not Classified",
+    faultCatalogueId: fault.faultCatalogueId || fault.fault_catalogue_id || "",
+    faultCode: fault.faultCode || fault.fault_code || fault.errorCode || "",
+    ftbCode: fault.ftbCode || fault.ftb_code || "", component: fault.component || "",
+    faultName: fault.faultName || fault.title || fault.category || "Needs Catalogue Classification",
+    faultDescription: fault.faultDescription || fault.technician_observation || "",
+    siteName: fault.siteName || fault.site_name || "", chargerId: fault.chargerId || fault.charger_id || "", chargerName: fault.chargerName || fault.charger_name || "",
+    possibleCauses: fault.possibleCauses || fault.possible_causes || "", recommendedAction: fault.recommendedAction || fault.recommended_actions || "",
+    technicalCategory: fault.technicalCategory || fault.technical_category || "", chargerStatus: fault.chargerStatus || fault.charger_status || "Active",
+    siteVisitRequired: fault.siteVisitRequired ?? fault.requires_site_visit ?? false, reportedBy: fault.reportedBy || fault.reported_by_name || fault.created_by_name || "",
+    reportedAt: fault.reportedAt || fault.reported_at || "", reportedDate: fault.reportedDate || String(fault.reported_at || "").slice(0,10), reportedTime: fault.reportedTime || String(fault.reported_at || "").slice(11,16),
+    createdAt: fault.createdAt || fault.created_at, updatedAt: fault.updatedAt || fault.updated_at,
+    status: ({ open:"Open", in_progress:"In Progress", resolved:"Resolved" }[fault.status] || fault.status),
+    priority: normalizedFaultSeverity(fault.priority, "Medium"), category: fault.category || fault.fault_type || "Other",
+    comments: fault.comments || fault.resolution_notes || "", attachmentRecords: fault.attachments || [],
+    severity: normalizedFaultSeverity(fault.severity),
     recommendedAction: fault.recommendedAction || "",
-    photos: Array.isArray(fault.photos) ? fault.photos : state.uploads.filter((file) => file.faultId === faultId || file.faultId === fault.id).map((file) => file.id),
+    photos: Array.isArray(fault.attachments) ? fault.attachments.map((file) => file.id) : Array.isArray(fault.photos) ? fault.photos : [],
   };
+}
+
+function normalizedFaultSeverity(value, fallback = "Not Classified") {
+  const normalized = String(value || "").trim().toLowerCase();
+  return { low: "Low", medium: "Medium", high: "High", critical: "Critical", "not classified": "Not Classified", not_classified: "Not Classified" }[normalized] || fallback;
 }
 
 function calculateDurationFromTimes(timeIn, timeOut) {
@@ -426,7 +511,6 @@ function refreshDerivedCounts() {
   state.counts.chargers = chargerTotal;
   state.counts.faults = state.faults.filter((fault) => ["Open", "In Progress"].includes(fault.status)).length;
   state.counts.visits = state.visits.length;
-  state.counts.documents = getValidUploads().length;
   return state.counts;
 }
 

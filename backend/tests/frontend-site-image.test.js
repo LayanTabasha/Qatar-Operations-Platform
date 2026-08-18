@@ -34,7 +34,7 @@ describe("frontend site image workflow", () => {
     const modalsSource = readRootFile("js/modals.js");
 
     expect(modalsSource).toContain("if (pendingSiteImageFile) {");
-    expect(modalsSource).toContain("await SitesApi.uploadImage(response.site.id, pendingSiteImageFile);");
+    expect(modalsSource).toContain("await window.QatarOpsApi.Sites.uploadImage(response.site.id, pendingSiteImageFile);");
     expect(modalsSource).toContain("Site details were saved, but the image upload failed");
     expect(modalsSource).toContain("setTimeout(closeModal, 300);");
   });

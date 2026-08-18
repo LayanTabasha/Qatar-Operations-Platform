@@ -1,10 +1,10 @@
-let activePreview = { fileId: "", zoom: 1, rotation: 0, mode: "fit-screen" };
+let activePreview = { fileId: "", zoom: 1, rotation: 0, mode: "fit-screen", objectUrl: "" };
 
 function getUploadById(fileId) {
   return state.uploads.find((file) => file.id === fileId);
 }
 
-function openFilePreview(fileId) {
+async function openFilePreview(fileId) {
   const file = getUploadById(fileId);
   if (!file) return;
   if (!state.authenticated) {
@@ -15,20 +15,43 @@ function openFilePreview(fileId) {
   const modal = document.querySelector(".modal");
   activePreview = { fileId, zoom: 1, rotation: 0, mode: "fit-screen" };
   modal?.classList.add("preview-modal");
-  document.getElementById("modal-title").textContent = "Document Preview";
+  document.getElementById("modal-title").textContent = file.name || file.title || "File Preview";
   document.getElementById("modal-eyebrow").textContent = "Embedded Viewer";
   form.innerHTML = renderDocumentPreview(file, true);
   document.getElementById("modal-backdrop").classList.remove("hidden");
   resetModalScroll();
-  setTimeout(() => {
-    form.innerHTML = renderDocumentPreview(file, false);
-    applyPreviewTransform();
-  }, 180);
+  let previewError = null;
+  try {
+    const type = previewType(file);
+    const isOffice = ["word", "excel", "powerpoint"].includes(type);
+    if (file.persisted && file.id) {
+      const blob = await window.QatarOpsApi.Attachments.preview(file.id, file.previewUrl);
+      activePreview.objectUrl = URL.createObjectURL(blob);
+      file.runtimePreviewUrl = activePreview.objectUrl;
+      file.runtimePreviewType = blob.type;
+    } else if (isOffice) {
+      throw new Error("This file was uploaded before server storage was enabled.");
+    }
+  } catch (error) {
+    previewError = error;
+  } finally {
+    if (previewError) {
+      const officeUnavailable = previewError.code === "OFFICE_PREVIEW_UNAVAILABLE";
+      const message = officeUnavailable
+        ? "Office preview is temporarily unavailable. You can still download the original file."
+        : previewError.message;
+      form.innerHTML = renderDocumentPreview(file, false, message);
+    } else {
+      form.innerHTML = renderDocumentPreview(file, false);
+      applyPreviewTransform();
+    }
+  }
 }
 
-function renderDocumentPreview(file, loading = false) {
+function renderDocumentPreview(file, loading = false, errorMessage = "") {
   const type = previewType(file);
   const supportsRotate = type === "image";
+  const supportsZoom = !errorMessage && type !== "unsupported";
   return `<div class="document-preview-shell">
     <div class="preview-info">
       <div>
@@ -45,18 +68,44 @@ function renderDocumentPreview(file, loading = false) {
       </dl>
     </div>
     <div class="preview-toolbar" aria-label="Preview controls">
-      <button class="secondary-button" type="button" data-preview-action="zoom-out">Zoom -</button>
-      <button class="secondary-button" type="button" data-preview-action="zoom-in">Zoom +</button>
-      <button class="secondary-button" type="button" data-preview-action="fit-width">Fit Width</button>
-      <button class="secondary-button" type="button" data-preview-action="fit-screen">Fit Screen</button>
+      <button class="secondary-button" type="button" data-preview-action="zoom-out"${supportsZoom ? "" : " disabled"}>Zoom -</button>
+      <button class="secondary-button" type="button" data-preview-action="zoom-in"${supportsZoom ? "" : " disabled"}>Zoom +</button>
+      <button class="secondary-button" type="button" data-preview-action="fit-width"${supportsZoom ? "" : " disabled"}>Fit Width</button>
+      <button class="secondary-button" type="button" data-preview-action="fit-screen"${supportsZoom ? "" : " disabled"}>Fit Screen</button>
       ${supportsRotate ? `<button class="secondary-button" type="button" data-preview-action="rotate">Rotate</button><button class="secondary-button" type="button" data-preview-action="reset">Reset</button>` : ""}
-      <button class="secondary-button" type="button" data-file-download="${file.id}">Download</button>
+      <button class="secondary-button" type="button" data-file-download="${file.id}">${errorMessage ? "Download Original" : "Download"}</button>
       <button class="primary-button" type="button" id="cancel-modal">Close</button>
     </div>
     <div class="preview-stage" data-preview-stage>
-      ${loading ? `<div class="preview-loading"><span></span><strong>Loading preview...</strong></div>` : previewContent(file, type)}
+      ${loading ? `<div class="preview-loading"><span></span><strong>Loading preview...</strong></div>` : errorMessage ? previewErrorContent(file, errorMessage) : previewContent(file, type)}
     </div>
   </div>`;
+}
+
+function previewErrorContent(file, message) {
+  const legacyOffice = ["word", "excel", "powerpoint"].includes(previewType(file)) && !file.persisted;
+  const explanation = legacyOffice ? "This file was uploaded before server storage was enabled." : message;
+  const replace = legacyOffice && canManageOperations()
+    ? `<button class="secondary-button" type="button" data-legacy-file-replace="${file.id}">Replace / Re-upload File</button>` : "";
+  return `<div class="preview-fallback"><h2>Preview unavailable</h2><p>${escapeHtml(explanation)}</p><strong>${escapeHtml(file.name || file.title || "Office file")}</strong>${replace}</div>`;
+}
+
+function replaceLegacyFile(fileId) {
+  const file = getUploadById(fileId);
+  if (!file || !canManageOperations()) return;
+  state.pendingLegacyReplacementId = file.id;
+  closeModal();
+  if (file.kind === "fault" || file.module === "fault") {
+    const fault = state.faults.find((item) => item.faultId === file.faultId || item.id === file.faultId);
+    if (fault) state.currentFaultId = fault.id;
+    openModal("fault", "edit");
+  } else {
+    openModal(file.kind === "guide" || file.module === "troubleshooting" ? "guide" : "document", "create");
+  }
+  const input = document.querySelector("#modal-form input[type='file']");
+  input?.closest("label")?.classList.add("legacy-replacement-highlight");
+  input?.scrollIntoView({ behavior: "smooth", block: "center" });
+  input?.focus();
 }
 
 function previewType(file) {
@@ -72,21 +121,13 @@ function previewType(file) {
 }
 
 function previewContent(file, type) {
-  if (type === "pdf") return `<iframe class="preview-document preview-pdf" src="${file.dataUrl}#toolbar=1&navpanes=0" title="${file.name}"></iframe>`;
-  if (type === "image") return `<div class="preview-image-wrap"><img class="preview-document preview-image" src="${file.dataUrl}" alt="${file.name}" /></div>`;
+  const source = file.runtimePreviewUrl || file.dataUrl;
+  if (type === "pdf" || (file.persisted && ["word", "excel", "powerpoint"].includes(type))) return `<iframe class="preview-document preview-pdf" src="${source}#toolbar=1&navpanes=0" title="${file.name}"></iframe>`;
+  if (type === "image") return `<div class="preview-image-wrap"><img class="preview-document preview-image" src="${source}" alt="${file.name}" /></div>`;
+  if (type === "text" && file.persisted) return `<iframe class="preview-document preview-pdf" sandbox src="${source}" title="${file.name}"></iframe>`;
   if (type === "text") return `<pre class="preview-document preview-text">${escapeHtml(readTextFile(file.dataUrl))}</pre>`;
-  if (["word", "excel", "powerpoint"].includes(type)) {
-    return `<div class="preview-fallback">
-      <h2>${officeLabel(type)} preview requires document conversion.</h2>
-      <p>This static prototype cannot securely convert Office files in-browser. In production, connect a server-side conversion service or Microsoft/Google document renderer, then load the converted preview here.</p>
-      <p>Download remains available for authorized users.</p>
-    </div>`;
-  }
+  if (["word", "excel", "powerpoint"].includes(type)) return `<div class="preview-fallback"><h2>Preview unavailable</h2><p>This file was uploaded before server storage was enabled.</p></div>`;
   return `<div class="preview-fallback"><h2>Preview is not available for this file type.</h2><p>Download remains available for authorized users.</p></div>`;
-}
-
-function officeLabel(type) {
-  return { word: "Word document", excel: "Excel workbook", powerpoint: "PowerPoint presentation" }[type] || "Office document";
 }
 
 function readTextFile(dataUrl = "") {
@@ -136,7 +177,7 @@ function downloadFile(fileId) {
   const file = getUploadById(fileId);
   if (!file) return;
   const link = document.createElement("a");
-  link.href = file.dataUrl;
+  link.href = file.persisted && file.downloadUrl ? apiAssetUrl(file.downloadUrl) : file.dataUrl;
   link.download = file.name;
   document.body.appendChild(link);
   link.click();

@@ -23,6 +23,12 @@ Phase 3 adds authentication and authorization on top of the Phase 1 and Phase 2 
 
 Sites, chargers, Site Visits, DTC catalogue records, authentication, and Admin-only user-management endpoints are implemented. Uploads, reports, documents, and full fault record persistence still need future backend modules.
 
+## Operational attachment storage
+
+At startup the API creates the configured operational upload and preview directories recursively, then verifies both are readable and writable. Startup stops with a safe error if either check fails. It does not create probe files or alter existing files.
+
+The directories should be owned by the Linux account that runs `qatar-operations-backend`, with a shared application group where needed. A typical deployment uses owner/group `rwx` and no access for other users (`0770` directories); use `0750` instead when the group needs read-only access. Do not use world-writable permissions. Set `OPERATIONAL_UPLOAD_ROOT` and `OPERATIONAL_PREVIEW_ROOT` in the backend environment when the defaults are not appropriate. `LIBREOFFICE_BIN` may specify a trusted absolute LibreOffice executable; otherwise the API tries `libreoffice` and then `soffice` from its service PATH.
+
 ## Backend Structure
 
 Shared infrastructure stays in the shared folders:

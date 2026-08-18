@@ -3,14 +3,19 @@ import { logger } from "../../config/logger.js";
 import { asyncHandler } from "../../utils/async-handler.js";
 import { ApiError } from "../../utils/api-error.js";
 import { publicPathForSiteImage } from "./site-image-upload.middleware.js";
-import { createSite, getSite, getSites, updateSite, updateSiteImage, updateSiteStatus } from "./sites.service.js";
+import { archiveSite, createSite, getSite, getSites, permanentlyDeleteSite, restoreSite, updateSite, updateSiteImage, updateSiteStatus } from "./sites.service.js";
 import {
   createSiteSchema,
+  archiveReasonSchema,
   listSitesQuerySchema,
   siteIdParamsSchema,
   updateSiteSchema,
   updateSiteStatusSchema,
 } from "./sites.validation.js";
+
+function auditContext(req) {
+  return { ipAddress: req.ip, requestId: req.id };
+}
 
 export const listSites = asyncHandler(async (req, res) => {
   const query = listSitesQuerySchema.parse(req.query);
@@ -110,4 +115,23 @@ export const uploadSiteImageRecord = asyncHandler(async (req, res) => {
     image_path: imagePath,
     site,
   });
+});
+
+export const archiveSiteRecord = asyncHandler(async (req, res) => {
+  const { id } = siteIdParamsSchema.parse(req.params);
+  const { reason } = archiveReasonSchema.parse(req.body || {});
+  const site = await archiveSite(id, req.user.id, reason, auditContext(req));
+  res.json({ success: true, site });
+});
+
+export const restoreSiteRecord = asyncHandler(async (req, res) => {
+  const { id } = siteIdParamsSchema.parse(req.params);
+  const site = await restoreSite(id, req.user.id, auditContext(req));
+  res.json({ success: true, site });
+});
+
+export const permanentlyDeleteSiteRecord = asyncHandler(async (req, res) => {
+  const { id } = siteIdParamsSchema.parse(req.params);
+  await permanentlyDeleteSite(id, req.user.id, auditContext(req));
+  res.status(204).send();
 });

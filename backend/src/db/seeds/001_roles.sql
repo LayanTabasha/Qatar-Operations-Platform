@@ -2,6 +2,7 @@ INSERT INTO roles (name, description)
 VALUES
   ('admin', 'Full system administration access'),
   ('operations_staff', 'Full operational access without user or role management'),
-  ('viewer', 'Read-only platform access')
+  ('viewer', 'Read-only platform access'),
+  ('hq_user', 'HQ request processing access only')
 ON CONFLICT (name) DO UPDATE
 SET description = EXCLUDED.description;

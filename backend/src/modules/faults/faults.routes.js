@@ -1,0 +1,11 @@
+import { Router } from "express";
+import { authenticate, authorizeRoles } from "../auth/auth.middleware.js";
+import { archiveFaultRecord, createFaultRecord, getFaultRecord, listFaultRecords, updateFaultRecord } from "./faults.controller.js";
+import { ROLE_GROUPS } from "../auth/permissions.js";
+export const faultsRouter = Router();
+faultsRouter.use(authenticate);
+faultsRouter.get("/", authorizeRoles(...ROLE_GROUPS.authenticatedRead), listFaultRecords);
+faultsRouter.get("/:id", authorizeRoles(...ROLE_GROUPS.authenticatedRead), getFaultRecord);
+faultsRouter.post("/", authorizeRoles(...ROLE_GROUPS.operationalManage), createFaultRecord);
+faultsRouter.patch("/:id", authorizeRoles(...ROLE_GROUPS.operationalManage), updateFaultRecord);
+faultsRouter.delete("/:id", authorizeRoles(...ROLE_GROUPS.operationalManage), archiveFaultRecord);

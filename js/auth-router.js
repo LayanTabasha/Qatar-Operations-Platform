@@ -30,6 +30,7 @@ function normalizeAuthenticatedUser(user) {
     admin: "Administrator",
     operations_staff: "Operations Staff",
     viewer: "Viewer",
+    hq_user: "HQ User",
   };
   const roleKey = user?.role || "";
 
@@ -58,6 +59,7 @@ function applyAuthenticatedUser(user) {
   state.mustChangePassword = false;
   state.users = [normalizedUser];
   document.getElementById("current-user").textContent = state.currentUser;
+  updateRequestsNavigation();
 }
 
 function clearAuthenticatedUser() {
@@ -69,6 +71,7 @@ function clearAuthenticatedUser() {
   state.currentUserRoleKey = "";
   state.mustChangePassword = false;
   state.users = [];
+  updateRequestsNavigation();
 }
 
 function showLoginScreen() {
@@ -96,15 +99,19 @@ function requireAuth() {
 function setRoute(route) {
   if (!requireAuth()) return;
   if (!routes.includes(route)) route = "home";
+  if (route === "requests" && !window.QatarOpsRequests.canAccess()) {
+    renderRequestsAccessDenied();
+  }
   document.querySelectorAll(".page").forEach((page) => page.classList.toggle("active", page.id === route));
   document.querySelectorAll("[data-route]").forEach((item) => item.classList.toggle("active", item.dataset.route === route));
   window.location.hash = route;
   saveViewContext({ route });
+  if (route === "requests" && window.QatarOpsRequests.canAccess()) loadRequestsPage();
 }
 
 async function restoreAuthenticatedSession() {
   try {
-    const response = await AuthApi.me();
+    const response = await window.QatarOpsApi.Auth.me();
     applyAuthenticatedUser(response.user);
     showAppShell();
     await loadOperationalData();
@@ -142,8 +149,8 @@ async function signIn(email, password) {
   }
 
   try {
-    const loginResponse = await AuthApi.login(email, password);
-    const currentUserResponse = await AuthApi.me().catch(() => loginResponse);
+    const loginResponse = await window.QatarOpsApi.Auth.login(email, password);
+    const currentUserResponse = await window.QatarOpsApi.Auth.me().catch(() => loginResponse);
     applyAuthenticatedUser(currentUserResponse.user);
     showAppShell();
     await loadOperationalData();
@@ -159,7 +166,7 @@ async function signIn(email, password) {
 
 async function logout() {
   try {
-    await AuthApi.logout();
+    await window.QatarOpsApi.Auth.logout();
   } catch (err) {
     console.warn("Logout request failed. Clearing local UI session only.", err);
   }

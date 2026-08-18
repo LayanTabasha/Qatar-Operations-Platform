@@ -1,18 +1,32 @@
 import { Router } from "express";
 import { authRouter } from "../modules/auth/auth.routes.js";
+import { archiveRouter } from "../modules/archive/archive.routes.js";
+import { attachmentsRouter } from "../modules/attachments/attachments.routes.js";
 import { chargersRouter } from "../modules/chargers/chargers.routes.js";
 import { dtcRouter } from "../modules/dtc/dtc.routes.js";
 import { healthRouter } from "../modules/health/health.routes.js";
+import { faultsRouter } from "../modules/faults/faults.routes.js";
 import { siteVisitsRouter } from "../modules/site-visits/site-visits.routes.js";
 import { sitesRouter } from "../modules/sites/sites.routes.js";
 import { usersRouter } from "../modules/users/users.routes.js";
+import { contentRecordsRouter } from "../modules/content-records/content-records.routes.js";
+import { requestsRouter } from "../modules/requests/requests.routes.js";
+import { contactsRouter } from "../modules/contacts/contacts.routes.js";
 
 export const apiRouter = Router();
 
 apiRouter.use("/auth", authRouter);
+apiRouter.use("/archive", archiveRouter);
+apiRouter.use("/attachments", attachmentsRouter);
 apiRouter.use("/chargers", chargersRouter);
 apiRouter.use("/dtc", dtcRouter);
+apiRouter.use("/documents", contentRecordsRouter("documents"));
 apiRouter.use("/health", healthRouter);
+apiRouter.use("/faults", faultsRouter);
 apiRouter.use("/site-visits", siteVisitsRouter);
+apiRouter.use("/weekly-reports", contentRecordsRouter("weekly-reports"));
+apiRouter.use("/troubleshooting", contentRecordsRouter("troubleshooting"));
 apiRouter.use("/sites", sitesRouter);
 apiRouter.use("/users", usersRouter);
+apiRouter.use("/requests", requestsRouter);
+apiRouter.use("/contacts", contactsRouter);

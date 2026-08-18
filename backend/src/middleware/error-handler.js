@@ -25,6 +25,10 @@ export function errorHandler(err, req, res, _next) {
     },
   };
 
+  if (err.details) {
+    response.error.details = err.details;
+  }
+
   if (env.NODE_ENV !== "production" && err.stack) {
     response.error.stack = err.stack;
   }

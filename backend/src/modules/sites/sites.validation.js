@@ -21,8 +21,14 @@ export const siteIdParamsSchema = z.object({
   id: z.string().uuid(),
 });
 
+export const archiveReasonSchema = z
+  .object({
+    reason: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict();
+
 export const listSitesQuerySchema = z.object({
-  status: z.enum(["active", "archived"]).default("active"),
+  status: z.literal("active").default("active"),
   search: z.string().trim().max(200).optional(),
   sort: z.enum(["name", "created_at", "updated_at"]).default("name"),
   order: z.enum(["asc", "desc"]).default("asc"),
@@ -51,6 +57,6 @@ export const updateSiteSchema = createSiteSchema.partial().superRefine((value, c
 
 export const updateSiteStatusSchema = z
   .object({
-    status: z.enum(["active", "archived"]),
+    status: z.literal("active"),
   })
   .strict();

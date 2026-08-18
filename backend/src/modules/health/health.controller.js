@@ -1,5 +1,6 @@
 import { testDatabaseConnection } from "../../config/database.js";
 import { asyncHandler } from "../../utils/async-handler.js";
+import { getPlatformHealth } from "./health.service.js";
 
 export function getHealth(_req, res) {
   res.json({
@@ -17,4 +18,8 @@ export const getDatabaseHealth = asyncHandler(async (_req, res) => {
     status: "ok",
     database: "reachable",
   });
+});
+
+export const getDetailedPlatformHealth = asyncHandler(async (_req, res) => {
+  res.json(await getPlatformHealth());
 });

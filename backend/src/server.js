@@ -2,6 +2,7 @@ import { app } from "./app.js";
 import { closeDatabasePool, testDatabaseConnection } from "./config/database.js";
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
+import { initializeOperationalStorage } from "./config/operational-storage.js";
 
 let server;
 let isShuttingDown = false;
@@ -36,6 +37,7 @@ async function shutdown(signal) {
 }
 
 async function startServer() {
+  await initializeOperationalStorage();
   await testDatabaseConnection();
 
   server = app.listen(env.PORT, () => {

@@ -1,4 +1,5 @@
-import { query } from "../../config/database.js";
+import { query, withTransaction } from "../../config/database.js";
+import { insertActivityLog } from "../activity-logs/activity-logs.repository.js";
 
 const sortColumns = {
   name: "chargers.name",
@@ -16,6 +17,9 @@ const chargerSummarySelect = `
     chargers.name,
     chargers.code,
     chargers.manufacturer,
+    chargers.operator,
+    chargers.administrator,
+    chargers.installation_date,
     chargers.model,
     chargers.serial_number,
     chargers.type,
@@ -26,6 +30,8 @@ const chargerSummarySelect = `
     chargers.status,
     chargers.previous_status,
     chargers.archived_at,
+    chargers.archived_by,
+    chargers.archive_reason,
     archived_by_user.full_name AS archived_by_name,
     chargers.restored_at,
     restored_by_user.full_name AS restored_by_name,
@@ -56,7 +62,7 @@ const chargerSummarySelect = `
 
 export async function listChargers({ site_id, status, type, search, sort, order, limit }) {
   const values = [];
-  const filters = ["chargers.deleted_at IS NULL"];
+  const filters = ["chargers.deleted_at IS NULL", "sites.status = 'active'"];
 
   if (site_id) {
     values.push(site_id);
@@ -111,12 +117,45 @@ export async function findChargerById(id) {
       ${chargerSummarySelect}
       WHERE chargers.id = $1
         AND chargers.deleted_at IS NULL
+        AND chargers.status <> 'archived'
+        AND sites.status = 'active'
       LIMIT 1
     `,
     [id],
   );
 
   return result.rows[0] || null;
+}
+
+export async function findAnyChargerById(id) {
+  const result = await query(
+    `${chargerSummarySelect} WHERE chargers.id = $1 AND chargers.deleted_at IS NULL LIMIT 1`,
+    [id],
+  );
+  return result.rows[0] || null;
+}
+
+export async function listArchivedChargers() {
+  const result = await query(`
+    SELECT chargers.id, chargers.name, chargers.code, chargers.site_id, sites.name AS site_name,
+      chargers.status, chargers.previous_status, chargers.archived_at, chargers.archived_by,
+      users.full_name AS archived_by_name, chargers.archive_reason,
+      COALESCE(visits.count, 0)::integer AS site_visit_count,
+      COALESCE(faults.count, 0)::integer AS fault_count,
+      COALESCE(documents.count, 0)::integer AS document_count,
+      COALESCE(troubleshooting.count, 0)::integer AS troubleshooting_count,
+      chargers.created_at, chargers.updated_at
+    FROM chargers
+    JOIN sites ON sites.id = chargers.site_id
+    LEFT JOIN users ON users.id = chargers.archived_by
+    LEFT JOIN (SELECT charger_id, COUNT(*) AS count FROM site_visits WHERE charger_id IS NOT NULL GROUP BY charger_id) visits ON visits.charger_id = chargers.id
+    LEFT JOIN (SELECT charger_id, COUNT(*) AS count FROM faults GROUP BY charger_id) faults ON faults.charger_id = chargers.id
+    LEFT JOIN (SELECT charger_id, COUNT(*) AS count FROM documents WHERE charger_id IS NOT NULL GROUP BY charger_id) documents ON documents.charger_id = chargers.id
+    LEFT JOIN (SELECT charger_id, COUNT(*) AS count FROM troubleshooting_records WHERE charger_id IS NOT NULL GROUP BY charger_id) troubleshooting ON troubleshooting.charger_id = chargers.id
+    WHERE chargers.status = 'archived' AND chargers.deleted_at IS NULL
+    ORDER BY chargers.archived_at DESC NULLS LAST, chargers.name ASC
+  `);
+  return result.rows;
 }
 
 export async function findDeletedChargerById(id) {
@@ -141,6 +180,9 @@ export async function insertCharger(charger) {
         name,
         code,
         manufacturer,
+        operator,
+        administrator,
+        installation_date,
         model,
         serial_number,
         type,
@@ -149,7 +191,7 @@ export async function insertCharger(charger) {
         description,
         image_path
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING id
     `,
     [
@@ -157,6 +199,9 @@ export async function insertCharger(charger) {
       charger.name,
       charger.code,
       charger.manufacturer ?? null,
+      charger.operator ?? null,
+      charger.administrator ?? null,
+      charger.installation_date ?? null,
       charger.model ?? null,
       charger.serial_number ?? null,
       charger.type,
@@ -210,55 +255,66 @@ export async function updateChargerStatusById(id, status) {
   return findChargerById(result.rows[0].id);
 }
 
-export async function archiveChargerById(id, userId, previousStatus) {
-  const result = await query(
-    `
-      UPDATE chargers
-      SET status = 'archived',
-          previous_status = $2,
-          archived_at = now(),
-          archived_by = $3
-      WHERE id = $1
-        AND deleted_at IS NULL
-      RETURNING id
-    `,
-    [id, previousStatus, userId],
-  );
-
-  return result.rows[0] ? findChargerById(result.rows[0].id) : null;
+export async function archiveChargerById(id, userId, previousStatus, reason, audit) {
+  return withTransaction(async (client) => {
+    const result = await client.query(
+      `UPDATE chargers SET status = 'archived', previous_status = $2, archived_at = now(),
+        archived_by = $3, archive_reason = $4
+       WHERE id = $1 AND status <> 'archived' AND deleted_at IS NULL RETURNING *`,
+      [id, previousStatus, userId, reason || null],
+    );
+    const charger = result.rows[0];
+    if (!charger) return null;
+    await insertActivityLog(client, {
+      userId, action: "charger_archived", entityType: "charger", entityId: id,
+      description: `Archived charger ${charger.name}`,
+      context: { charger_name: charger.name, site_id: charger.site_id, archive_reason: reason || null }, ...audit,
+    });
+    return charger;
+  });
 }
 
-export async function restoreChargerById(id, userId) {
-  const result = await query(
-    `
-      UPDATE chargers
-      SET status = 'active',
-          restored_at = now(),
-          restored_by = $2
-      WHERE id = $1
-        AND status = 'archived'
-        AND deleted_at IS NULL
-      RETURNING id
-    `,
-    [id, userId],
-  );
-
-  return result.rows[0] ? findChargerById(result.rows[0].id) : null;
+export async function restoreChargerById(id, userId, audit) {
+  return withTransaction(async (client) => {
+    const result = await client.query(
+      `UPDATE chargers SET status = 'active', restored_at = now(), restored_by = $2,
+        archived_at = NULL, archived_by = NULL, archive_reason = NULL, previous_status = NULL
+       WHERE id = $1 AND status = 'archived' AND deleted_at IS NULL RETURNING *`,
+      [id, userId],
+    );
+    const charger = result.rows[0];
+    if (!charger) return null;
+    await insertActivityLog(client, {
+      userId, action: "charger_restored", entityType: "charger", entityId: id,
+      description: `Restored charger ${charger.name}`,
+      context: { charger_name: charger.name, site_id: charger.site_id }, ...audit,
+    });
+    return charger;
+  });
 }
 
-export async function softDeleteArchivedChargerById(id, userId) {
-  const result = await query(
-    `
-      UPDATE chargers
-      SET deleted_at = now(),
-          deleted_by = $2
-      WHERE id = $1
-        AND status = 'archived'
-        AND deleted_at IS NULL
-      RETURNING id
-    `,
-    [id, userId],
-  );
-
-  return result.rows[0] ? findDeletedChargerById(result.rows[0].id) : null;
+export async function permanentlyDeleteChargerById(id, userId, audit) {
+  return withTransaction(async (client) => {
+    const chargerResult = await client.query("SELECT * FROM chargers WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", [id]);
+    const charger = chargerResult.rows[0];
+    if (!charger) return { state: "not_found" };
+    if (charger.status !== "archived") return { state: "not_archived" };
+    const countsResult = await client.query(
+      `SELECT
+        (SELECT COUNT(*) FROM site_visits WHERE charger_id = $1)::integer AS site_visits,
+        (SELECT COUNT(*) FROM faults WHERE charger_id = $1)::integer AS faults,
+        (SELECT COUNT(*) FROM documents WHERE charger_id = $1)::integer AS documents,
+        (SELECT COUNT(*) FROM troubleshooting_records WHERE charger_id = $1)::integer AS troubleshooting_records`,
+      [id],
+    );
+    const dependencies = countsResult.rows[0];
+    if (Object.values(dependencies).some((count) => count > 0)) return { state: "dependencies", dependencies };
+    await client.query("DELETE FROM chargers WHERE id = $1", [id]);
+    await insertActivityLog(client, {
+      userId, action: "charger_permanently_deleted", entityType: "charger", entityId: id,
+      description: `Permanently deleted archived charger ${charger.name}`,
+      context: { charger_name: charger.name, charger_code: charger.code, site_id: charger.site_id }, ...audit,
+    });
+    return { state: "deleted", charger };
+  });
 }

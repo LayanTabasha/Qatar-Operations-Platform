@@ -1,0 +1,10 @@
+import fs from "node:fs"; import path from "node:path"; import { describe, expect, it } from "vitest";
+const root=path.resolve(process.cwd(),"..");
+const state=fs.readFileSync(path.join(root,"js/state.js"),"utf8"), sites=fs.readFileSync(path.join(root,"js/sites-page.js"),"utf8"), modals=fs.readFileSync(path.join(root,"js/modals.js"),"utf8"), home=fs.readFileSync(path.join(root,"js/home-page.js"),"utf8"), app=fs.readFileSync(path.join(root,"app.js"),"utf8");
+describe("shared frontend faults",()=>{
+  it("loads fault state from the API for dashboard and site renderers",()=>{ expect(sites).toContain("window.QatarOpsApi.Faults.list({ limit: 500 })"); expect(sites).toContain("state.faults = (faultsResponse.faults || [])"); });
+  it("creates and updates through the backend and uploads managed photos",()=>{ expect(modals).toContain("await window.QatarOpsApi.Faults.create(payload)"); expect(modals).toContain('persistOperationalFiles("faults", fault.id'); expect(app).toContain("await window.QatarOpsApi.Faults.update(fault.id"); });
+  it("does not load faults or fault data URLs from localStorage and preserves old recovery data",()=>{ expect(state).not.toContain("state.faults = saved.faults"); expect(state).toContain("preservedFaultUploads"); expect(state).toContain("...existing,"); expect(state).not.toMatch(/faults:\s*state\.faults/); });
+  it("offers safe archive deletion only to operational managers",()=>{ expect(sites).toContain('data-delete-type="fault"'); expect(sites).toContain("canManageOperations()"); expect(modals).toContain("window.QatarOpsApi.Faults.remove(form.dataset.recordId)"); expect(sites).toContain("preserving audit history"); });
+  it("uses only Open, In Progress, and Resolved in fault controls and dashboard status data",()=>{ expect(state).toContain('FAULT_STATUS_OPTIONS = Object.freeze(["Open", "In Progress", "Resolved"])'); expect(state).not.toContain("select:Open,In Progress,Resolved,Closed"); expect(sites).toContain('title === "Faults" ? "All Statuses"'); expect(modals).toContain("FAULT_STATUS_OPTIONS.map"); expect(home).not.toContain('{ label: "Closed"'); });
+});

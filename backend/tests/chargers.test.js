@@ -9,17 +9,21 @@ const authRepositoryMocks = vi.hoisted(() => ({
 
 const chargersRepositoryMocks = vi.hoisted(() => ({
   listChargers: vi.fn(),
+  listArchivedChargers: vi.fn(),
   findChargerById: vi.fn(),
+  findAnyChargerById: vi.fn(),
   insertCharger: vi.fn(),
   archiveChargerById: vi.fn(),
   restoreChargerById: vi.fn(),
-  softDeleteArchivedChargerById: vi.fn(),
+  permanentlyDeleteChargerById: vi.fn(),
   updateChargerById: vi.fn(),
   updateChargerStatusById: vi.fn(),
 }));
 
 const sitesRepositoryMocks = vi.hoisted(() => ({
   findSiteById: vi.fn(),
+  findActiveSiteById: vi.fn(),
+  listArchivedSites: vi.fn(),
 }));
 
 vi.mock("../src/modules/auth/auth.repository.js", () => ({
@@ -52,6 +56,9 @@ const chargerSummary = {
   name: "DC Charger 01",
   code: "DC_01",
   manufacturer: "Example Manufacturer",
+  operator: "Qatar Charge Operations",
+  administrator: "Platform Administration",
+  installation_date: "2026-07-15",
   model: "Model X",
   serial_number: "SN-001",
   type: "DC",
@@ -101,10 +108,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   chargersRepositoryMocks.listChargers.mockResolvedValue([chargerSummary]);
   chargersRepositoryMocks.findChargerById.mockResolvedValue(chargerSummary);
+  chargersRepositoryMocks.findAnyChargerById.mockResolvedValue(chargerSummary);
   chargersRepositoryMocks.insertCharger.mockResolvedValue(chargerSummary);
   chargersRepositoryMocks.archiveChargerById.mockResolvedValue({ ...chargerSummary, status: "archived", previous_status: "active" });
   chargersRepositoryMocks.restoreChargerById.mockResolvedValue({ ...chargerSummary, status: "active" });
-  chargersRepositoryMocks.softDeleteArchivedChargerById.mockResolvedValue({ ...chargerSummary, status: "archived", deleted_at: "2026-07-27T09:00:00.000Z" });
+  chargersRepositoryMocks.permanentlyDeleteChargerById.mockResolvedValue({ state: "deleted", charger: { ...chargerSummary, status: "archived" } });
   chargersRepositoryMocks.updateChargerById.mockResolvedValue(chargerSummary);
   chargersRepositoryMocks.updateChargerStatusById.mockResolvedValue(chargerSummary);
   sitesRepositoryMocks.findSiteById.mockResolvedValue(activeSite);
@@ -125,6 +133,9 @@ function validChargerBody(overrides = {}) {
     name: "DC Charger 01",
     code: "dc_01",
     manufacturer: "Example Manufacturer",
+    operator: "Qatar Charge Operations",
+    administrator: "Platform Administration",
+    installation_date: "2026-07-15",
     model: "Model X",
     serial_number: "SN-001",
     type: "DC",
@@ -148,6 +159,13 @@ describe("chargers routes", () => {
       open_fault_count: 0,
       last_site_visit: null,
     });
+  });
+
+  it("requires an administrator to list archived chargers", async () => {
+    chargersRepositoryMocks.listArchivedChargers.mockResolvedValue([{ ...chargerSummary, status: "archived" }]);
+    await request(app).get("/api/v1/archive/chargers").set("Cookie", authCookie(operatorUser)).expect(403);
+    const response = await request(app).get("/api/v1/archive/chargers").set("Cookie", authCookie(adminUser)).expect(200);
+    expect(response.body.chargers[0].status).toBe("archived");
   });
 
   it("allows viewers to view one charger", async () => {
@@ -183,14 +201,29 @@ describe("chargers routes", () => {
       .expect(403);
   });
 
-  it("allows operators to create a charger and normalizes the code", async () => {
+  it("allows admins to create a charger and normalizes the code", async () => {
     await request(app)
       .post("/api/v1/chargers")
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .send(validChargerBody())
       .expect(201);
 
-    expect(chargersRepositoryMocks.insertCharger).toHaveBeenCalledWith(expect.objectContaining({ code: "DC_01" }));
+    expect(chargersRepositoryMocks.insertCharger).toHaveBeenCalledWith(expect.objectContaining({
+      code: "DC_01",
+      operator: "Qatar Charge Operations",
+      administrator: "Platform Administration",
+      installation_date: "2026-07-15",
+    }));
+  });
+
+  it("returns the persisted charger fields in list responses", async () => {
+    const response = await request(app).get("/api/v1/chargers").set("Cookie", authCookie(viewerUser)).expect(200);
+
+    expect(response.body.chargers[0]).toMatchObject({
+      operator: "Qatar Charge Operations",
+      administrator: "Platform Administration",
+      installation_date: "2026-07-15",
+    });
   });
 
   it("allows admins to update a charger", async () => {
@@ -199,6 +232,30 @@ describe("chargers routes", () => {
       .set("Cookie", authCookie(adminUser))
       .send({ name: "Updated Charger" })
       .expect(200);
+  });
+
+  it("updates charger persistence fields without requiring unrelated fields", async () => {
+    await request(app)
+      .patch(`/api/v1/chargers/${chargerId}`)
+      .set("Cookie", authCookie(adminUser))
+      .send({ operator: "New Operator", administrator: "New Administrator", installation_date: "2026-08-01" })
+      .expect(200);
+
+    expect(chargersRepositoryMocks.updateChargerById).toHaveBeenCalledWith(chargerId, {
+      operator: "New Operator",
+      administrator: "New Administrator",
+      installation_date: "2026-08-01",
+    });
+  });
+
+  it("preserves charger persistence fields when a PATCH omits them", async () => {
+    await request(app)
+      .patch(`/api/v1/chargers/${chargerId}`)
+      .set("Cookie", authCookie(adminUser))
+      .send({ name: "Updated Charger" })
+      .expect(200);
+
+    expect(chargersRepositoryMocks.updateChargerById).toHaveBeenCalledWith(chargerId, { name: "Updated Charger" });
   });
 
   it("accepts supported query filters", async () => {
@@ -232,8 +289,20 @@ describe("chargers routes", () => {
     expect(repository).toContain("chargers.status = 'active'");
   });
 
-  it("accepts archived, maintenance, and faulted filters", async () => {
-    await request(app).get("/api/v1/chargers?status=archived").set("Cookie", authCookie(viewerUser)).expect(200);
+  it("repository selects and inserts the three persisted charger fields", () => {
+    const repository = fs.readFileSync(path.resolve("src/modules/chargers/chargers.repository.js"), "utf8");
+
+    ["chargers.operator", "chargers.administrator", "chargers.installation_date"].forEach((field) => {
+      expect(repository).toContain(field);
+    });
+    expect(repository).toMatch(/INSERT INTO chargers \([\s\S]*operator,[\s\S]*administrator,[\s\S]*installation_date/);
+    expect(repository).toContain("charger.operator ?? null");
+    expect(repository).toContain("charger.administrator ?? null");
+    expect(repository).toContain("charger.installation_date ?? null");
+  });
+
+  it("keeps archived chargers out of normal filters", async () => {
+    await request(app).get("/api/v1/chargers?status=archived").set("Cookie", authCookie(viewerUser)).expect(400);
     await request(app).get("/api/v1/chargers?status=maintenance").set("Cookie", authCookie(viewerUser)).expect(200);
     await request(app).get("/api/v1/chargers?status=faulted").set("Cookie", authCookie(viewerUser)).expect(200);
   });
@@ -262,7 +331,7 @@ describe("chargers routes", () => {
   it("normalizes lowercase charger types to uppercase", async () => {
     await request(app)
       .post("/api/v1/chargers")
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .send(validChargerBody({ type: "ac" }))
       .expect(201);
 
@@ -274,7 +343,7 @@ describe("chargers routes", () => {
 
     const response = await request(app)
       .post("/api/v1/chargers")
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .send(validChargerBody({ code: "duplicate" }))
       .expect(409);
 
@@ -292,7 +361,7 @@ describe("chargers routes", () => {
 
     const response = await request(app)
       .post("/api/v1/chargers")
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .send(validChargerBody())
       .expect(404);
 
@@ -304,7 +373,7 @@ describe("chargers routes", () => {
 
     const response = await request(app)
       .post("/api/v1/chargers")
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .send(validChargerBody())
       .expect(409);
 
@@ -312,13 +381,13 @@ describe("chargers routes", () => {
   });
 
   it("rejects empty PATCH bodies", async () => {
-    await request(app).patch(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(operatorUser)).send({}).expect(400);
+    await request(app).patch(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(adminUser)).send({}).expect(400);
   });
 
   it("does not allow normal PATCH to change status", async () => {
     await request(app)
       .patch(`/api/v1/chargers/${chargerId}`)
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .send({ status: "archived" })
       .expect(400);
   });
@@ -326,61 +395,74 @@ describe("chargers routes", () => {
   it("accepts only current statuses in the status endpoint", async () => {
     await request(app)
       .patch(`/api/v1/chargers/${chargerId}/status`)
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .send({ status: "faulted" })
       .expect(200);
 
     await request(app)
       .patch(`/api/v1/chargers/${chargerId}/status`)
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .send({ status: "inactive" })
       .expect(400);
   });
 
+  it.each([operatorUser, { ...operatorUser, role: "hq_user" }, viewerUser])("rejects non-admin charger mutations for $role", async (user) => {
+    await request(app).post("/api/v1/chargers").set("Cookie", authCookie(user)).send(validChargerBody()).expect(403);
+    await request(app).patch(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(user)).send({ name: "Blocked" }).expect(403);
+    await request(app).delete(`/api/v1/chargers/${chargerId}/permanent`).set("Cookie", authCookie(user)).expect(403);
+  });
+
   it("does not restore a charger when the parent site is archived", async () => {
+    chargersRepositoryMocks.findAnyChargerById.mockResolvedValue({ ...chargerSummary, status: "archived", previous_status: "active" });
     sitesRepositoryMocks.findSiteById.mockResolvedValue({ ...activeSite, status: "archived" });
 
     const response = await request(app)
-      .patch(`/api/v1/chargers/${chargerId}/status`)
-      .set("Cookie", authCookie(operatorUser))
-      .send({ status: "active" })
+      .patch(`/api/v1/chargers/${chargerId}/restore`)
+      .set("Cookie", authCookie(adminUser))
       .expect(409);
 
     expect(response.body.error.code).toBe("ARCHIVED_SITE_CONFLICT");
   });
 
-  it("archives a charger with audit information", async () => {
-    await request(app).patch(`/api/v1/chargers/${chargerId}/archive`).set("Cookie", authCookie(operatorUser)).expect(200);
+  it("allows only admins to archive a charger with audit information", async () => {
+    await request(app).patch(`/api/v1/chargers/${chargerId}/archive`).set("Cookie", authCookie(operatorUser)).expect(403);
+    await request(app).patch(`/api/v1/chargers/${chargerId}/archive`).set("Cookie", authCookie(adminUser)).send({ reason: "Retired" }).expect(200);
 
-    expect(chargersRepositoryMocks.archiveChargerById).toHaveBeenCalledWith(chargerId, operatorUser.id, "active");
+    expect(chargersRepositoryMocks.archiveChargerById).toHaveBeenCalledWith(chargerId, adminUser.id, "active", "Retired", expect.any(Object));
   });
 
   it("restores an archived charger to active", async () => {
-    chargersRepositoryMocks.findChargerById.mockResolvedValue({ ...chargerSummary, status: "archived", previous_status: "active" });
+    chargersRepositoryMocks.findAnyChargerById.mockResolvedValue({ ...chargerSummary, status: "archived", previous_status: "active" });
 
-    await request(app).patch(`/api/v1/chargers/${chargerId}/restore`).set("Cookie", authCookie(operatorUser)).expect(200);
+    await request(app).patch(`/api/v1/chargers/${chargerId}/restore`).set("Cookie", authCookie(operatorUser)).expect(403);
+    await request(app).patch(`/api/v1/chargers/${chargerId}/restore`).set("Cookie", authCookie(adminUser)).expect(200);
 
-    expect(chargersRepositoryMocks.restoreChargerById).toHaveBeenCalledWith(chargerId, operatorUser.id);
+    expect(chargersRepositoryMocks.restoreChargerById).toHaveBeenCalledWith(chargerId, adminUser.id, expect.any(Object));
   });
 
   it("rejects permanent delete for operations staff and viewers", async () => {
     chargersRepositoryMocks.findChargerById.mockResolvedValue({ ...chargerSummary, status: "archived" });
 
-    await request(app).delete(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(operatorUser)).expect(403);
-    await request(app).delete(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(viewerUser)).expect(403);
+    await request(app).delete(`/api/v1/chargers/${chargerId}/permanent`).set("Cookie", authCookie(operatorUser)).expect(403);
+    await request(app).delete(`/api/v1/chargers/${chargerId}/permanent`).set("Cookie", authCookie(viewerUser)).expect(403);
   });
 
-  it("soft-deletes archived chargers for admins only", async () => {
-    chargersRepositoryMocks.findChargerById.mockResolvedValue({ ...chargerSummary, status: "archived" });
+  it("permanently deletes an empty archived charger for admins only", async () => {
+    await request(app).delete(`/api/v1/chargers/${chargerId}/permanent`).set("Cookie", authCookie(adminUser)).expect(204);
 
-    await request(app).delete(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(adminUser)).expect(200);
-
-    expect(chargersRepositoryMocks.softDeleteArchivedChargerById).toHaveBeenCalledWith(chargerId, adminUser.id);
+    expect(chargersRepositoryMocks.permanentlyDeleteChargerById).toHaveBeenCalledWith(chargerId, adminUser.id, expect.any(Object));
   });
 
   it("does not permanently delete active chargers", async () => {
-    const response = await request(app).delete(`/api/v1/chargers/${chargerId}`).set("Cookie", authCookie(adminUser)).expect(409);
+    chargersRepositoryMocks.permanentlyDeleteChargerById.mockResolvedValue({ state: "not_archived" });
+    const response = await request(app).delete(`/api/v1/chargers/${chargerId}/permanent`).set("Cookie", authCookie(adminUser)).expect(409);
 
     expect(response.body.error.code).toBe("CHARGER_NOT_ARCHIVED");
+  });
+
+  it("returns safe dependency counts when permanent delete is blocked", async () => {
+    chargersRepositoryMocks.permanentlyDeleteChargerById.mockResolvedValue({ state: "dependencies", dependencies: { faults: 2, documents: 1 } });
+    const response = await request(app).delete(`/api/v1/chargers/${chargerId}/permanent`).set("Cookie", authCookie(adminUser)).expect(409);
+    expect(response.body.error.details.dependencies).toEqual({ faults: 2, documents: 1 });
   });
 });

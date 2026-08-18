@@ -22,13 +22,28 @@ const chargerType = z.preprocess(
   z.enum(["AC", "DC"]),
 );
 
+const optionalDate = z.preprocess(
+  (value) => (value === "" ? null : value),
+  z
+    .string()
+    .date()
+    .nullable()
+    .optional(),
+);
+
 export const chargerIdParamsSchema = z.object({
   id: z.string().uuid(),
 });
 
+export const archiveReasonSchema = z
+  .object({
+    reason: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict();
+
 export const listChargersQuerySchema = z.object({
   site_id: z.string().uuid().optional(),
-  status: z.enum(["active", "maintenance", "faulted", "archived"]).optional(),
+  status: z.enum(["active", "maintenance", "faulted"]).optional(),
   type: chargerType.optional(),
   search: z.string().trim().max(200).optional(),
   sort: z.enum(["name", "code", "created_at", "updated_at", "power_kw"]).default("name"),
@@ -42,6 +57,9 @@ export const createChargerSchema = z
     name: z.string().trim().min(2).max(100),
     code: chargerCode,
     manufacturer: optionalText(100),
+    operator: optionalText(200),
+    administrator: optionalText(200),
+    installation_date: optionalDate,
     model: optionalText(100),
     serial_number: optionalText(100),
     type: chargerType,
@@ -65,6 +83,6 @@ export const updateChargerSchema = createChargerSchema
 
 export const updateChargerStatusSchema = z
   .object({
-    status: z.enum(["active", "maintenance", "faulted", "archived"]),
+    status: z.enum(["active", "maintenance", "faulted"]),
   })
   .strict();

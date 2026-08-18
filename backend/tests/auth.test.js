@@ -15,6 +15,7 @@ const usersRepositoryMocks = vi.hoisted(() => ({
   countActiveAdmins: vi.fn(),
   findRoleByName: vi.fn(),
   createUser: vi.fn(),
+  deleteUserById: vi.fn(),
   updateUserById: vi.fn(),
   updateUserStatusById: vi.fn(),
   updateUserPasswordById: vi.fn(),
@@ -48,6 +49,7 @@ const activeViewer = {
   email: "viewer@example.com",
   role: "viewer",
 };
+const activeHqUser = { ...activeViewer, id: "44444444-4444-4444-8444-444444444444", email: "hq@example.com", role: "hq_user" };
 
 beforeAll(async () => {
   process.env.NODE_ENV = "test";
@@ -73,6 +75,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   usersRepositoryMocks.listUsers.mockResolvedValue([]);
   usersRepositoryMocks.countActiveAdmins.mockResolvedValue(2);
+  usersRepositoryMocks.deleteUserById.mockResolvedValue({ state: "deleted", user: activeViewer });
 });
 
 function createToken(user = activeAdmin) {
@@ -403,7 +406,12 @@ describe("user management routes", () => {
       .send({ is_active: false })
       .expect(200);
 
-    expect(usersRepositoryMocks.updateUserStatusById).toHaveBeenCalledWith(activeViewer.id, false);
+    expect(usersRepositoryMocks.updateUserStatusById).toHaveBeenCalledWith(
+      activeViewer.id,
+      false,
+      activeAdmin.id,
+      expect.objectContaining({ requestId: expect.any(String) }),
+    );
 
     usersRepositoryMocks.updateUserStatusById.mockResolvedValue({ ...activeViewer, is_active: true });
 
@@ -471,5 +479,67 @@ describe("user management routes", () => {
       .set("Cookie", [`qatar_ops_token=${createToken()}`])
       .send({ role: "viewer" })
       .expect(400);
+  });
+
+  it("returns 404 when deactivating a missing user", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+    usersRepositoryMocks.findUserById.mockResolvedValue(null);
+    const response = await request(app).patch(`/api/v1/users/${activeViewer.id}/status`)
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .send({ is_active: false })
+      .expect(404);
+    expect(response.body.error.code).toBe("USER_NOT_FOUND");
+  });
+
+  it.each([["operations staff", activeOperationsStaff], ["HQ user", activeHqUser], ["viewer", activeViewer]])("denies user deactivation to %s", async (_label, user) => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(user);
+    await request(app).patch(`/api/v1/users/${activeAdmin.id}/status`)
+      .set("Cookie", [`qatar_ops_token=${createToken(user)}`])
+      .send({ is_active: false })
+      .expect(403);
+    expect(usersRepositoryMocks.updateUserStatusById).not.toHaveBeenCalled();
+  });
+
+  it("allows an administrator to permanently delete another user", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+    await request(app).delete(`/api/v1/users/${activeViewer.id}`)
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .expect(204);
+    expect(usersRepositoryMocks.deleteUserById).toHaveBeenCalledWith(activeViewer.id, activeAdmin.id, expect.objectContaining({ requestId: expect.any(String) }));
+  });
+
+  it("rejects self-deletion", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+    const response = await request(app).delete(`/api/v1/users/${activeAdmin.id}`)
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .expect(400);
+    expect(response.body.error.code).toBe("CANNOT_DELETE_SELF");
+    expect(usersRepositoryMocks.deleteUserById).not.toHaveBeenCalled();
+  });
+
+  it("rejects deletion of the last usable administrator", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+    usersRepositoryMocks.deleteUserById.mockResolvedValue({ state: "last_admin", user: activeViewer });
+    const response = await request(app).delete(`/api/v1/users/${activeViewer.id}`)
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .expect(409);
+    expect(response.body.error.code).toBe("CANNOT_DELETE_LAST_ADMIN");
+  });
+
+  it("returns 404 for a missing deletion target", async () => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(activeAdmin);
+    usersRepositoryMocks.deleteUserById.mockResolvedValue({ state: "missing", user: null });
+    const response = await request(app).delete(`/api/v1/users/${activeViewer.id}`)
+      .set("Cookie", [`qatar_ops_token=${createToken()}`])
+      .expect(404);
+    expect(response.body.error.code).toBe("USER_NOT_FOUND");
+  });
+
+  it.each([["operations staff", activeOperationsStaff], ["HQ user", activeHqUser], ["viewer", activeViewer]])("denies permanent deletion to %s", async (_label, user) => {
+    authRepositoryMocks.findSafeUserById.mockResolvedValue(user);
+    await request(app).delete(`/api/v1/users/${activeViewer.id}`)
+      .set("Cookie", [`qatar_ops_token=${createToken(user)}`])
+      .expect(403);
+    expect(usersRepositoryMocks.deleteUserById).not.toHaveBeenCalled();
   });
 });

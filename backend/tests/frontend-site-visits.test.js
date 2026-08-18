@@ -29,8 +29,8 @@ describe("frontend site visit workflow", () => {
     expect(modalsSource).toContain("time_in: timeIn || null");
     expect(modalsSource).toContain("time_out: timeOut || null");
     expect(modalsSource).toContain("status: backendSiteVisitStatus");
-    expect(modalsSource).toContain("await SiteVisitsApi.create(payload)");
-    expect(modalsSource).toContain("await SiteVisitsApi.update(existing.id, payload)");
+    expect(modalsSource).toContain("await window.QatarOpsApi.SiteVisits.create(payload)");
+    expect(modalsSource).toContain("await window.QatarOpsApi.SiteVisits.update(existing.id, payload)");
   });
 
   it("renders visitDate, timeIn, and timeOut from persisted records", () => {
@@ -42,5 +42,17 @@ describe("frontend site visit workflow", () => {
     expect(sitesPageSource).toContain("recordedOn: visit.created_at");
     expect(sitesPageSource).toContain("recordedBy: visit.recorded_by_name");
     expect(sitesPageSource).toContain("formatMediumDate(visit.visitDate)");
+  });
+
+  it("provides role-aware edit/delete actions and exact confirmation", () => {
+    const sites = readRootFile("js/sites-page.js");
+    const modals = readRootFile("js/modals.js");
+    const api = readRootFile("js/api-client.js");
+    expect(sites).toContain('data-delete-type="siteVisit"');
+    expect(sites).toContain("canManageOperations()");
+    expect(modals).toContain('setFieldValue("site", visit.siteName);\n      refreshChargerSelect();');
+    expect(modals).toContain('operational-delete-confirmation")?.value.trim() !== "DELETE"');
+    expect(modals).toContain("window.QatarOpsApi.SiteVisits.remove(form.dataset.recordId)");
+    expect(api).toContain('remove(id) { return apiRequest(`/site-visits/${id}`, { method: "DELETE" })');
   });
 });

@@ -3,6 +3,7 @@ import { ApiError } from "../../utils/api-error.js";
 import {
   countActiveAdmins,
   createUser,
+  deleteUserById,
   findRoleByName,
   findUserById,
   listUsers,
@@ -90,7 +91,7 @@ export async function updateExistingUser(currentAdminId, id, input) {
   return safeUser(user);
 }
 
-export async function updateExistingUserStatus(currentAdminId, id, input) {
+export async function updateExistingUserStatus(currentAdminId, id, input, audit = {}) {
   const targetUser = await getUserById(id);
   const isActive = input.is_active !== undefined ? input.is_active : input.status === "active";
 
@@ -102,7 +103,7 @@ export async function updateExistingUserStatus(currentAdminId, id, input) {
     throw new ApiError(400, "LAST_ADMIN_PROTECTED", "At least one active Administrator must remain");
   }
 
-  const user = await updateUserStatusById(id, isActive);
+  const user = await updateUserStatusById(id, isActive, currentAdminId, audit);
   if (!user) throw new ApiError(404, "USER_NOT_FOUND", "User not found");
   return safeUser(user);
 }
@@ -113,4 +114,15 @@ export async function resetUserPassword(id, input) {
   const user = await updateUserPasswordById(id, passwordHash);
   if (!user) throw new ApiError(404, "USER_NOT_FOUND", "User not found");
   return safeUser(user);
+}
+
+export async function deleteExistingUser(currentAdminId, id, audit = {}) {
+  if (id === currentAdminId) throw new ApiError(400, "CANNOT_DELETE_SELF", "You cannot delete your own account");
+
+  const result = await deleteUserById(id, currentAdminId, audit);
+  if (result.state === "missing") throw new ApiError(404, "USER_NOT_FOUND", "User not found");
+  if (result.state === "last_admin") {
+    throw new ApiError(409, "CANNOT_DELETE_LAST_ADMIN", "At least one active Administrator must remain");
+  }
+  return result.user;
 }

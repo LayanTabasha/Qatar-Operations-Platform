@@ -10,7 +10,12 @@ const authRepositoryMocks = vi.hoisted(() => ({
 
 const sitesRepositoryMocks = vi.hoisted(() => ({
   listSites: vi.fn(),
+  listArchivedSites: vi.fn(),
   findSiteById: vi.fn(),
+  findActiveSiteById: vi.fn(),
+  archiveSiteById: vi.fn(),
+  restoreSiteById: vi.fn(),
+  permanentlyDeleteSiteById: vi.fn(),
   insertSite: vi.fn(),
   updateSiteById: vi.fn(),
   updateSiteImagePathById: vi.fn(),
@@ -79,10 +84,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   sitesRepositoryMocks.listSites.mockResolvedValue([siteSummary]);
   sitesRepositoryMocks.findSiteById.mockResolvedValue(siteSummary);
+  sitesRepositoryMocks.findActiveSiteById.mockResolvedValue(siteSummary);
   sitesRepositoryMocks.insertSite.mockResolvedValue(siteSummary);
   sitesRepositoryMocks.updateSiteById.mockResolvedValue(siteSummary);
   sitesRepositoryMocks.updateSiteImagePathById.mockResolvedValue({ ...siteSummary, image_path: "/uploads/site-images/test.webp" });
   sitesRepositoryMocks.updateSiteStatusById.mockResolvedValue(siteSummary);
+  sitesRepositoryMocks.archiveSiteById.mockResolvedValue({ ...siteSummary, status: "archived" });
+  sitesRepositoryMocks.restoreSiteById.mockResolvedValue(siteSummary);
+  sitesRepositoryMocks.permanentlyDeleteSiteById.mockResolvedValue({ state: "deleted", site: { ...siteSummary, status: "archived" } });
 });
 
 function authCookie(user) {
@@ -149,7 +158,7 @@ describe("sites routes", () => {
   it("requires an image when uploading a site image", async () => {
     const response = await request(app)
       .post(`/api/v1/sites/${siteId}/image`)
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .expect(400);
 
     expect(response.body.error.code).toBe("IMAGE_REQUIRED");
@@ -158,7 +167,7 @@ describe("sites routes", () => {
   it("rejects unsupported site image types", async () => {
     const response = await request(app)
       .post(`/api/v1/sites/${siteId}/image`)
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .attach("image", Buffer.from("<svg></svg>"), {
         filename: "site.svg",
         contentType: "image/svg+xml",
@@ -173,7 +182,7 @@ describe("sites routes", () => {
 
     const response = await request(app)
       .post(`/api/v1/sites/${siteId}/image`)
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .attach("image", oversizedImage, {
         filename: "large.png",
         contentType: "image/png",
@@ -184,11 +193,11 @@ describe("sites routes", () => {
   });
 
   it("returns 404 before upload when the site is unknown", async () => {
-    sitesRepositoryMocks.findSiteById.mockResolvedValueOnce(null);
+    sitesRepositoryMocks.findActiveSiteById.mockResolvedValueOnce(null);
 
     const response = await request(app)
       .post(`/api/v1/sites/${siteId}/image`)
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .attach("image", tinyPng, {
         filename: "site.png",
         contentType: "image/png",
@@ -217,10 +226,10 @@ describe("sites routes", () => {
     fs.unlinkSync(storedFile);
   });
 
-  it("allows operators to store a site image and updates the public image path", async () => {
+  it("allows admins to store a site image and updates the public image path", async () => {
     const response = await request(app)
       .post(`/api/v1/sites/${siteId}/image`)
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .attach("image", tinyPng, {
         filename: "unsafe original name.png",
         contentType: "image/png",
@@ -236,10 +245,10 @@ describe("sites routes", () => {
     fs.unlinkSync(storedFile);
   });
 
-  it("allows operators to create a site", async () => {
+  it("allows admins to create a site", async () => {
     await request(app)
       .post("/api/v1/sites")
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .send({ name: "New Site", code: "new_site" })
       .expect(201);
 
@@ -264,10 +273,8 @@ describe("sites routes", () => {
     expect(sitesRepositoryMocks.listSites).toHaveBeenCalledWith(expect.objectContaining({ status: "active" }));
   });
 
-  it("accepts archived as a status filter", async () => {
-    await request(app).get("/api/v1/sites?status=archived").set("Cookie", authCookie(viewerUser)).expect(200);
-
-    expect(sitesRepositoryMocks.listSites).toHaveBeenCalledWith(expect.objectContaining({ status: "archived" }));
+  it("keeps archived sites out of normal list filters", async () => {
+    await request(app).get("/api/v1/sites?status=archived").set("Cookie", authCookie(viewerUser)).expect(400);
   });
 
   it("rejects inactive as a status filter", async () => {
@@ -281,7 +288,7 @@ describe("sites routes", () => {
   it("normalizes lowercase site codes to uppercase", async () => {
     await request(app)
       .post("/api/v1/sites")
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .send({ name: "Code Site", code: "abc_123" })
       .expect(201);
 
@@ -293,7 +300,7 @@ describe("sites routes", () => {
 
     const response = await request(app)
       .post("/api/v1/sites")
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .send({ name: "Duplicate Site", code: "DUPLICATE" })
       .expect(409);
 
@@ -301,30 +308,64 @@ describe("sites routes", () => {
   });
 
   it("returns 404 when a site is not found", async () => {
-    sitesRepositoryMocks.findSiteById.mockResolvedValue(null);
+    sitesRepositoryMocks.findActiveSiteById.mockResolvedValue(null);
 
     await request(app).get(`/api/v1/sites/${siteId}`).set("Cookie", authCookie(viewerUser)).expect(404);
   });
 
-  it("rejects empty PATCH bodies", async () => {
-    await request(app).patch(`/api/v1/sites/${siteId}`).set("Cookie", authCookie(operatorUser)).send({}).expect(400);
+  it("requires an administrator to list archived sites", async () => {
+    sitesRepositoryMocks.listArchivedSites.mockResolvedValue([{ ...siteSummary, status: "archived" }]);
+    await request(app).get("/api/v1/archive/sites").set("Cookie", authCookie(viewerUser)).expect(403);
+    const response = await request(app).get("/api/v1/archive/sites").set("Cookie", authCookie(adminUser)).expect(200);
+    expect(response.body.sites[0].status).toBe("archived");
   });
 
-  it("accepts only active or archived in the status endpoint", async () => {
+  it("rejects empty PATCH bodies", async () => {
+    await request(app).patch(`/api/v1/sites/${siteId}`).set("Cookie", authCookie(adminUser)).send({}).expect(400);
+  });
+
+  it("does not permit archiving through the general status endpoint", async () => {
     await request(app)
       .patch(`/api/v1/sites/${siteId}/status`)
-      .set("Cookie", authCookie(operatorUser))
+      .set("Cookie", authCookie(adminUser))
       .send({ status: "active" })
       .expect(200);
 
     await request(app)
       .patch(`/api/v1/sites/${siteId}/status`)
-      .set("Cookie", authCookie(operatorUser))
-      .send({ status: "inactive" })
+      .set("Cookie", authCookie(adminUser))
+      .send({ status: "archived" })
       .expect(400);
+  });
+
+  it.each([operatorUser, { ...operatorUser, role: "hq_user" }, viewerUser])("rejects non-admin site mutations for $role", async (user) => {
+    await request(app).post("/api/v1/sites").set("Cookie", authCookie(user)).send({ name: "Blocked", code: "BLOCKED" }).expect(403);
+    await request(app).patch(`/api/v1/sites/${siteId}`).set("Cookie", authCookie(user)).send({ name: "Blocked" }).expect(403);
+    await request(app).delete(`/api/v1/sites/${siteId}/permanent`).set("Cookie", authCookie(user)).expect(403);
   });
 
   it("does not expose a DELETE route", async () => {
     await request(app).delete(`/api/v1/sites/${siteId}`).set("Cookie", authCookie(adminUser)).expect(404);
+  });
+
+  it("allows only admins to archive and restore sites", async () => {
+    await request(app).patch(`/api/v1/sites/${siteId}/archive`).set("Cookie", authCookie(operatorUser)).expect(403);
+    await request(app).patch(`/api/v1/sites/${siteId}/archive`).set("Cookie", authCookie(adminUser)).send({ reason: "Contract ended" }).expect(200);
+    expect(sitesRepositoryMocks.archiveSiteById).toHaveBeenCalledWith(siteId, adminUser.id, "Contract ended", expect.any(Object));
+
+    sitesRepositoryMocks.findSiteById.mockResolvedValue({ ...siteSummary, status: "archived" });
+    await request(app).patch(`/api/v1/sites/${siteId}/restore`).set("Cookie", authCookie(adminUser)).expect(200);
+    expect(sitesRepositoryMocks.restoreSiteById).toHaveBeenCalledWith(siteId, adminUser.id, expect.any(Object));
+  });
+
+  it("blocks site deletion with safe dependency counts", async () => {
+    sitesRepositoryMocks.permanentlyDeleteSiteById.mockResolvedValue({ state: "dependencies", dependencies: { chargers: 1, faults: 2 } });
+    const response = await request(app).delete(`/api/v1/sites/${siteId}/permanent`).set("Cookie", authCookie(adminUser)).expect(409);
+    expect(response.body.error.details.dependencies).toEqual({ chargers: 1, faults: 2 });
+  });
+
+  it("permanently deletes only an empty archived site", async () => {
+    await request(app).delete(`/api/v1/sites/${siteId}/permanent`).set("Cookie", authCookie(adminUser)).expect(204);
+    expect(sitesRepositoryMocks.permanentlyDeleteSiteById).toHaveBeenCalledWith(siteId, adminUser.id, expect.any(Object));
   });
 });

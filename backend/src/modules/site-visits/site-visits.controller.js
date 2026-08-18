@@ -1,5 +1,5 @@
 import { asyncHandler } from "../../utils/async-handler.js";
-import { createSiteVisit, getSiteVisit, getSiteVisits, updateSiteVisit } from "./site-visits.service.js";
+import { createSiteVisit, deleteSiteVisit, getSiteVisit, getSiteVisits, updateSiteVisit } from "./site-visits.service.js";
 import {
   createSiteVisitSchema,
   listSiteVisitsQuerySchema,
@@ -29,7 +29,7 @@ export const getSiteVisitRecord = asyncHandler(async (req, res) => {
 
 export const createSiteVisitRecord = asyncHandler(async (req, res) => {
   const input = createSiteVisitSchema.parse(req.body);
-  const siteVisit = await createSiteVisit(input, req.user.id);
+  const siteVisit = await createSiteVisit(input, req.user.id, { ipAddress: req.ip, requestId: req.id });
 
   res.status(201).json({
     success: true,
@@ -40,10 +40,16 @@ export const createSiteVisitRecord = asyncHandler(async (req, res) => {
 export const updateSiteVisitRecord = asyncHandler(async (req, res) => {
   const { id } = siteVisitIdParamsSchema.parse(req.params);
   const input = updateSiteVisitSchema.parse(req.body);
-  const siteVisit = await updateSiteVisit(id, input, req.user.id);
+  const siteVisit = await updateSiteVisit(id, input, req.user.id, { ipAddress: req.ip, requestId: req.id });
 
   res.json({
     success: true,
     site_visit: siteVisit,
   });
+});
+
+export const deleteSiteVisitRecord = asyncHandler(async (req, res) => {
+  const { id } = siteVisitIdParamsSchema.parse(req.params);
+  await deleteSiteVisit(id, req.user.id, { ipAddress: req.ip, requestId: req.id });
+  res.status(204).end();
 });

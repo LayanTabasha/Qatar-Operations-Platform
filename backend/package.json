@@ -18,7 +18,8 @@
     "user:create": "node src/db/create-user.js",
     "user:create-admin": "node src/db/create-user.js --role=admin",
     "seed:admin": "node src/db/create-admin.js",
-    "create-admin": "node src/db/create-admin.js"
+    "create-admin": "node src/db/create-admin.js",
+    "faults:import": "node src/scripts/import-browser-faults.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -39,6 +40,7 @@
     "@eslint/js": "^9.17.0",
     "eslint": "^9.17.0",
     "globals": "^15.14.0",
+    "jsdom": "^25.0.1",
     "nodemon": "^3.1.9",
     "prettier": "^3.4.2",
     "supertest": "^7.0.0",

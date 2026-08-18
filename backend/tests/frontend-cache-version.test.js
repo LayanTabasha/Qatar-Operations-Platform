@@ -1,0 +1,71 @@
+import fs from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+
+const root = path.resolve(process.cwd(), "..");
+const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
+const state = fs.readFileSync(path.join(root, "js/state.js"), "utf8");
+
+const FRONTEND_STABILIZATION_VERSION = "20260811-requests-frontend";
+const HOMEPAGE_REQUESTS_VERSION = "20260813-homepage-requests";
+const REQUESTS_BOOTSTRAP_VERSION = "20260813-requests-bootstrap";
+const ROLE_PERMISSIONS_VERSION = "20260817-charger-natural-sort";
+const USER_DELETE_UI_VERSION = "20260816-permanent-user-delete";
+const HOMEPAGE_COMPACT_VERSION = "20260816-homepage-compact";
+const CONTACT_OPTIONAL_SITE_VERSION = "20260818-contacts-optional-site";
+const CONTENT_RECORD_ACTIONS_VERSION = "20260818-legacy-content-actions-v3";
+const FAULT_LIFECYCLE_VERSION = "20260818-fault-lifecycle-v1";
+const STABILIZATION_PHASE_SCRIPTS = [
+  "js/file-preview.js",
+  "js/archive-page.js",
+];
+
+function browserScriptSources() {
+  return Array.from(index.matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1]);
+}
+
+describe("frontend cache-version integrity", () => {
+  it("uses the coherent cache token for every script changed in the stabilization phase", () => {
+    const sources = browserScriptSources();
+
+    for (const script of STABILIZATION_PHASE_SCRIPTS) {
+      expect(sources, `${script} must be browser-loaded with the current cache token`).toContain(
+        `${script}?v=${FRONTEND_STABILIZATION_VERSION}`,
+      );
+    }
+  });
+
+  it("loads state before scripts that consume its normalization helpers", () => {
+    const sources = browserScriptSources();
+    const stateIndex = sources.indexOf(`js/state.js?v=${FAULT_LIFECYCLE_VERSION}`);
+
+    expect(stateIndex).toBeGreaterThanOrEqual(0);
+    expect(sources.indexOf(`js/home-page.js?v=${FAULT_LIFECYCLE_VERSION}`)).toBeGreaterThan(stateIndex);
+    expect(sources.indexOf(`app.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
+    expect(sources.indexOf(`js/sites-page.js?v=${FAULT_LIFECYCLE_VERSION}`)).toBeGreaterThan(stateIndex);
+    expect(sources.indexOf(`js/api-client.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
+    expect(sources.indexOf(`js/modals.js?v=${FAULT_LIFECYCLE_VERSION}`)).toBeGreaterThan(stateIndex);
+  });
+
+  it("pairs the post-Fault state token with the persisted Fault normalization contract", () => {
+    expect(index).toContain(`js/state.js?v=${FAULT_LIFECYCLE_VERSION}`);
+    expect(state).toContain("faultId = fault.faultId || fault.fault_reference");
+    expect(state).toContain("siteName: fault.siteName || fault.site_name");
+    expect(state).toContain("chargerId: fault.chargerId || fault.charger_id");
+    expect(state).toContain("chargerName: fault.chargerName || fault.charger_name");
+  });
+
+  it("loads the Requests response UX with its current token", () => {
+    expect(index).not.toContain(`styles.css?v=${HOMEPAGE_REQUESTS_VERSION}`);
+    expect(index).toContain(`styles.css?v=${HOMEPAGE_COMPACT_VERSION}`);
+    expect(index).toContain(`js/api-client.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`);
+    expect(index).toContain(`js/settings-page.js?v=${USER_DELETE_UI_VERSION}`);
+    expect(index).toContain(`js/requests-page.js?v=${ROLE_PERMISSIONS_VERSION}`);
+    expect(index).toContain(`js/auth-router.js?v=${REQUESTS_BOOTSTRAP_VERSION}`);
+    expect(index).toContain(`js/home-page.js?v=${FAULT_LIFECYCLE_VERSION}`);
+    expect(index).toContain(`js/sites-page.js?v=${FAULT_LIFECYCLE_VERSION}`);
+    expect(index).toContain(`js/contacts-page.js?v=${CONTACT_OPTIONAL_SITE_VERSION}`);
+    expect(index).toContain(`js/modals.js?v=${FAULT_LIFECYCLE_VERSION}`);
+    expect(index).toContain(`app.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`);
+  });
+});

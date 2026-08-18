@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=20260816-homepage-compact" />
   </head>
   <body>
     <section class="login-screen" id="auth-loading-screen">
@@ -65,6 +65,7 @@
         <nav class="main-tabs" aria-label="Main navigation">
           <button class="active" data-route="home" type="button">Homepage</button>
           <button data-route="sites" type="button">Sites</button>
+          <button class="hidden" id="requests-nav" data-route="requests" type="button">Requests</button>
           <button data-route="contacts" type="button">Contacts</button>
           <button data-route="settings" type="button">Settings</button>
         </nav>
@@ -85,47 +86,58 @@
               <p>EV Charging Operations Dashboard</p>
             </div>
             <div class="hero-tools">
-              <input type="search" placeholder="Search sites, chargers, reports" />
+              <input id="global-search" type="search" placeholder="Search sites, chargers, reports" aria-label="Search sites, chargers, and reports" />
             </div>
           </div>
 
           <section class="kpi-grid" aria-label="KPI cards">
             <article class="kpi-card"><span>Total Sites</span><strong id="kpi-sites">3</strong><small>Current sites</small></article>
-            <article class="kpi-card"><span>Total Chargers</span><strong id="kpi-chargers">--</strong><small>Pending Data</small></article>
-            <article class="kpi-card"><span>Open Faults</span><strong id="kpi-faults">--</strong><small>Pending Data</small></article>
-            <article class="kpi-card"><span>Site Visits</span><strong id="kpi-visits">--</strong><small>Pending Data</small></article>
-            <article class="kpi-card"><span>Total Uploaded Files</span><strong id="kpi-documents">--</strong><small>Valid linked files</small></article>
+            <article class="kpi-card"><span>Total Chargers</span><strong id="kpi-chargers">--</strong></article>
+            <article class="kpi-card"><span>Open Faults</span><strong id="kpi-faults">--</strong></article>
+            <article class="kpi-card"><span>Site Visits</span><strong id="kpi-visits">--</strong></article>
+            <article class="kpi-card hidden" id="open-requests-kpi"><span>Open Requests</span><strong id="kpi-requests">--</strong><small id="kpi-requests-detail">Loading requests</small></article>
           </section>
 
           <section class="dashboard-grid" aria-label="Operational charts">
-            <article class="panel dashboard-card">
+            <article class="panel dashboard-card dashboard-comparison-card">
               <div class="panel-head compact">
                 <h2>Fault Status</h2>
-                <select id="fault-status-site-filter" aria-label="Filter fault status by site">
-                  <option value="">All Sites</option>
-                </select>
               </div>
               <div id="fault-status-chart" class="chart-body"></div>
             </article>
-            <article class="panel dashboard-card">
+            <article class="panel dashboard-card dashboard-comparison-card">
               <div class="panel-head compact">
                 <h2>Charger Status Distribution</h2>
-                <select id="charger-status-site-filter" aria-label="Filter charger status by site">
-                  <option value="">All Sites</option>
-                </select>
               </div>
               <div id="charger-status-chart" class="chart-body"></div>
             </article>
-            <article class="panel dashboard-card">
-              <div class="panel-head compact">
-                <h2>Fault Trend</h2>
-                <select id="fault-trend-range" aria-label="Filter fault trend by date range">
-                  <option value="7">Last 7 Days</option>
-                  <option value="30" selected>Last 30 Days</option>
-                  <option value="90">Last 3 Months</option>
-                </select>
+            <article class="panel dashboard-card wide fault-trend-card">
+              <div class="panel-head compact fault-trend-head">
+                <div><h2>Fault Trend</h2><p id="fault-trend-subtitle">Overview of faults over time</p></div>
+                <div class="fault-trend-controls">
+                  <label><span>Site</span><select id="fault-trend-site" aria-label="Filter fault trend by site"><option value="">All Sites</option></select></label>
+                  <label><span>Period</span><select id="fault-trend-range" aria-label="Filter fault trend by date range">
+                    <option value="7">Last 7 Days</option>
+                    <option value="30" selected>Last 30 Days</option>
+                    <option value="90">Last 3 Months</option>
+                    <option value="180">Last 6 Months</option>
+                    <option value="365">Last 12 Months</option>
+                  </select></label>
+                </div>
               </div>
-              <div id="fault-trend-chart" class="chart-body"></div>
+              <div class="fault-trend-layout">
+                <section class="fault-trend-main" aria-labelledby="fault-trend-detail-title">
+                  <div class="fault-trend-summary">
+                    <div><span id="fault-trend-detail-title">Total Faults (All Sites)</span><small id="fault-trend-context">Last 30 Days</small></div>
+                    <strong id="fault-trend-total">0</strong>
+                  </div>
+                  <div id="fault-trend-chart" class="chart-body"></div>
+                </section>
+                <aside class="fault-trend-sites" aria-labelledby="fault-trend-sites-title">
+                  <div class="fault-trend-sites-head"><h3 id="fault-trend-sites-title">By Site</h3><span>Faults</span></div>
+                  <div id="fault-trend-site-list" class="fault-trend-site-list"></div>
+                </aside>
+              </div>
             </article>
             <article class="panel dashboard-card">
               <div class="panel-head compact">
@@ -137,6 +149,10 @@
               </div>
               <div id="visit-activity-chart" class="chart-body"></div>
             </article>
+            <article class="panel dashboard-card hidden" id="requests-status-card">
+              <div class="panel-head compact"><h2>Requests Status</h2></div>
+              <div id="requests-status-chart" class="chart-body"></div>
+            </article>
             <article class="panel dashboard-card wide">
               <div class="panel-head compact"><h2>Records by Site</h2></div>
               <div id="records-by-site-chart" class="chart-body"></div>
@@ -145,8 +161,8 @@
 
           <section class="quick-actions-panel" aria-label="Quick actions">
             <button class="secondary-button" data-modal="siteVisit" type="button">Add Site Visit</button>
-            <button class="secondary-button" data-modal="fault" type="button">Report Fault</button>
-            <button class="primary-button" data-modal="document" type="button">Upload Charger Document</button>
+            <button class="secondary-button" data-modal="fault" data-mode="create" type="button">Report Fault</button>
+            <button class="primary-button" data-modal="document" data-mode="create" type="button">Upload Charger Document</button>
           </section>
 
           <section class="panel recent-panel">
@@ -163,9 +179,9 @@
           <div class="page-title-row">
             <div><p class="eyebrow">Operational Sites</p><h1>Sites</h1></div>
             <div class="site-header-tools">
-              <input type="search" placeholder="Search sites" />
-              <select><option>Filter by status</option><option>Pending Data</option><option>Healthy</option><option>Warning</option><option>Critical</option></select>
-              <button class="primary-button" data-modal="site" data-mode="create" type="button">+ Add New Site</button>
+              <input id="sites-search" type="search" placeholder="Search sites" />
+              <select id="sites-status-filter"><option value="">Filter by status</option></select>
+              <button class="primary-button hidden" id="add-site-button" data-modal="site" data-mode="create" type="button">+ Add Site</button>
             </div>
           </div>
           <div class="site-grid" id="site-list"></div>
@@ -174,6 +190,10 @@
         </section>
 
         <section class="page" id="contacts">
+        </section>
+
+        <section class="page" id="requests" aria-labelledby="requests-title">
+          <div id="requests-page-content"></div>
         </section>
 
         <section class="page" id="settings">
@@ -193,15 +213,18 @@
       </div>
     </div>
 
-    <script src="js/state.js"></script>
-    <script src="js/api-client.js"></script>
-    <script src="js/auth-router.js"></script>
-    <script src="js/home-page.js"></script>
-    <script src="js/sites-page.js"></script>
-    <script src="js/contacts-page.js"></script>
-    <script src="js/modals.js"></script>
-    <script src="js/file-preview.js"></script>
-    <script src="js/settings-page.js"></script>
-    <script src="app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="js/state.js?v=20260818-fault-lifecycle-v1"></script>
+    <script src="js/api-client.js?v=20260818-legacy-content-actions-v3"></script>
+    <script src="js/auth-router.js?v=20260813-requests-bootstrap"></script>
+    <script src="js/home-page.js?v=20260818-fault-lifecycle-v1"></script>
+    <script src="js/sites-page.js?v=20260818-fault-lifecycle-v1"></script>
+    <script src="js/contacts-page.js?v=20260818-contacts-optional-site"></script>
+    <script src="js/requests-page.js?v=20260817-charger-natural-sort"></script>
+    <script src="js/modals.js?v=20260818-fault-lifecycle-v1"></script>
+    <script src="js/file-preview.js?v=20260811-requests-frontend"></script>
+    <script src="js/archive-page.js?v=20260811-requests-frontend"></script>
+    <script src="js/settings-page.js?v=20260816-permanent-user-delete"></script>
+    <script src="app.js?v=20260818-legacy-content-actions-v3"></script>
   </body>
 </html>

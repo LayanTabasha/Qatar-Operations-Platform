@@ -10,16 +10,17 @@ import {
   updateChargerRecord,
   updateChargerStatusRecord,
 } from "./chargers.controller.js";
+import { ROLE_GROUPS } from "../auth/permissions.js";
 
 export const chargersRouter = Router();
 
 chargersRouter.use(authenticate);
 
-chargersRouter.get("/", authorizeRoles("admin", "operations_staff", "viewer"), listChargers);
-chargersRouter.get("/:id", authorizeRoles("admin", "operations_staff", "viewer"), getChargerById);
-chargersRouter.post("/", authorizeRoles("admin", "operations_staff"), createChargerRecord);
-chargersRouter.patch("/:id/archive", authorizeRoles("admin", "operations_staff"), archiveChargerRecord);
-chargersRouter.patch("/:id/restore", authorizeRoles("admin", "operations_staff"), restoreChargerRecord);
-chargersRouter.patch("/:id/status", authorizeRoles("admin", "operations_staff"), updateChargerStatusRecord);
-chargersRouter.patch("/:id", authorizeRoles("admin", "operations_staff"), updateChargerRecord);
-chargersRouter.delete("/:id", authorizeRoles("admin"), deleteChargerRecord);
+chargersRouter.get("/", authorizeRoles(...ROLE_GROUPS.authenticatedRead), listChargers);
+chargersRouter.get("/:id", authorizeRoles(...ROLE_GROUPS.authenticatedRead), getChargerById);
+chargersRouter.post("/", authorizeRoles(...ROLE_GROUPS.adminOnly), createChargerRecord);
+chargersRouter.patch("/:id/archive", authorizeRoles("admin"), archiveChargerRecord);
+chargersRouter.patch("/:id/restore", authorizeRoles("admin"), restoreChargerRecord);
+chargersRouter.patch("/:id/status", authorizeRoles(...ROLE_GROUPS.adminOnly), updateChargerStatusRecord);
+chargersRouter.patch("/:id", authorizeRoles(...ROLE_GROUPS.adminOnly), updateChargerRecord);
+chargersRouter.delete("/:id/permanent", authorizeRoles("admin"), deleteChargerRecord);

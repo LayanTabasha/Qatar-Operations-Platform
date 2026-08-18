@@ -1,4 +1,5 @@
-import { query } from "../../config/database.js";
+import { query, withTransaction } from "../../config/database.js";
+import { insertActivityLog } from "../activity-logs/activity-logs.repository.js";
 
 const siteVisitSelect = `
   SELECT
@@ -22,7 +23,15 @@ const siteVisitSelect = `
     site_visits.created_at,
     site_visits.updated_by,
     updated_by_user.full_name AS last_modified_by_name,
-    site_visits.updated_at
+    site_visits.updated_at,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object(
+      'id', a.id, 'original_filename', a.original_filename, 'mime_type', a.mime_type, 'file_extension', a.file_extension,
+      'file_size_bytes', a.file_size_bytes, 'uploaded_by_name', attachment_user.full_name, 'created_at', a.created_at,
+      'updated_at', a.updated_at, 'preview_url', '/api/v1/attachments/' || a.id || '/preview',
+      'download_url', '/api/v1/attachments/' || a.id || '/download'
+    ) ORDER BY a.created_at)
+    FROM operational_attachments a JOIN users attachment_user ON attachment_user.id = a.uploaded_by
+    WHERE a.site_visit_id = site_visits.id), '[]'::jsonb) AS attachments
   FROM site_visits
   JOIN sites ON sites.id = site_visits.site_id
   LEFT JOIN chargers ON chargers.id = site_visits.charger_id
@@ -106,7 +115,7 @@ export async function insertSiteVisit(visit) {
       visit.observations ?? null,
       visit.actions_taken ?? null,
       visit.status === "follow_up_required" || visit.follow_up_required === true,
-      visit.report_file_path ?? null,
+      null,
       visit.created_by,
       visit.updated_by,
     ],
@@ -115,19 +124,34 @@ export async function insertSiteVisit(visit) {
   return findSiteVisitById(result.rows[0].id);
 }
 
-export async function updateSiteVisitById(id, updates) {
+export async function updateSiteVisitById(id, updates, audit = {}) {
   const entries = Object.entries(updates);
   const setClauses = entries.map(([column], index) => `${column} = $${index + 2}`);
   const values = [id, ...entries.map(([, value]) => value ?? null)];
-  const result = await query(
-    `
+  const result = await withTransaction(async (client) => {
+    const changed = await client.query(`
       UPDATE site_visits
       SET ${setClauses.join(", ")}
       WHERE id = $1
       RETURNING id
     `,
-    values,
-  );
+    values);
+    if (!changed.rows[0]) return changed;
+    const record = await client.query("SELECT id,site_id,charger_id,purpose FROM site_visits WHERE id=$1", [id]);
+    await insertActivityLog(client, { userId: updates.updated_by, action: "site_visit_updated", entityType: "site_visit", entityId: id,
+      description: `Updated site visit ${record.rows[0].purpose}`, context: { site_id: record.rows[0].site_id, charger_id: record.rows[0].charger_id }, ...audit });
+    return changed;
+  });
 
   return result.rows[0] ? findSiteVisitById(result.rows[0].id) : null;
+}
+
+export async function deleteSiteVisitById(id, actor, record, audit = {}) {
+  return withTransaction(async (client) => {
+    const result = await client.query("DELETE FROM site_visits WHERE id=$1 RETURNING id", [id]);
+    if (!result.rows[0]) return false;
+    await insertActivityLog(client, { userId: actor, action: "site_visit_deleted", entityType: "site_visit", entityId: id,
+      description: `Deleted site visit ${record.purpose}`, context: { site_id: record.site_id, site_name: record.site_name, charger_id: record.charger_id, charger_name: record.charger_name }, ...audit });
+    return true;
+  });
 }

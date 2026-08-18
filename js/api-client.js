@@ -2,7 +2,7 @@ const isLocalFrontend = ["", "localhost", "127.0.0.1"].includes(window.location.
 const DEFAULT_API_ORIGIN = isLocalFrontend ? "http://localhost:3000" : window.location.origin;
 const API_ORIGIN = window.QATAR_OPS_API_ORIGIN || DEFAULT_API_ORIGIN;
 const API_BASE_URL = `${API_ORIGIN}/api/v1`;
-const QATAR_OPS_FRONTEND_VERSION = "2026.07.27-site-image-upload";
+const QATAR_OPS_FRONTEND_VERSION = "2026.08.05-platform-health";
 
 console.info(`Qatar Operations frontend ${QATAR_OPS_FRONTEND_VERSION}`);
 
@@ -71,6 +71,12 @@ const AuthApi = {
   },
 };
 
+const HealthApi = {
+  platform() {
+    return apiRequest("/health/platform", { method: "GET" });
+  },
+};
+
 const SitesApi = {
   list(params = {}) {
     return apiRequest(`/sites${buildQueryString(params)}`, { method: "GET" });
@@ -106,6 +112,18 @@ const SitesApi = {
       body: formData,
     });
   },
+
+  archive(id, reason = "") {
+    return apiRequest(`/sites/${id}/archive`, { method: "PATCH", body: { reason: reason || null } });
+  },
+
+  restore(id) {
+    return apiRequest(`/sites/${id}/restore`, { method: "PATCH" });
+  },
+
+  deleteArchived(id) {
+    return apiRequest(`/sites/${id}/permanent`, { method: "DELETE" });
+  },
 };
 
 const ChargersApi = {
@@ -134,8 +152,8 @@ const ChargersApi = {
     });
   },
 
-  archive(id) {
-    return apiRequest(`/chargers/${id}/archive`, { method: "PATCH" });
+  archive(id, reason = "") {
+    return apiRequest(`/chargers/${id}/archive`, { method: "PATCH", body: { reason: reason || null } });
   },
 
   restore(id) {
@@ -143,7 +161,19 @@ const ChargersApi = {
   },
 
   deleteArchived(id) {
-    return apiRequest(`/chargers/${id}`, { method: "DELETE" });
+    return apiRequest(`/chargers/${id}/permanent`, { method: "DELETE" });
+  },
+};
+
+// Administrator-only archive collection endpoints. Authentication remains
+// centralized in apiRequest; the backend enforces the role authorization.
+const ArchiveApi = {
+  listSites() {
+    return apiRequest("/archive/sites", { method: "GET" });
+  },
+
+  listChargers() {
+    return apiRequest("/archive/chargers", { method: "GET" });
   },
 };
 
@@ -179,6 +209,11 @@ const UsersApi = {
       body: { password },
     });
   },
+
+  remove(id) {
+    return apiRequest(`/users/${id}`, { method: "DELETE" });
+  },
+
 };
 
 const SiteVisitsApi = {
@@ -199,11 +234,73 @@ const SiteVisitsApi = {
       body: siteVisit,
     });
   },
+  remove(id) { return apiRequest(`/site-visits/${id}`, { method: "DELETE" }); },
+};
+
+const FaultsApi = {
+  list(params = {}) { return apiRequest(`/faults${buildQueryString(params)}`, { method: "GET" }); },
+  get(id) { return apiRequest(`/faults/${id}`, { method: "GET" }); },
+  create(fault) { return apiRequest("/faults", { method: "POST", body: fault }); },
+  update(id, fault) { return apiRequest(`/faults/${id}`, { method: "PATCH", body: fault }); },
+  remove(id) { return apiRequest(`/faults/${id}`, { method: "DELETE" }); },
+};
+
+const RequestsApi = {
+  list(params = {}) { return apiRequest(`/requests${buildQueryString(params)}`, { method: "GET" }); },
+  get(id) { return apiRequest(`/requests/${id}`, { method: "GET" }); },
+  create(request) { return apiRequest("/requests", { method: "POST", body: request }); },
+  update(id, request) { return apiRequest(`/requests/${id}`, { method: "PATCH", body: request }); },
+  remove(id) { return apiRequest(`/requests/${id}`, { method: "DELETE" }); },
+};
+
+const ContactsApi = {
+  list(params = {}) { return apiRequest(`/contacts${buildQueryString(params)}`, { method: "GET" }); },
+  get(id) { return apiRequest(`/contacts/${id}`, { method: "GET" }); },
+  create(contact) { return apiRequest("/contacts", { method: "POST", body: contact }); },
+  update(id, contact) { return apiRequest(`/contacts/${id}`, { method: "PATCH", body: contact }); },
+  remove(id) { return apiRequest(`/contacts/${id}`, { method: "DELETE" }); },
+};
+
+const AttachmentsApi = {
+  list(parentType, parentId) { return apiRequest(`/attachments/parent/${parentType}/${parentId}`, { method: "GET" }); },
+  upload(parentType, parentId, file) {
+    const body = new FormData(); body.append("file", file);
+    return apiRequest(`/attachments/parent/${parentType}/${parentId}`, { method: "POST", body });
+  },
+  replace(id, file) {
+    const body = new FormData(); body.append("file", file);
+    return apiRequest(`/attachments/${id}/file`, { method: "PATCH", body });
+  },
+  previewUrl(id) { return `/api/v1/attachments/${encodeURIComponent(id)}/preview`; },
+  async preview(id, previewUrl = "") {
+    const url = apiAssetUrl(previewUrl || this.previewUrl(id));
+    const response = await fetch(url, { method: "GET", credentials: "include" });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      const error = new ApiError(payload?.error?.message || `Preview failed with HTTP ${response.status}`, response.status, payload);
+      error.code = payload?.error?.code || "";
+      throw error;
+    }
+    return response.blob();
+  },
+  remove(id) { return apiRequest(`/attachments/${id}`, { method: "DELETE" }); },
+};
+
+const ContentRecordsApi = {
+  list(type) { return apiRequest(`/${type}`, { method: "GET" }); },
+  get(type, id) { return apiRequest(`/${type}/${id}`, { method: "GET" }); },
+  create(type, record) { return apiRequest(`/${type}`, { method: "POST", body: record }); },
+  update(type, id, record) { return apiRequest(`/${type}/${id}`, { method: "PATCH", body: record }); },
+  remove(type, id) { return apiRequest(`/${type}/${id}`, { method: "DELETE" }); },
 };
 
 const DtcApi = {
   list(params = {}) {
     return apiRequest(`/dtc${buildQueryString(params)}`, { method: "GET" });
+  },
+
+  get(id) {
+    return apiRequest(`/dtc/${id}`, { method: "GET" });
   },
 
   create(record) {
@@ -237,3 +334,19 @@ const DtcApi = {
     });
   },
 };
+
+window.QatarOpsApi = Object.freeze({
+  Auth: AuthApi,
+  Sites: SitesApi,
+  Chargers: ChargersApi,
+  Users: UsersApi,
+  SiteVisits: SiteVisitsApi,
+  Attachments: AttachmentsApi,
+  ContentRecords: ContentRecordsApi,
+  Dtc: DtcApi,
+  Faults: FaultsApi,
+  Requests: RequestsApi,
+  Contacts: ContactsApi,
+  Archive: ArchiveApi,
+  PlatformHealth: HealthApi,
+});

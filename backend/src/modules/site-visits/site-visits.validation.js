@@ -39,7 +39,6 @@ const siteVisitFieldsSchema = z.object({
   observations: optionalText(2000),
   actions_taken: optionalText(2000),
   follow_up_required: z.boolean().default(false),
-  report_file_path: optionalText(1000),
 });
 
 export const createSiteVisitSchema = siteVisitFieldsSchema

@@ -66,6 +66,8 @@ export async function listDtcRecords(options = {}) {
     values.push(`%${keyword}%`);
     filters.push(`(
       dtc_code ILIKE $${values.length}
+      OR ftb_code ILIKE $${values.length}
+      OR component ILIKE $${values.length}
       OR fault_title ILIKE $${values.length}
       OR description ILIKE $${values.length}
       OR possible_causes ILIKE $${values.length}
