@@ -127,7 +127,7 @@ describe("frontend Archive workflow", () => {
     expect(index).toContain("js/settings-page.js?v=20260816-permanent-user-delete");
     expect(index).toContain("js/api-client.js?v=20260818-legacy-content-actions-v3");
     expect(index).toContain("js/state.js?v=20260818-fault-lifecycle-v1");
-    expect(index).toContain("js/sites-page.js?v=20260818-fault-lifecycle-v1");
+    expect(index).toContain("js/sites-page.js?v=20260818-sites-split-cache-fix-v1");
     expect(index).toContain("js/modals.js?v=20260818-fault-lifecycle-v1");
     expect(index).toContain("styles.css?v=20260816-homepage-compact");
   });
