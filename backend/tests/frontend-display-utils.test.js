@@ -9,7 +9,7 @@ const utilityPath = "frontend/shared/utils/display-utils.js";
 const callerPaths = [
   "frontend/pages/homepage/fault-trend.js",
   "frontend/pages/sites/sites-shared.js",
-  "js/sites-page.js",
+  "frontend/pages/sites/site-profile.js",
   "js/modals.js",
 ];
 
@@ -73,7 +73,7 @@ describe("shared display utilities", () => {
     const index = read("index.html");
     const sources = Array.from(index.matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1].split("?")[0]);
     const utilityIndex = sources.indexOf(utilityPath);
-    for (const consumer of ["js/sites-page.js", ...callers]) {
+    for (const consumer of callers) {
       expect(sources.indexOf(consumer), consumer).toBeGreaterThan(utilityIndex);
     }
   });

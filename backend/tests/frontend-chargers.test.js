@@ -9,6 +9,8 @@ describe("frontend Archive workflow", () => {
   const sources = () => ({
     api: readRootFile("js/api-client.js"), archive: readRootFile("frontend/pages/settings/archive-page.js"),
     settings: readRootFile("js/settings-page.js"), sites: readRootFile("js/sites-page.js"),
+    siteProfile: readRootFile("frontend/pages/sites/site-profile.js"),
+    chargerProfile: readRootFile("frontend/pages/sites/charger-profile.js"),
     sitesList: readRootFile("frontend/pages/sites/sites-list.js"),
     mappers: readRootFile("frontend/pages/sites/sites-data-mappers.js"),
     state: readRootFile("js/state.js"), modals: readRootFile("js/modals.js"),
@@ -35,10 +37,10 @@ describe("frontend Archive workflow", () => {
   });
 
   it("keeps the charger card field labels and order unchanged", () => {
-    const { sites } = sources();
-    const cardStart = sites.indexOf('<article class="charger-card">');
-    const cardEnd = sites.indexOf('</article>', cardStart);
-    const card = sites.slice(cardStart, cardEnd);
+    const { siteProfile } = sources();
+    const cardStart = siteProfile.indexOf('<article class="charger-card">');
+    const cardEnd = siteProfile.indexOf('</article>', cardStart);
+    const card = siteProfile.slice(cardStart, cardEnd);
     const labels = Array.from(card.matchAll(/placeholder\("([^"]+)"/g), (match) => match[1]);
 
     expect(labels).toEqual([
@@ -106,11 +108,11 @@ describe("frontend Archive workflow", () => {
   });
 
   it("provides admin-only Archive actions on active sites and chargers without permanent delete", () => {
-    const { sites, sitesList } = sources();
+    const { chargerProfile, sitesList } = sources();
     expect(sitesList).toContain('data-archive-active="site"');
-    expect(sites).toContain('data-archive-active="charger"');
-    expect(sites).toContain("isAdmin()");
-    expect(sites).not.toContain('data-archive-delete="');
+    expect(chargerProfile).toContain('data-archive-active="charger"');
+    expect(chargerProfile).toContain("isAdmin()");
+    expect(chargerProfile).not.toContain('data-archive-delete="');
   });
 
   it("keeps archived data out of operational loading and local storage", () => {
@@ -127,7 +129,7 @@ describe("frontend Archive workflow", () => {
     expect(index).toContain("js/settings-page.js?v=20260816-permanent-user-delete");
     expect(index).toContain("js/api-client.js?v=20260818-legacy-content-actions-v3");
     expect(index).toContain("js/state.js?v=20260818-fault-lifecycle-v1");
-    expect(index).toContain("js/sites-page.js?v=20260820-operational-records-split-v1");
+    expect(index).toContain("js/sites-page.js?v=20260820-profile-split-v1");
     expect(index).toContain("js/modals.js?v=20260818-fault-lifecycle-v1");
     expect(index).toContain("styles.css?v=20260816-homepage-compact");
   });

@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 const root = path.resolve(process.cwd(), "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const index = read("index.html");
-const sites = read("js/sites-page.js");
+const siteProfile = read("frontend/pages/sites/site-profile.js");
+const chargerProfile = read("frontend/pages/sites/charger-profile.js");
 const sitesList = read("frontend/pages/sites/sites-list.js");
 const modals = read("js/modals.js");
 const state = read("js/state.js");
@@ -22,14 +23,14 @@ describe("Site and Charger creation controls", () => {
   });
 
   it("shows Add Charger in populated and empty Site Profile Charger tabs only to writable roles", () => {
-    expect(sites).toContain("const addCharger = isAdmin() && siteRecord?.id");
-    expect(sites).toContain('${addCharger}</div></div><div class="charger-grid">');
-    expect(sites).toContain("${addCharger}</div>`");
-    expect(sites).toContain('data-mode="create" data-site-context="${site}"');
+    expect(siteProfile).toContain("const addCharger = isAdmin() && siteRecord?.id");
+    expect(siteProfile).toContain('${addCharger}</div></div><div class="charger-grid">');
+    expect(siteProfile).toContain("${addCharger}</div>`");
+    expect(siteProfile).toContain('data-mode="create" data-site-context="${site}"');
   });
 
   it("locks Site Profile charger creation to the captured PostgreSQL site UUID", () => {
-    expect(sites).toContain('data-site-id="${siteRecord.id}" data-lock-site="true"');
+    expect(siteProfile).toContain('data-site-id="${siteRecord.id}" data-lock-site="true"');
     expect(app).toContain('siteId: modalButton.dataset.siteId || ""');
     expect(app).toContain('lockSite: modalButton.dataset.lockSite === "true"');
     expect(modals).toContain('form.dataset.siteId = context.siteId || ""');
@@ -49,14 +50,14 @@ describe("Site and Charger creation controls", () => {
 
   it("preserves edit and archive controls with role-safe rendering", () => {
     expect(sitesList).toContain('data-modal="site" data-mode="edit"');
-    expect(sites).toContain('data-modal="charger" type="button">Edit Charger Information');
+    expect(chargerProfile).toContain('data-modal="charger" type="button">Edit Charger Information');
     expect(sitesList).toContain('data-archive-active="site"');
-    expect(sites).toContain('data-archive-active="charger"');
-    expect(sites).not.toContain('data-archive-delete="');
+    expect(chargerProfile).toContain('data-archive-active="charger"');
+    expect(chargerProfile).not.toContain('data-archive-delete="');
   });
 
   it("reuses compact controls without changing Site or Charger card sizing CSS", () => {
-    expect(sites).toContain('class="quick-actions compact"');
+    expect(siteProfile).toContain('class="quick-actions compact"');
     expect(styles).toContain(".site-card .site-card-actions button { flex: 1 1 82px; width: auto;");
     expect(styles).toContain(".site-grid, .contact-grid, .charger-grid, .summary-grid { display: grid;");
   });

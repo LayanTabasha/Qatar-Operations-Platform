@@ -14,6 +14,8 @@ function loadBrowserScript(file, additions = {}) {
     vm.runInContext(read("frontend/pages/sites/site-visits.js"), context, { filename: "frontend/pages/sites/site-visits.js" });
     vm.runInContext(read("frontend/pages/sites/faults.js"), context, { filename: "frontend/pages/sites/faults.js" });
     vm.runInContext(read("frontend/pages/sites/operational-records.js"), context, { filename: "frontend/pages/sites/operational-records.js" });
+    vm.runInContext(read("frontend/pages/sites/site-profile.js"), context, { filename: "frontend/pages/sites/site-profile.js" });
+    vm.runInContext(read("frontend/pages/sites/charger-profile.js"), context, { filename: "frontend/pages/sites/charger-profile.js" });
     vm.runInContext(read("frontend/pages/sites/charger-lifecycle.js"), context, { filename: "frontend/pages/sites/charger-lifecycle.js" });
   }
   vm.runInContext(read(file), context, { filename: file });

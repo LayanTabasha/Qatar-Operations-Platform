@@ -73,7 +73,7 @@ describe("frontend charger display ordering", () => {
   });
 
   it("uses the shared helper for cards and every active charger dropdown", () => {
-    const sites = fs.readFileSync(path.join(repoRoot, "js/sites-page.js"), "utf8");
+    const sites = fs.readFileSync(path.join(repoRoot, "frontend/pages/sites/site-profile.js"), "utf8");
     const modals = fs.readFileSync(path.join(repoRoot, "js/modals.js"), "utf8");
     const requests = fs.readFileSync(path.join(repoRoot, "js/requests-page.js"), "utf8");
 
