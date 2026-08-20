@@ -1,9 +1,6 @@
 // Main bootstrap only.
-// Page-specific code lives in:
-// - frontend/pages/homepage/home-page.js
-// - js/sites-page.js
-// - js/settings-page.js
-// Modal/form code lives in js/modals.js.
+// Page-specific code lives in frontend/pages/.
+// Modal/form code lives in frontend/shared/modals/.
 // Shared data/helpers live in js/state.js.
 
 document.getElementById("login-form").addEventListener("submit", async (event) => {

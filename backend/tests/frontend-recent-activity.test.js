@@ -58,7 +58,7 @@ describe("Homepage Recent Activity component", () => {
   it("loads before every external caller and preserves their global calls", () => {
     const sources = Array.from(read("index.html").matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1]);
     const componentIndex = sources.indexOf("frontend/pages/homepage/recent-activity.js?v=20260818-recent-activity-v1");
-    for (const caller of ["frontend/pages/homepage/home-page.js?v=20260818-homepage-kpi-orchestrator-v1", "frontend/shared/modals/modal-submit.js?v=20260820-modal-submit-v1", "frontend/pages/settings/settings-page.js?v=20260820-settings-page-v1", "app.js?v=20260818-legacy-content-actions-v3"]) {
+    for (const caller of ["frontend/pages/homepage/home-page.js?v=20260818-homepage-kpi-orchestrator-v1", "frontend/shared/modals/modal-submit.js?v=20260820-modal-submit-v1", "frontend/pages/settings/settings-page.js?v=20260820-settings-page-v1", "app.js?v=20260820-final-production-cleanup-v1"]) {
       expect(sources.indexOf(caller), `${caller} must load after Recent Activity`).toBeGreaterThan(componentIndex);
     }
     expect(read("app.js")).toContain("renderActivity();");

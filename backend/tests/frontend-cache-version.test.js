@@ -49,6 +49,7 @@ const MODAL_CORE_VERSION = "20260820-modal-core-v1";
 const MODAL_SUBMIT_VERSION = "20260820-modal-submit-v1";
 const HOMEPAGE_COMPACT_VERSION = "20260816-homepage-compact";
 const CONTENT_RECORD_ACTIONS_VERSION = "20260818-legacy-content-actions-v3";
+const APP_VERSION = "20260820-final-production-cleanup-v1";
 const MOVED_FRONTEND_SCRIPTS = [
   "frontend/pages/contacts/contacts-page.js",
   "frontend/shared/files/file-preview.js",
@@ -119,7 +120,7 @@ describe("frontend cache-version integrity", () => {
     expect(chargerProfileIndex).toBeGreaterThan(siteProfileIndex);
     expect(chargerLifecycleIndex).toBeGreaterThan(chargerProfileIndex);
     expect(sitesDataIndex).toBeGreaterThan(chargerLifecycleIndex);
-    expect(sources.indexOf(`app.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
+    expect(sources.indexOf(`app.js?v=${APP_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sitesDataIndex).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`js/api-client.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`frontend/shared/modals/modal-files.js?v=${MODAL_FILES_VERSION}`)).toBeGreaterThan(stateIndex);
@@ -164,6 +165,6 @@ describe("frontend cache-version integrity", () => {
     expect(index).toContain(`frontend/shared/modals/modal-core.js?v=${MODAL_CORE_VERSION}`);
     expect(index).toContain(`frontend/shared/modals/modal-submit.js?v=${MODAL_SUBMIT_VERSION}`);
     expect(index).not.toContain("js/modals.js?v=");
-    expect(index).toContain(`app.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`);
+    expect(index).toContain(`app.js?v=${APP_VERSION}`);
   });
 });

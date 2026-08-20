@@ -124,7 +124,7 @@ describe("frontend Archive workflow", () => {
 
   it("loads every changed browser asset with a current cache token", () => {
     const { index } = sources();
-    expect(index).toContain("app.js?v=20260818-legacy-content-actions-v3");
+    expect(index).toContain("app.js?v=20260820-final-production-cleanup-v1");
     expect(index).toContain("frontend/pages/settings/archive-page.js?v=20260818-frontend-structure-v1");
     expect(index).toContain("frontend/pages/settings/settings-page.js?v=20260820-settings-page-v1");
     expect(index).toContain("js/api-client.js?v=20260818-legacy-content-actions-v3");
