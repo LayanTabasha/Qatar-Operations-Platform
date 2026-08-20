@@ -8,7 +8,7 @@ const root = path.resolve(process.cwd(), "..");
 const mapperPath = "frontend/pages/sites/sites-data-mappers.js";
 const mapperSource = fs.readFileSync(path.join(root, mapperPath), "utf8");
 const sitesSource = fs.readFileSync(path.join(root, "frontend/pages/sites/sites-data.js"), "utf8");
-const modalsSource = ["frontend/shared/modals/modal-files.js", "frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map((file) => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
+const modalsSource = ["frontend/shared/modals/modal-files.js", "frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-configs.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map((file) => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
 const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
 
 function runtime() {

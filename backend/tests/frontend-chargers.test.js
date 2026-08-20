@@ -13,20 +13,20 @@ describe("frontend Archive workflow", () => {
     chargerProfile: readRootFile("frontend/pages/sites/charger-profile.js"),
     sitesList: readRootFile("frontend/pages/sites/sites-list.js"),
     mappers: readRootFile("frontend/pages/sites/sites-data-mappers.js"),
-    state: readRootFile("js/state.js"), modals: ["frontend/shared/modals/modal-files.js", "frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(readRootFile).join("\n"),
+    state: readRootFile("js/state.js"), modals: ["frontend/shared/modals/modal-files.js", "frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-configs.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(readRootFile).join("\n"),
     index: readRootFile("index.html"), styles: readRootFile("styles.css"),
   });
 
   it("maps and submits the three existing charger form fields", () => {
-    const { mappers, modals, state } = sources();
+    const { mappers, modals } = sources();
     expect(mappers).toContain('operator: charger.operator || ""');
     expect(mappers).toContain('administrator: charger.administrator || ""');
     expect(mappers).toContain('installationDate: charger.installation_date || ""');
     expect(modals).toContain('operator: document.getElementById("operator")?.value.trim() || null');
     expect(modals).toContain('administrator: document.getElementById("administrator")?.value.trim() || null');
     expect(modals).toContain('installation_date: document.getElementById("installation-date")?.value || null');
-    expect(state).toContain('["Operator", "text"], ["Administrator", "text"]');
-    expect(state).toContain('["Installation date", "date"]');
+    expect(modals).toContain('["Operator", "text"], ["Administrator", "text"]');
+    expect(modals).toContain('["Installation date", "date"]');
   });
 
   it("prefills the existing charger fields when editing", () => {
@@ -50,8 +50,8 @@ describe("frontend Archive workflow", () => {
   });
 
   it("shows Archive only in the Administrator settings menu", () => {
-    const { settings, state } = sources();
-    expect(state).toContain('administrationSettingsItems = ["User Management", "Site & Charger Configuration", "Archive", "Audit Logs"]');
+    const { settings } = sources();
+    expect(settings).toContain('administrationSettingsItems = ["User Management", "Site & Charger Configuration", "Archive", "Audit Logs"]');
     expect(settings).toContain("const adminButtons = isAdmin()");
     expect(settings).toContain("const availableSettings = isAdmin() ? settingsItems : personalSettingsItems");
   });
@@ -128,7 +128,7 @@ describe("frontend Archive workflow", () => {
     expect(index).toContain("frontend/pages/settings/archive-page.js?v=20260818-frontend-structure-v1");
     expect(index).toContain("frontend/pages/settings/settings-page.js?v=20260820-settings-page-v1");
     expect(index).toContain("js/api-client.js?v=20260818-legacy-content-actions-v3");
-    expect(index).toContain("js/state.js?v=20260818-fault-lifecycle-v1");
+    expect(index).toContain("js/state.js?v=20260820-state-ownership-v1");
     expect(index).toContain("frontend/pages/sites/sites-data.js?v=20260820-sites-data-refresh-v1");
     expect(index).not.toContain("js/sites-page.js?v=");
     expect(index).toContain("frontend/shared/modals/modal-submit.js?v=20260820-modal-submit-v1");

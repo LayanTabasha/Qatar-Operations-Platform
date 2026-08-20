@@ -9,7 +9,7 @@ const index = read("index.html");
 const siteVisits = read("frontend/pages/sites/site-visits.js");
 const faults = read("frontend/pages/sites/faults.js");
 const operationalRecords = read("frontend/pages/sites/operational-records.js");
-const modals = ["frontend/shared/modals/modal-files.js", "frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(read).join("\n");
+const modals = ["frontend/shared/modals/modal-files.js", "frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-configs.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(read).join("\n");
 
 function featureRuntime(canManage = true) {
   const filters = {

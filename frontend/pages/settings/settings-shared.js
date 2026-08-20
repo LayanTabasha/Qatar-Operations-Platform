@@ -1,3 +1,8 @@
+const personalSettingsItems = ["Profile", "Security"];
+const administrationSettingsItems = ["User Management", "Site & Charger Configuration", "Archive", "Audit Logs"];
+const systemSettingsItems = ["Platform Health"];
+const settingsItems = [...personalSettingsItems, ...administrationSettingsItems, ...systemSettingsItems];
+
 function formatSettingValue(value) {
   return String(valueOrPlaceholder(value))
     .replace(/&/g, "&amp;")

@@ -69,7 +69,7 @@ describe("full production-order frontend startup", () => {
       "frontend/pages/requests/requests-shared.js", "frontend/pages/requests/requests-list.js",
       "frontend/pages/requests/request-detail.js", "frontend/pages/requests/request-form.js",
       "frontend/pages/requests/requests-page.js", "frontend/shared/modals/modal-files.js",
-      "frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-core.js",
+      "frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-configs.js", "frontend/shared/modals/modal-core.js",
       "frontend/shared/modals/modal-submit.js",
       "frontend/shared/files/file-preview.js", "frontend/pages/settings/settings-shared.js",
       "frontend/pages/settings/archive-page.js", "frontend/pages/settings/account-settings.js",
@@ -132,7 +132,7 @@ describe("full production-order frontend startup", () => {
 
   it("locks the Settings split cache and single-definition contract", () => {
     const settingsSources = [
-      "frontend/pages/settings/settings-shared.js?v=20260820-settings-shared-v1",
+      "frontend/pages/settings/settings-shared.js?v=20260820-settings-shared-ownership-v1",
       "frontend/pages/settings/account-settings.js?v=20260820-account-settings-v1",
       "frontend/pages/settings/platform-health.js?v=20260820-platform-health-v1",
       "frontend/pages/settings/user-management.js?v=20260820-user-management-v1",
@@ -154,6 +154,7 @@ describe("full production-order frontend startup", () => {
     const modalSources = [
       "frontend/shared/modals/modal-files.js?v=20260820-modal-files-v1",
       "frontend/shared/modals/fault-modals.js?v=20260820-fault-modals-v1",
+      "frontend/shared/modals/modal-configs.js?v=20260820-modal-configs-v1",
       "frontend/shared/modals/modal-core.js?v=20260820-modal-core-v1",
       "frontend/shared/modals/modal-submit.js?v=20260820-modal-submit-v1",
     ];
@@ -166,6 +167,21 @@ describe("full production-order frontend startup", () => {
     const production = localScripts.map(({ file }) => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
     for (const declaration of ["IMAGE_UPLOAD_MAX_BYTES", "IMAGE_UPLOAD_TYPES", "pendingModalImage", "pendingSiteImageFile", "removeExistingSiteImage", "faultCatalogueSearchTimer"]) {
       expect(production.match(new RegExp(`(?:const|let|class)\\s+${declaration}\\b`, "g")) || [], declaration).toHaveLength(1);
+    }
+  });
+
+  it("locks final shared ownership and foundational cache tokens", () => {
+    expect(scriptSources).toContain("js/state.js?v=20260820-state-ownership-v1");
+    expect(scriptSources).toContain("js/auth-router.js?v=20260820-auth-router-ownership-v1");
+    expect(scriptSources).toContain("frontend/shared/modals/modal-configs.js?v=20260820-modal-configs-v1");
+    expect(scriptSources).toContain("frontend/pages/settings/settings-shared.js?v=20260820-settings-shared-ownership-v1");
+    const production = localScripts.map(({ file }) => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
+    for (const declaration of ["modalConfigs", "personalSettingsItems", "administrationSettingsItems", "systemSettingsItems", "settingsItems", "routes", "VIEW_CONTEXT_KEY"]) {
+      expect(production.match(new RegExp(`(?:const|let|class)\\s+${declaration}\\b`, "g")) || [], declaration).toHaveLength(1);
+    }
+    const stateSource = fs.readFileSync(path.join(root, "js/state.js"), "utf8");
+    for (const declaration of ["modalConfigs", "personalSettingsItems", "administrationSettingsItems", "systemSettingsItems", "settingsItems", "routes", "VIEW_CONTEXT_KEY"]) {
+      expect(stateSource).not.toMatch(new RegExp(`(?:const|let|class)\\s+${declaration}\\b`));
     }
   });
 

@@ -1,3 +1,6 @@
+const routes = ["home", "sites", "requests", "contacts", "settings"];
+const VIEW_CONTEXT_KEY = "zeeda-qatar-ops-view-context";
+
 function getVisibleRoute() {
   return Array.from(document.querySelectorAll(".page")).find((page) => page.classList.contains("active"))?.id || window.location.hash.replace("#", "") || "home";
 }

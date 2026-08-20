@@ -8,10 +8,9 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 describe("Platform Health frontend", () => {
   const settings = ["frontend/pages/settings/settings-shared.js", "frontend/pages/settings/platform-health.js", "frontend/pages/settings/settings-page.js"].map(read).join("\n");
   const api = read("js/api-client.js");
-  const state = read("js/state.js");
 
   it("keeps Platform Health in the administrator-only system menu", () => {
-    expect(state).toContain('const systemSettingsItems = ["Platform Health"]');
+    expect(settings).toContain('const systemSettingsItems = ["Platform Health"]');
     expect(settings).toContain("const systemButtons = isAdmin()");
     expect(settings).toContain('if (selected === "Platform Health" && isAdmin())');
   });

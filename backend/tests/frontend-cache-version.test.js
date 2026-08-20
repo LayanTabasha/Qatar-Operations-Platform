@@ -30,24 +30,25 @@ const SITE_PROFILE_VERSION = "20260820-site-profile-v1";
 const CHARGER_PROFILE_VERSION = "20260820-charger-profile-v1";
 const SITES_DATA_VERSION = "20260820-sites-data-refresh-v1";
 const HOMEPAGE_REQUESTS_VERSION = "20260813-homepage-requests";
-const REQUESTS_BOOTSTRAP_VERSION = "20260813-requests-bootstrap";
+const STATE_OWNERSHIP_VERSION = "20260820-state-ownership-v1";
+const AUTH_ROUTER_OWNERSHIP_VERSION = "20260820-auth-router-ownership-v1";
 const REQUESTS_SHARED_VERSION = "20260820-requests-shared-v1";
 const REQUESTS_LIST_VERSION = "20260820-requests-list-v1";
 const REQUEST_DETAIL_VERSION = "20260820-request-detail-v1";
 const REQUEST_FORM_VERSION = "20260820-request-form-v1";
 const REQUESTS_PAGE_VERSION = "20260820-requests-page-v1";
-const SETTINGS_SHARED_VERSION = "20260820-settings-shared-v1";
+const SETTINGS_SHARED_VERSION = "20260820-settings-shared-ownership-v1";
 const ACCOUNT_SETTINGS_VERSION = "20260820-account-settings-v1";
 const PLATFORM_HEALTH_VERSION = "20260820-platform-health-v1";
 const USER_MANAGEMENT_VERSION = "20260820-user-management-v1";
 const SETTINGS_PAGE_VERSION = "20260820-settings-page-v1";
 const MODAL_FILES_VERSION = "20260820-modal-files-v1";
 const FAULT_MODALS_VERSION = "20260820-fault-modals-v1";
+const MODAL_CONFIGS_VERSION = "20260820-modal-configs-v1";
 const MODAL_CORE_VERSION = "20260820-modal-core-v1";
 const MODAL_SUBMIT_VERSION = "20260820-modal-submit-v1";
 const HOMEPAGE_COMPACT_VERSION = "20260816-homepage-compact";
 const CONTENT_RECORD_ACTIONS_VERSION = "20260818-legacy-content-actions-v3";
-const FAULT_LIFECYCLE_VERSION = "20260818-fault-lifecycle-v1";
 const MOVED_FRONTEND_SCRIPTS = [
   "frontend/pages/contacts/contacts-page.js",
   "frontend/shared/files/file-preview.js",
@@ -71,7 +72,7 @@ describe("frontend cache-version integrity", () => {
 
   it("loads state before scripts that consume its normalization helpers", () => {
     const sources = browserScriptSources();
-    const stateIndex = sources.indexOf(`js/state.js?v=${FAULT_LIFECYCLE_VERSION}`);
+    const stateIndex = sources.indexOf(`js/state.js?v=${STATE_OWNERSHIP_VERSION}`);
     const displayUtilsIndex = sources.indexOf(`frontend/shared/utils/display-utils.js?v=${DISPLAY_UTILS_VERSION}`);
     const homeSharedIndex = sources.indexOf(`frontend/pages/homepage/home-shared.js?v=${HOME_SHARED_VERSION}`);
     const recordsBySiteIndex = sources.indexOf(`frontend/pages/homepage/records-by-site.js?v=${RECORDS_BY_SITE_VERSION}`);
@@ -123,12 +124,13 @@ describe("frontend cache-version integrity", () => {
     expect(sources.indexOf(`js/api-client.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`frontend/shared/modals/modal-files.js?v=${MODAL_FILES_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`frontend/shared/modals/fault-modals.js?v=${FAULT_MODALS_VERSION}`)).toBeGreaterThan(stateIndex);
+    expect(sources.indexOf(`frontend/shared/modals/modal-configs.js?v=${MODAL_CONFIGS_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`frontend/shared/modals/modal-core.js?v=${MODAL_CORE_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`frontend/shared/modals/modal-submit.js?v=${MODAL_SUBMIT_VERSION}`)).toBeGreaterThan(stateIndex);
   });
 
   it("pairs the post-Fault state token with the persisted Fault normalization contract", () => {
-    expect(index).toContain(`js/state.js?v=${FAULT_LIFECYCLE_VERSION}`);
+    expect(index).toContain(`js/state.js?v=${STATE_OWNERSHIP_VERSION}`);
     expect(state).toContain("faultId = fault.faultId || fault.fault_reference");
     expect(state).toContain("siteName: fault.siteName || fault.site_name");
     expect(state).toContain("chargerId: fault.chargerId || fault.charger_id");
@@ -151,13 +153,14 @@ describe("frontend cache-version integrity", () => {
     expect(index).toContain(`frontend/pages/requests/request-form.js?v=${REQUEST_FORM_VERSION}`);
     expect(index).toContain(`frontend/pages/requests/requests-page.js?v=${REQUESTS_PAGE_VERSION}`);
     expect(index).not.toContain("js/requests-page.js?v=");
-    expect(index).toContain(`js/auth-router.js?v=${REQUESTS_BOOTSTRAP_VERSION}`);
+    expect(index).toContain(`js/auth-router.js?v=${AUTH_ROUTER_OWNERSHIP_VERSION}`);
     expect(index).toContain(`frontend/pages/homepage/home-page.js?v=${HOMEPAGE_STRUCTURE_VERSION}`);
     expect(index).toContain(`frontend/pages/sites/sites-data.js?v=${SITES_DATA_VERSION}`);
     expect(index).not.toContain("js/sites-page.js?v=");
     expect(index).toContain(`frontend/pages/contacts/contacts-page.js?v=${FRONTEND_STRUCTURE_VERSION}`);
     expect(index).toContain(`frontend/shared/modals/modal-files.js?v=${MODAL_FILES_VERSION}`);
     expect(index).toContain(`frontend/shared/modals/fault-modals.js?v=${FAULT_MODALS_VERSION}`);
+    expect(index).toContain(`frontend/shared/modals/modal-configs.js?v=${MODAL_CONFIGS_VERSION}`);
     expect(index).toContain(`frontend/shared/modals/modal-core.js?v=${MODAL_CORE_VERSION}`);
     expect(index).toContain(`frontend/shared/modals/modal-submit.js?v=${MODAL_SUBMIT_VERSION}`);
     expect(index).not.toContain("js/modals.js?v=");

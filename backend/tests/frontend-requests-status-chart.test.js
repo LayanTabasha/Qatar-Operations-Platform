@@ -103,7 +103,7 @@ describe("Homepage Requests Status component", () => {
   it("loads before Homepage and Sites while preserving the external caller", () => {
     const sources = Array.from(read("index.html").matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1]);
     const componentIndex = sources.indexOf("frontend/pages/homepage/requests-status.js?v=20260818-requests-status-v1");
-    expect(componentIndex).toBeGreaterThan(sources.indexOf("js/state.js?v=20260818-fault-lifecycle-v1"));
+    expect(componentIndex).toBeGreaterThan(sources.indexOf("js/state.js?v=20260820-state-ownership-v1"));
     expect(componentIndex).toBeGreaterThan(sources.indexOf("js/api-client.js?v=20260818-legacy-content-actions-v3"));
     expect(componentIndex).toBeGreaterThan(sources.indexOf("frontend/pages/homepage/home-shared.js?v=20260818-home-shared-v1"));
     expect(sources.indexOf("frontend/pages/homepage/home-page.js?v=20260818-homepage-kpi-orchestrator-v1")).toBeGreaterThan(componentIndex);

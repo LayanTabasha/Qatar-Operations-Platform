@@ -1,8 +1,6 @@
 const sites = ["Musheireb", "Mowasalat", "Al Mana"];
-const routes = ["home", "sites", "requests", "contacts", "settings"];
 const STORAGE_KEY = "zeeda-qatar-ops-state";
 const USERS_KEY = "zeeda-qatar-ops-users";
-const VIEW_CONTEXT_KEY = "zeeda-qatar-ops-view-context";
 
 const chargerNameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 const FAULT_STATUS_OPTIONS = Object.freeze(["Open", "In Progress", "Resolved"]);
@@ -86,28 +84,6 @@ window.QatarOpsRequests = Object.freeze({
     return ["admin", "hq_user"].includes(normalizedRoleKey(state.currentUserRoleKey || state.currentUserRole));
   },
 });
-
-const modalConfigs = {
-  site: { title: "Site Details", fields: [["Site name", "text"], ["Location", "text"], ["Client / organization", "text"], ["Status", "select:Active"], ["Description", "textarea"], ["Notes", "textarea"], ["Upload site image", "file"]] },
-  charger: { title: "Charger Details", fields: [["Charger name", "text"], ["Charger type", "select:AC,DC"], ["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Operator", "text"], ["Administrator", "text"], ["Manufacturer", "text"], ["Model", "text"], ["Serial number", "text"], ["Capacity", "text"], ["Installation date", "date"], ["Status", "select:Active,Maintenance,Faulted"], ["Notes", "textarea"], ["Upload charger image", "file"]] },
-  siteVisit: { title: "Add Site Visit", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Visit date", "date"], ["Visit status", "select:Scheduled,Ongoing,Completed,Cancelled,Follow-Up Required"], ["Time in", "time"], ["Time out", "time"], ["Visit type", "text"], ["Engineer name", "text"], ["Technician name", "text"], ["Purpose", "textarea"], ["Work completed", "textarea"], ["Findings", "textarea"], ["Notes", "textarea"], ["Site Visit Report upload", "file"]] },
-  visitReport: { title: "Upload Site Visit Report", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Visit date", "date"], ["Report title", "text"], ["File upload", "file"], ["Notes", "textarea"]] },
-  fault: { title: "Report Fault", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Generated Fault ID", "fault-id"], ["DTC Catalogue", "fault-catalogue-search"], ["DTC code", "text"], ["FTB code", "text"], ["Component ECU", "text"], ["Fault title", "text"], ["Catalogue description", "textarea"], ["Possible causes", "textarea"], ["Recommended actions", "textarea"], ["Severity", "text"], ["Category", "text"], ["Fault status", "select:Open,In Progress,Resolved"], ["Date reported", "date"], ["Time reported", "time"], ["Description", "textarea"], ["Photo evidence", "image-file"], ["Comments", "textarea"]] },
-  document: { title: "Document", fields: [["Related site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Document title", "text"], ["Document category", "select:Specification,Warranty,Installation,Commissioning,Electrical Drawing,Certificate,Manual,Asset Record,Inspection Certificate,Other"], ["Document date", "date"], ["Description", "textarea"], ["File upload", "file"]] },
-  weeklyReport: { title: "Upload Weekly Report", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Week start", "date"], ["Week end", "date"], ["Report title", "text"], ["Summary", "textarea"], ["File upload", "file"]] },
-  guide: { title: "Troubleshooting Record", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Guide title", "text"], ["Category", "select:Reset Procedure,Replacement Guide,Error-Code Troubleshooting,Communication Failure,Preventive Maintenance,Manufacturer Repair,Other"], ["Symptoms", "textarea"], ["Possible cause", "textarea"], ["Troubleshooting steps", "textarea"], ["Resolution", "textarea"], ["Notes", "textarea"], ["File upload", "file"]] },
-  contact: { title: "Contact", fields: [["Name", "text"], ["Role", "text"], ["Organization / Department", "text"], ["Phone", "tel"], ["Email", "email"], ["Assigned Site", "select:Not site-specific"], ["Notes", "textarea"]] },
-  profile: { title: "Profile", fields: [["Name", "text"], ["Department", "text"]] },
-  user: { title: "Add User", fields: [["Full Name", "text"], ["Work Email", "email"], ["Role", "select:Operations Staff,Viewer,Administrator"], ["Department", "select:Operations,Maintenance,Administration,Management"], ["Account Status", "select:Active,Invited,Disabled,Locked"], ["Temporary Password", "text"], ["Require Password Change on First Login", "select:Yes,No"]] },
-  faultCode: { title: "Fault Catalogue Entry", fields: [["Fault code", "text"], ["Fault name", "text"], ["Meaning", "textarea"], ["Severity", "select:Low,Medium,High,Critical,Not Classified"], ["Recommended action", "textarea"], ["Status", "select:Active,Disabled"]] },
-  deleteCharger: { title: "Remove Charger", fields: [["Type REMOVE to confirm", "text"]] },
-  confirmDelete: { title: "Delete Record", fields: [["Confirmation notes", "textarea"]] },
-};
-
-const personalSettingsItems = ["Profile", "Security"];
-const administrationSettingsItems = ["User Management", "Site & Charger Configuration", "Archive", "Audit Logs"];
-const systemSettingsItems = ["Platform Health"];
-const settingsItems = [...personalSettingsItems, ...administrationSettingsItems, ...systemSettingsItems];
 
 function normalizeUser(user, fallbackName = "User") {
   if (!user.id) user.id = `user-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
