@@ -58,12 +58,12 @@ describe("Homepage Recent Activity component", () => {
   it("loads before every external caller and preserves their global calls", () => {
     const sources = Array.from(read("index.html").matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1]);
     const componentIndex = sources.indexOf("frontend/pages/homepage/recent-activity.js?v=20260818-recent-activity-v1");
-    for (const caller of ["frontend/pages/homepage/home-page.js?v=20260818-homepage-kpi-orchestrator-v1", "js/modals.js?v=20260818-fault-lifecycle-v1", "js/settings-page.js?v=20260816-permanent-user-delete", "app.js?v=20260818-legacy-content-actions-v3"]) {
+    for (const caller of ["frontend/pages/homepage/home-page.js?v=20260818-homepage-kpi-orchestrator-v1", "js/modals.js?v=20260818-fault-lifecycle-v1", "frontend/pages/settings/settings-page.js?v=20260820-settings-page-v1", "app.js?v=20260818-legacy-content-actions-v3"]) {
       expect(sources.indexOf(caller), `${caller} must load after Recent Activity`).toBeGreaterThan(componentIndex);
     }
     expect(read("app.js")).toContain("renderActivity();");
     expect(read("js/modals.js")).toContain("renderActivity();");
-    expect(read("js/settings-page.js")).toContain("activityIcon(item.actionType)");
+    expect(read("frontend/pages/settings/settings-page.js")).toContain("activityIcon(item.actionType)");
   });
 
   it("keeps both declarations in exactly one production file", () => {

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 const root = path.resolve(process.cwd(), "..");
 const repository = fs.readFileSync(path.join(process.cwd(), "src/modules/users/users.repository.js"), "utf8");
 const routes = fs.readFileSync(path.join(process.cwd(), "src/modules/users/users.routes.js"), "utf8");
-const settings = fs.readFileSync(path.join(root, "js/settings-page.js"), "utf8");
+const settings = fs.readFileSync(path.join(root, "frontend/pages/settings/user-management.js"), "utf8");
 const api = fs.readFileSync(path.join(root, "js/api-client.js"), "utf8");
 const migration = fs.readFileSync(path.join(process.cwd(), "src/db/migrations/024_allow_safe_user_deletion.sql"), "utf8");
 

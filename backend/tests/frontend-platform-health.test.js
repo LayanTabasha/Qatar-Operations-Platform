@@ -6,7 +6,7 @@ const root = path.resolve(import.meta.dirname, "../..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 describe("Platform Health frontend", () => {
-  const settings = read("js/settings-page.js");
+  const settings = ["frontend/pages/settings/settings-shared.js", "frontend/pages/settings/platform-health.js", "frontend/pages/settings/settings-page.js"].map(read).join("\n");
   const api = read("js/api-client.js");
   const state = read("js/state.js");
 

@@ -27,7 +27,7 @@ describe("frontend DTC catalogue workflow", () => {
   });
 
   it("keeps the intentionally removed DTC catalogue out of Settings", () => {
-    const settingsSource = readRootFile("js/settings-page.js");
+    const settingsSource = ["frontend/pages/settings/settings-shared.js", "frontend/pages/settings/account-settings.js", "frontend/pages/settings/platform-health.js", "frontend/pages/settings/user-management.js", "frontend/pages/settings/settings-page.js"].map(readRootFile).join("\n");
 
     expect(settingsSource).not.toContain('"DTC Catalogue"');
     expect(settingsSource).not.toContain("Import Excel Catalogue");

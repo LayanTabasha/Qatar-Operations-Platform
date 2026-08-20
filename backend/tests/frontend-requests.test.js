@@ -15,7 +15,7 @@ const requestScripts = [
 ];
 const page = requestScripts.map(read).join("\n");
 const auth = read("js/auth-router.js");
-const settings = read("js/settings-page.js");
+const settings = read("frontend/pages/settings/user-management.js");
 const state = read("js/state.js");
 
 describe("Operations Requests frontend", () => {

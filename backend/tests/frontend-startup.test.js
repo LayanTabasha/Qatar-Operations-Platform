@@ -69,8 +69,10 @@ describe("full production-order frontend startup", () => {
       "frontend/pages/requests/requests-shared.js", "frontend/pages/requests/requests-list.js",
       "frontend/pages/requests/request-detail.js", "frontend/pages/requests/request-form.js",
       "frontend/pages/requests/requests-page.js", "js/modals.js",
-      "frontend/shared/files/file-preview.js", "frontend/pages/settings/archive-page.js",
-      "js/settings-page.js", "app.js",
+      "frontend/shared/files/file-preview.js", "frontend/pages/settings/settings-shared.js",
+      "frontend/pages/settings/archive-page.js", "frontend/pages/settings/account-settings.js",
+      "frontend/pages/settings/platform-health.js", "frontend/pages/settings/user-management.js",
+      "frontend/pages/settings/settings-page.js", "app.js",
     ]);
     const instance = await startup();
     expect(instance.errors).toEqual([]);
@@ -124,6 +126,26 @@ describe("full production-order frontend startup", () => {
     for (const name of ["renderRequestsPage", "loadRequestsPage", "loadRequestsPageFresh", "updateRequestsNavigation", "submitRequestForm", "openRequestDetails", "updateRequestStatusFromTable"]) {
       expect(productionDefinitionCount(name), name).toBe(1);
     }
+  });
+
+  it("locks the Settings split cache and single-definition contract", () => {
+    const settingsSources = [
+      "frontend/pages/settings/settings-shared.js?v=20260820-settings-shared-v1",
+      "frontend/pages/settings/account-settings.js?v=20260820-account-settings-v1",
+      "frontend/pages/settings/platform-health.js?v=20260820-platform-health-v1",
+      "frontend/pages/settings/user-management.js?v=20260820-user-management-v1",
+      "frontend/pages/settings/settings-page.js?v=20260820-settings-page-v1",
+    ];
+    for (const source of settingsSources) expect(scriptSources).toContain(source);
+    expect(scriptSources.some((source) => source.startsWith("js/settings-page.js?"))).toBe(false);
+    expect(fs.existsSync(path.join(root, "js/settings-page.js"))).toBe(false);
+    for (const name of ["renderSettings", "renderSettingsMenu", "loadManagedUsers", "loadPlatformHealth", "renderArchivePage", "loadArchiveData"]) {
+      expect(productionDefinitionCount(name), name).toBe(1);
+    }
+    const production = localScripts.map(({ file }) => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
+    expect((production.match(/data-user-delete-confirm/g) || []).length).toBeGreaterThan(0);
+    expect((production.match(/getElementById\("settings-panel"\)\?\.addEventListener\("click"/g) || [])).toHaveLength(1);
+    expect((production.match(/getElementById\("modal-form"\)\?\.addEventListener\("click"/g) || [])).toHaveLength(1);
   });
 
   it("locks the Sites cache-fix contract", () => {
