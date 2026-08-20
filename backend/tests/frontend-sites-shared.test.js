@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 const root = path.resolve(process.cwd(), "..");
 const sharedPath = "frontend/pages/sites/sites-shared.js";
 const shared = fs.readFileSync(path.join(root, sharedPath), "utf8");
-const sites = fs.readFileSync(path.join(root, "js/sites-page.js"), "utf8");
+const sites = fs.readFileSync(path.join(root, "frontend/pages/sites/sites-data.js"), "utf8");
 const sitesList = fs.readFileSync(path.join(root, "frontend/pages/sites/sites-list.js"), "utf8");
 const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
 
@@ -80,7 +80,7 @@ describe("shared Sites helpers", () => {
     expect(sharedIndex).toBeGreaterThan(sources.indexOf("js/state.js"));
     expect(sharedIndex).toBeGreaterThan(sources.indexOf("frontend/shared/utils/display-utils.js"));
     expect(sharedIndex).toBeGreaterThan(sources.indexOf("frontend/pages/sites/sites-data-mappers.js"));
-    expect(sharedIndex).toBeLessThan(sources.indexOf("js/sites-page.js"));
+    expect(sharedIndex).toBeLessThan(sources.indexOf("frontend/pages/sites/sites-data.js"));
   });
 
   it("keeps one helper definition and one persistent filter store", () => {

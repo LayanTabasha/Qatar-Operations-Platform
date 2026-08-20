@@ -11,6 +11,11 @@ const localScripts = scriptSources
   .filter((source) => !/^https?:\/\//.test(source))
   .map((source) => ({ source, file: source.split("?")[0] }));
 
+function productionDefinitionCount(name, scripts = localScripts) {
+  const production = scripts.map(({ file }) => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
+  return (production.match(new RegExp(`(?:async\\s+)?function\\s+${name}\\(`, "g")) || []).length;
+}
+
 async function startup() {
   const errors = [];
   const virtualConsole = new VirtualConsole();
@@ -58,7 +63,8 @@ describe("full production-order frontend startup", () => {
       "frontend/pages/sites/sites-shared.js", "frontend/pages/sites/sites-list.js",
       "frontend/pages/sites/site-visits.js", "frontend/pages/sites/faults.js",
       "frontend/pages/sites/operational-records.js", "frontend/pages/sites/site-profile.js",
-      "frontend/pages/sites/charger-profile.js", "frontend/pages/sites/charger-lifecycle.js", "js/sites-page.js",
+      "frontend/pages/sites/charger-profile.js", "frontend/pages/sites/charger-lifecycle.js",
+      "frontend/pages/sites/sites-data.js",
       "frontend/pages/contacts/contacts-page.js", "js/requests-page.js", "js/modals.js",
       "frontend/shared/files/file-preview.js", "frontend/pages/settings/archive-page.js",
       "js/settings-page.js", "app.js",
@@ -93,6 +99,7 @@ describe("full production-order frontend startup", () => {
       "moduleTableBody", "recordsModule", "updateOperationalRecordResults", "restoreArchivedCharger",
       "permanentlyDeleteArchivedCharger",
       "siteTab", "openSite", "chargerTab", "openCharger",
+      "loadOperationalData", "refreshOpenProfiles", "removeSiteVisitReportAttachment",
     ]) {
       expect(production.match(new RegExp(`(?:async\\s+)?function\\s+${name}\\(`, "g")) || [], name).toHaveLength(1);
     }
@@ -101,12 +108,26 @@ describe("full production-order frontend startup", () => {
   it("locks the Sites cache-fix contract", () => {
     expect(scriptSources).toContain("frontend/pages/sites/site-profile.js?v=20260820-site-profile-v1");
     expect(scriptSources).toContain("frontend/pages/sites/charger-profile.js?v=20260820-charger-profile-v1");
-    expect(scriptSources).toContain("js/sites-page.js?v=20260820-profile-split-v1");
-    expect(scriptSources).not.toContain("js/sites-page.js?v=20260820-operational-records-split-v1");
+    expect(scriptSources).toContain("frontend/pages/sites/site-visits.js?v=20260820-site-visits-lifecycle-v1");
+    expect(scriptSources).toContain("frontend/pages/sites/sites-data.js?v=20260820-sites-data-refresh-v1");
+    expect(scriptSources.some((source) => source.startsWith("js/sites-page.js?"))).toBe(false);
     expect(scriptSources).toContain("frontend/pages/sites/operational-records.js?v=20260820-operational-records-v1");
     expect(scriptSources).toContain("frontend/pages/sites/charger-lifecycle.js?v=20260820-charger-lifecycle-v1");
     expect(scriptSources).not.toContain("js/sites-page.js?v=20260818-sites-split-cache-fix-v1");
     expect(scriptSources).not.toContain("js/sites-page.js?v=20260818-fault-lifecycle-v1");
-    expect(fs.readFileSync(path.join(root, "js/sites-page.js"), "utf8")).not.toMatch(/(?:const|let|class)\s+siteListFilters\b/);
+    expect(fs.existsSync(path.join(root, "js/sites-page.js"))).toBe(false);
+    expect(productionDefinitionCount("removeCurrentCharger", localScripts)).toBe(0);
+  });
+
+  it("preserves external global callers after final Sites ownership moves", () => {
+    const callers = {
+      loadOperationalData: ["app.js", "js/auth-router.js", "js/modals.js", "frontend/pages/settings/archive-page.js"],
+      refreshOpenProfiles: ["js/modals.js", "frontend/pages/sites/site-visits.js"],
+      removeSiteVisitReportAttachment: ["app.js"],
+    };
+    for (const [name, files] of Object.entries(callers)) {
+      expect(productionDefinitionCount(name), `${name} definition`).toBe(1);
+      for (const file of files) expect(fs.readFileSync(path.join(root, file), "utf8"), `${file} calls ${name}`).toContain(`${name}(`);
+    }
   });
 });

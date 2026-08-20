@@ -8,7 +8,6 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const index = read("index.html");
 const siteVisits = read("frontend/pages/sites/site-visits.js");
 const faults = read("frontend/pages/sites/faults.js");
-const sitesPage = read("js/sites-page.js");
 const operationalRecords = read("frontend/pages/sites/operational-records.js");
 const modals = read("js/modals.js");
 
@@ -43,7 +42,7 @@ describe("extracted Sites Visit and Fault renderers", () => {
     const listIndex = index.indexOf("frontend/pages/sites/sites-list.js");
     const visitsIndex = index.indexOf("frontend/pages/sites/site-visits.js");
     const faultsIndex = index.indexOf("frontend/pages/sites/faults.js");
-    const sitesIndex = index.indexOf("js/sites-page.js");
+    const sitesIndex = index.indexOf("frontend/pages/sites/sites-data.js");
     const modalsIndex = index.indexOf("js/modals.js");
     expect(listIndex).toBeLessThan(visitsIndex);
     expect(visitsIndex).toBeLessThan(faultsIndex);
@@ -87,7 +86,7 @@ describe("extracted Sites Visit and Fault renderers", () => {
   it("keeps external globals and exactly one production definition", () => {
     expect(modals).toContain("siteVisitRemoveControl(");
     expect(modals).toContain("faultPhotosMarkup(");
-    const production = [siteVisits, faults, sitesPage].join("\n");
+    const production = [siteVisits, faults].join("\n");
     for (const name of [
       "hasBackendAttachmentId", "canRemoveSiteVisitAttachment", "siteVisitRemoveControl", "baseVisitRecords",
       "filteredVisitRecords", "visitRecordRows", "visitAttachmentsMarkup", "baseFaultRecords",
@@ -95,7 +94,7 @@ describe("extracted Sites Visit and Fault renderers", () => {
     ]) {
       expect(production.match(new RegExp(`function ${name}\\(`, "g")) || [], name).toHaveLength(1);
     }
-    expect(sitesPage).toContain("async function removeSiteVisitReportAttachment");
+    expect(siteVisits).toContain("async function removeSiteVisitReportAttachment");
     expect(operationalRecords).toContain("function openOperationalDeleteConfirmation");
   });
 });

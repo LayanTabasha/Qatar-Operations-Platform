@@ -19,7 +19,7 @@ describe("frontend DTC catalogue workflow", () => {
   });
 
   it("loads DTC records from the backend with operational data", () => {
-    const sitesPageSource = readRootFile("js/sites-page.js");
+    const sitesPageSource = readRootFile("frontend/pages/sites/sites-data.js");
 
     expect(sitesPageSource).toContain('window.QatarOpsApi.Dtc.list({ status: "all", limit: 100 })');
     expect(sitesPageSource).toContain("state.faultCatalogue");

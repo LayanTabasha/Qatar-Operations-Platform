@@ -8,7 +8,7 @@ const readRootFile = (relativePath) => fs.readFileSync(path.join(repoRoot, relat
 describe("frontend Archive workflow", () => {
   const sources = () => ({
     api: readRootFile("js/api-client.js"), archive: readRootFile("frontend/pages/settings/archive-page.js"),
-    settings: readRootFile("js/settings-page.js"), sites: readRootFile("js/sites-page.js"),
+    settings: readRootFile("js/settings-page.js"), sites: readRootFile("frontend/pages/sites/sites-data.js"),
     siteProfile: readRootFile("frontend/pages/sites/site-profile.js"),
     chargerProfile: readRootFile("frontend/pages/sites/charger-profile.js"),
     sitesList: readRootFile("frontend/pages/sites/sites-list.js"),
@@ -129,7 +129,8 @@ describe("frontend Archive workflow", () => {
     expect(index).toContain("js/settings-page.js?v=20260816-permanent-user-delete");
     expect(index).toContain("js/api-client.js?v=20260818-legacy-content-actions-v3");
     expect(index).toContain("js/state.js?v=20260818-fault-lifecycle-v1");
-    expect(index).toContain("js/sites-page.js?v=20260820-profile-split-v1");
+    expect(index).toContain("frontend/pages/sites/sites-data.js?v=20260820-sites-data-refresh-v1");
+    expect(index).not.toContain("js/sites-page.js?v=");
     expect(index).toContain("js/modals.js?v=20260818-fault-lifecycle-v1");
     expect(index).toContain("styles.css?v=20260816-homepage-compact");
   });

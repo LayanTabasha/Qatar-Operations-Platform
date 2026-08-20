@@ -8,7 +8,7 @@ const faultTrend = fs.readFileSync(path.join(root, "frontend/pages/homepage/faul
 const requestsStatus = fs.readFileSync(path.join(root, "frontend/pages/homepage/requests-status.js"), "utf8");
 const page = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const state = fs.readFileSync(path.join(root, "js/state.js"), "utf8");
-const sites = fs.readFileSync(path.join(root, "js/sites-page.js"), "utf8");
+const sites = fs.readFileSync(path.join(root, "frontend/pages/sites/sites-data.js"), "utf8");
 const app = fs.readFileSync(path.join(root, "app.js"), "utf8");
 const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
 
@@ -112,7 +112,7 @@ describe("Homepage Requests integration", () => {
   it("loads the shared Requests contract before every consumer", () => {
     const sources = browserScripts().map(({ source }) => source);
     const sharedIndex = sources.indexOf("js/state.js");
-    for (const consumer of ["js/auth-router.js", "frontend/pages/homepage/requests-status.js", "frontend/pages/homepage/home-page.js", "js/sites-page.js", "js/requests-page.js"]) {
+    for (const consumer of ["js/auth-router.js", "frontend/pages/homepage/requests-status.js", "frontend/pages/homepage/home-page.js", "frontend/pages/sites/sites-data.js", "js/requests-page.js"]) {
       expect(sources.indexOf(consumer)).toBeGreaterThan(sharedIndex);
     }
   });

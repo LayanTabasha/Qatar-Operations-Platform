@@ -55,41 +55,6 @@ async function loadOperationalData() {
     return false;
   }
 }
-
-async function removeSiteVisitReportAttachment(attachmentId) {
-  await window.QatarOpsApi.Attachments.remove(attachmentId);
-  let affectedVisit = null;
-  state.visits.forEach((visit) => {
-    if ((visit.attachmentRecords || []).some((file) => file.id === attachmentId)) affectedVisit = visit;
-    visit.attachmentRecords = (visit.attachmentRecords || []).filter((file) => file.id !== attachmentId);
-    visit.attachments = (visit.attachments || []).filter((id) => id !== attachmentId);
-  });
-  state.uploads = state.uploads.filter((file) => file.id !== attachmentId);
-  refreshOpenProfiles();
-  const modalType = document.getElementById("modal-form")?.dataset.type;
-  if (modalType === "siteVisitDetail" && affectedVisit) openSiteVisitDetail(affectedVisit.id);
-  if (modalType === "siteVisit") renderCurrentAttachment("siteVisit");
-}
-
-
-
-function removeCurrentCharger() {
-  const site = getSite(state.currentSiteName);
-  if (!site || !state.currentChargerId) return;
-  site.chargers = site.chargers.filter((charger) => charger.id !== state.currentChargerId);
-  state.currentChargerId = "";
-  state.counts.chargers = state.sites.reduce((total, item) => total + (item.chargers?.length || 0), 0) || null;
-  renderCounts();
-  buildSites();
-  document.getElementById("charger-profile").classList.add("hidden");
-  if (!document.getElementById("site-profile").classList.contains("hidden")) {
-    const siteTabBeforeDelete = state.currentSiteTab === "Chargers" ? "Chargers" : state.currentSiteTab;
-    openSite(state.currentSiteName);
-    const tabButton = Array.from(document.querySelectorAll("#site-profile .subtabs button")).find((button) => button.dataset.tab === siteTabBeforeDelete);
-    if (tabButton) tabButton.click();
-  }
-}
-
 function refreshOpenProfiles() {
   if (!state.currentSiteName) return;
   const siteProfile = document.getElementById("site-profile");

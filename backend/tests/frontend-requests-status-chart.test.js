@@ -107,8 +107,8 @@ describe("Homepage Requests Status component", () => {
     expect(componentIndex).toBeGreaterThan(sources.indexOf("js/api-client.js?v=20260818-legacy-content-actions-v3"));
     expect(componentIndex).toBeGreaterThan(sources.indexOf("frontend/pages/homepage/home-shared.js?v=20260818-home-shared-v1"));
     expect(sources.indexOf("frontend/pages/homepage/home-page.js?v=20260818-homepage-kpi-orchestrator-v1")).toBeGreaterThan(componentIndex);
-    expect(sources.indexOf("js/sites-page.js?v=20260820-profile-split-v1")).toBeGreaterThan(componentIndex);
-    expect(read("js/sites-page.js")).toContain("Promise.resolve().then(loadHomepageRequests).catch");
+    expect(sources.indexOf("frontend/pages/sites/sites-data.js?v=20260820-sites-data-refresh-v1")).toBeGreaterThan(componentIndex);
+    expect(read("frontend/pages/sites/sites-data.js")).toContain("Promise.resolve().then(loadHomepageRequests).catch");
   });
 
   it("keeps all four declarations in exactly one production file", () => {

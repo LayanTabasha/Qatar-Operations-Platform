@@ -16,7 +16,7 @@ const operationalRecordsSource = read("frontend/pages/sites/operational-records.
 const siteProfileSource = read("frontend/pages/sites/site-profile.js");
 const chargerProfileSource = read("frontend/pages/sites/charger-profile.js");
 const chargerLifecycleSource = read("frontend/pages/sites/charger-lifecycle.js");
-const sitesSource = read("js/sites-page.js");
+const sitesSource = read("frontend/pages/sites/sites-data.js");
 const modalsSource = read("js/modals.js");
 const appSource = read("app.js");
 const siteId = "807c17a6-4a93-4882-8aec-5066d5d80cb8";
@@ -57,7 +57,7 @@ function runtime() {
   run(siteProfileSource, "frontend/pages/sites/site-profile.js");
   run(chargerProfileSource, "frontend/pages/sites/charger-profile.js");
   run(chargerLifecycleSource, "frontend/pages/sites/charger-lifecycle.js");
-  run(sitesSource, "js/sites-page.js");
+  run(sitesSource, "frontend/pages/sites/sites-data.js");
   run(modalsSource, "js/modals.js");
   run(`
     function renderSettings() {}
@@ -179,6 +179,31 @@ describe("real operational form context lifecycle", () => {
     expect(instance.window.document.getElementById("modal-form").dataset.mode).toBe("create");
     expect(instance.window.document.getElementById("related-site").disabled).toBe(false);
     expect(instance.window.document.getElementById("charger").disabled).toBe(false);
+    instance.dom.window.close();
+  });
+
+  it("preserves a second Site Charger and active tab across operational refresh", () => {
+    const instance = runtime();
+    instance.run(`
+      state.sites.push({ id: "al-mana-site", name: "Al Mana", status: "Active", chargers: [{
+        id: "al-mana-charger", siteId: "al-mana-site", name: "Al Mana AC Charger 01", status: "Active", type: "AC"
+      }] });
+      openCharger("Al Mana", "al-mana-charger", "Documents");
+      refreshOpenProfiles();
+    `);
+    expect(instance.window.state?.currentSiteName || instance.run("state.currentSiteName")).toBe("Al Mana");
+    expect(instance.run("state.currentChargerId")).toBe("al-mana-charger");
+    expect(instance.run("state.currentChargerTab")).toBe("Documents");
+    expect(instance.window.document.getElementById("charger-profile").classList.contains("hidden")).toBe(false);
+    instance.dom.window.close();
+  });
+
+  it("refreshes a Site-only profile without creating Charger context", () => {
+    const instance = runtime();
+    instance.run('openSite("Msheireb", "Faults"); refreshOpenProfiles();');
+    expect(instance.run("state.currentSiteName")).toBe("Msheireb");
+    expect(instance.run("state.currentChargerId")).toBe("");
+    expect(instance.run("state.currentSiteTab")).toBe("Faults");
     instance.dom.window.close();
   });
 });

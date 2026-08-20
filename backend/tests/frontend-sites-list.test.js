@@ -9,7 +9,7 @@ const sharedPath = "frontend/pages/sites/sites-shared.js";
 const listPath = "frontend/pages/sites/sites-list.js";
 const shared = fs.readFileSync(path.join(root, sharedPath), "utf8");
 const list = fs.readFileSync(path.join(root, listPath), "utf8");
-const sitesPage = fs.readFileSync(path.join(root, "js/sites-page.js"), "utf8");
+const sitesPage = fs.readFileSync(path.join(root, "frontend/pages/sites/sites-data.js"), "utf8");
 const app = fs.readFileSync(path.join(root, "app.js"), "utf8");
 const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
 
@@ -129,10 +129,10 @@ describe("Main Sites list component", () => {
     const sources = Array.from(index.matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1].split("?")[0]);
     const listIndex = sources.indexOf(listPath);
     expect(listIndex).toBeGreaterThan(sources.indexOf("frontend/pages/sites/sites-shared.js"));
-    expect(listIndex).toBeLessThan(sources.indexOf("js/sites-page.js"));
+    expect(listIndex).toBeLessThan(sources.indexOf("frontend/pages/sites/sites-data.js"));
     expect(listIndex).toBeLessThan(sources.indexOf("app.js"));
     expect(app).toMatch(/\bbuildSites\s*\(/);
-    expect(sitesPage.match(/\bbuildSites\s*\(/g) || []).toHaveLength(4);
+    expect(sitesPage.match(/\bbuildSites\s*\(/g) || []).toHaveLength(3);
   });
 
   it("keeps one list state, implementation, and immediate binding call", () => {

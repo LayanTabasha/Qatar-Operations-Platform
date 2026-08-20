@@ -8,7 +8,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 function loadBrowserScript(file, additions = {}) {
   const context = vm.createContext({ console, Map, Set, Date, String, Number, Array, Object, Math, ...additions });
-  if (file === "js/sites-page.js") {
+  if (file === "frontend/pages/sites/sites-data.js") {
     vm.runInContext(read("frontend/pages/sites/sites-shared.js"), context, { filename: "frontend/pages/sites/sites-shared.js" });
     vm.runInContext(read("frontend/pages/sites/sites-list.js"), context, { filename: "frontend/pages/sites/sites-list.js" });
     vm.runInContext(read("frontend/pages/sites/site-visits.js"), context, { filename: "frontend/pages/sites/site-visits.js" });
@@ -41,7 +41,7 @@ describe("frontend search and filter controls", () => {
         { id: "2", name: "Mowasalat Depot", code: "MWD", location: "Industrial Area", status: "Maintenance", chargers: [] },
       ],
     };
-    const context = loadBrowserScript("js/sites-page.js", {
+    const context = loadBrowserScript("frontend/pages/sites/sites-data.js", {
       document, state,
       canManageOperations: () => false,
       imageBlock: () => "",
@@ -90,7 +90,7 @@ describe("frontend search and filter controls", () => {
       { id: "1", kind: "document", title: "Commissioning Manual", name: "manual.pdf", siteName: "Al Mana", chargerId: "c1", chargerName: "DC One", documentType: "Manual", uploadedAt: "2026-08-01" },
       { id: "2", kind: "document", title: "Network Diagram", name: "network.pdf", siteName: "Al Mana", chargerId: "c2", chargerName: "AC Two", documentType: "Drawing", uploadedAt: "2026-08-02" },
     ];
-    const context = loadBrowserScript("js/sites-page.js", {
+    const context = loadBrowserScript("frontend/pages/sites/sites-data.js", {
       state: { currentSiteName: "Al Mana", currentChargerId: "", faults: [], visits: [] },
       getValidUploads: () => uploads,
       uploadKindForTitle: () => ["document"],
@@ -112,7 +112,7 @@ describe("frontend search and filter controls", () => {
       { id: "2", kind: "document", title: "Manual", siteName: "Al Mana", chargerId: "c2", chargerName: "AC Two", documentType: "Manual", uploadedAt: "2026-08-02" },
       { id: "3", kind: "document", title: "Drawing", siteName: "Al Mana", chargerId: "c1", chargerName: "DC One", documentType: "Drawing", uploadedAt: "2026-08-01" },
     ];
-    const context = loadBrowserScript("js/sites-page.js", {
+    const context = loadBrowserScript("frontend/pages/sites/sites-data.js", {
       state: { currentSiteName: "Al Mana", currentChargerId: "", faults: [], visits: [] },
       getValidUploads: () => uploads,
       uploadKindForTitle: () => ["document"],
@@ -134,7 +134,7 @@ describe("frontend search and filter controls", () => {
   });
 
   it("filters faults and visits with combined search/dropdown criteria", () => {
-    const context = loadBrowserScript("js/sites-page.js", {
+    const context = loadBrowserScript("frontend/pages/sites/sites-data.js", {
       state: {
         currentSiteName: "Al Mana", currentChargerId: "",
         faults: [

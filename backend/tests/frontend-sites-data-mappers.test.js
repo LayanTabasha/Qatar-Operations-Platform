@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 const root = path.resolve(process.cwd(), "..");
 const mapperPath = "frontend/pages/sites/sites-data-mappers.js";
 const mapperSource = fs.readFileSync(path.join(root, mapperPath), "utf8");
-const sitesSource = fs.readFileSync(path.join(root, "js/sites-page.js"), "utf8");
+const sitesSource = fs.readFileSync(path.join(root, "frontend/pages/sites/sites-data.js"), "utf8");
 const modalsSource = fs.readFileSync(path.join(root, "js/modals.js"), "utf8");
 const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
 
@@ -68,7 +68,7 @@ describe("Sites data mappers", () => {
     const sources = Array.from(index.matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1].split("?")[0]);
     const mapperIndex = sources.indexOf(mapperPath);
     expect(mapperIndex).toBeGreaterThan(sources.indexOf("js/state.js"));
-    expect(mapperIndex).toBeLessThan(sources.indexOf("js/sites-page.js"));
+    expect(mapperIndex).toBeLessThan(sources.indexOf("frontend/pages/sites/sites-data.js"));
     expect(mapperIndex).toBeLessThan(sources.indexOf("js/modals.js"));
     const context = runtime();
     for (const name of ["mapBackendSiteVisit", "mapBackendAttachment", "deduplicateSiteVisitAttachments", "backendSiteVisitStatus"]) {

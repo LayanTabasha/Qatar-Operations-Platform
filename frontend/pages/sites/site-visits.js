@@ -2,6 +2,21 @@ function hasBackendAttachmentId(file) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(file?.id || ""));
 }
 
+async function removeSiteVisitReportAttachment(attachmentId) {
+  await window.QatarOpsApi.Attachments.remove(attachmentId);
+  let affectedVisit = null;
+  state.visits.forEach((visit) => {
+    if ((visit.attachmentRecords || []).some((file) => file.id === attachmentId)) affectedVisit = visit;
+    visit.attachmentRecords = (visit.attachmentRecords || []).filter((file) => file.id !== attachmentId);
+    visit.attachments = (visit.attachments || []).filter((id) => id !== attachmentId);
+  });
+  state.uploads = state.uploads.filter((file) => file.id !== attachmentId);
+  refreshOpenProfiles();
+  const modalType = document.getElementById("modal-form")?.dataset.type;
+  if (modalType === "siteVisitDetail" && affectedVisit) openSiteVisitDetail(affectedVisit.id);
+  if (modalType === "siteVisit") renderCurrentAttachment("siteVisit");
+}
+
 function canRemoveSiteVisitAttachment(file) {
   return hasBackendAttachmentId(file) && canManageOperations();
 }

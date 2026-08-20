@@ -60,11 +60,11 @@ describe("Homepage KPI Cards component", () => {
   });
 
   it("preserves external renderCounts and renderDashboardCharts callers", () => {
-    for (const caller of ["app.js", "js/sites-page.js", "js/modals.js"]) {
+    for (const caller of ["app.js", "frontend/pages/sites/sites-data.js", "js/modals.js"]) {
       expect(read(caller), caller).toMatch(/\brenderCounts\s*\(/);
     }
     expect(read("app.js")).toContain('addEventListener("change", renderDashboardCharts)');
-    expect(read("js/sites-page.js")).toMatch(/\brenderDashboardCharts\s*\(/);
+    expect(read("frontend/pages/sites/sites-data.js")).toMatch(/\brenderDashboardCharts\s*\(/);
     expect(home.match(/function renderCounts\s*\(/g) || []).toHaveLength(1);
     expect(home.match(/function renderDashboardCharts\s*\(/g) || []).toHaveLength(1);
   });

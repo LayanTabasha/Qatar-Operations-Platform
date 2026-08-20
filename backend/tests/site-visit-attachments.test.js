@@ -10,7 +10,7 @@ const attachmentService = fs.readFileSync(path.join(root, "src/modules/attachmen
 const officePreview = fs.readFileSync(path.join(root, "src/modules/attachments/office-preview.js"), "utf8");
 const attachmentRoutes = fs.readFileSync(path.join(root, "src/modules/attachments/attachments.routes.js"), "utf8");
 const frontendPreview = fs.readFileSync(path.resolve(root, "../frontend/shared/files/file-preview.js"), "utf8");
-const sitesPage = fs.readFileSync(path.resolve(root, "../js/sites-page.js"), "utf8");
+const sitesData = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/sites-data.js"), "utf8");
 const siteVisits = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/site-visits.js"), "utf8");
 const operationalRecords = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/operational-records.js"), "utf8");
 const sitesDataMappers = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/sites-data-mappers.js"), "utf8");
@@ -72,7 +72,7 @@ describe("persistent Site Visit reports", () => {
   it("uses backend visit attachments as the authoritative deduplicated source", () => {
     expect(sitesDataMappers).toContain("function deduplicateSiteVisitAttachments");
     expect(siteVisits).toContain("visit.attachmentRecords || []");
-    expect(sitesPage).toContain('file.module !== "siteVisit"');
+    expect(sitesData).toContain('file.module !== "siteVisit"');
     expect(siteVisits).not.toContain('getValidUploads().filter((file) => file.siteVisitId === visit.id');
     const records = [
       { id: "attachment-1", name: "Site Visit Summary.pdf", size: 1200, siteVisitId: "visit-1" },
@@ -83,8 +83,8 @@ describe("persistent Site Visit reports", () => {
   });
 
   it("removes a report without removing its Site Visit", () => {
-    expect(sitesPage).toContain("async function removeSiteVisitReportAttachment");
-    expect(sitesPage).toContain("await window.QatarOpsApi.Attachments.remove(attachmentId)");
+    expect(siteVisits).toContain("async function removeSiteVisitReportAttachment");
+    expect(siteVisits).toContain("await window.QatarOpsApi.Attachments.remove(attachmentId)");
     expect(siteVisits).toContain("No report attached");
     expect(siteVisits).toContain("data-site-visit-report-remove");
   });

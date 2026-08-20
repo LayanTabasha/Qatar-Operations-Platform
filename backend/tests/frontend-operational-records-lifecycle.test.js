@@ -7,7 +7,7 @@ const root = path.resolve(process.cwd(), "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const operational = read("frontend/pages/sites/operational-records.js");
 const lifecycle = read("frontend/pages/sites/charger-lifecycle.js");
-const sites = read("js/sites-page.js");
+const sites = read("frontend/pages/sites/sites-data.js");
 const app = read("app.js");
 
 describe("extracted operational records and charger lifecycle", () => {

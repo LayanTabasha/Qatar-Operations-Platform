@@ -12,7 +12,7 @@ const siteVisitsSource = fs.readFileSync(path.resolve(root, "../frontend/pages/s
 const faultsSource = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/faults.js"), "utf8");
 const operationalRecordsSource = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/operational-records.js"), "utf8");
 const chargerLifecycleSource = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/charger-lifecycle.js"), "utf8");
-const sitesSource = fs.readFileSync(path.resolve(root, "../js/sites-page.js"), "utf8");
+const sitesSource = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/sites-data.js"), "utf8");
 const stateSource = fs.readFileSync(path.resolve(root, "../js/state.js"), "utf8");
 const appSource = fs.readFileSync(path.resolve(root, "../app.js"), "utf8");
 

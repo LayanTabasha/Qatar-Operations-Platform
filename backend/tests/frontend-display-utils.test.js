@@ -59,7 +59,7 @@ describe("shared display utilities", () => {
 
     const callers = ["js/requests-page.js", "js/modals.js", "frontend/shared/files/file-preview.js"];
     for (const caller of callers) expect(read(caller), caller).toContain("formatFileSize(");
-    expect(read("js/sites-page.js")).not.toContain("function formatFileSize(");
+    expect(read("frontend/pages/sites/sites-data.js")).not.toContain("function formatFileSize(");
 
     const context = vm.createContext({ valueOrPlaceholder: (value) => value ?? "Pending Data" });
     vm.runInContext(read(utilityPath), context, { filename: utilityPath });
