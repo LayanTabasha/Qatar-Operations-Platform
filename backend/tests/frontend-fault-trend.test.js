@@ -113,7 +113,7 @@ describe("Homepage Fault Trend component", () => {
       "frontend/pages/homepage/home-page.js",
       "app.js",
       "frontend/pages/sites/sites-data.js",
-      "js/requests-page.js",
+      "frontend/pages/requests/requests-page.js",
     ].map((file) => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
     expect(production.match(/function renderFaultTrendChart\s*\(/g) || []).toHaveLength(1);
     expect(production.match(/let faultTrendChartInstance\s*=\s*null/g) || []).toHaveLength(1);

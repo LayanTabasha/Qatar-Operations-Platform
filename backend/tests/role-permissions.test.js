@@ -14,7 +14,7 @@ describe("authoritative role permission groups", () => {
 
   it("uses separate frontend checks for Requests, infrastructure, and operational records", () => {
     const state = fs.readFileSync(path.resolve("../js/state.js"), "utf8");
-    const requests = fs.readFileSync(path.resolve("../js/requests-page.js"), "utf8");
+    const requests = fs.readFileSync(path.resolve("../frontend/pages/requests/requests-shared.js"), "utf8");
     expect(state).toContain('["admin", "hq_user"].includes');
     expect(state).toContain('["admin", "hq_user", "operations_staff"].includes');
     expect(state).toContain("function isAdmin()");

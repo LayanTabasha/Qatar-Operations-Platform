@@ -65,7 +65,10 @@ describe("full production-order frontend startup", () => {
       "frontend/pages/sites/operational-records.js", "frontend/pages/sites/site-profile.js",
       "frontend/pages/sites/charger-profile.js", "frontend/pages/sites/charger-lifecycle.js",
       "frontend/pages/sites/sites-data.js",
-      "frontend/pages/contacts/contacts-page.js", "js/requests-page.js", "js/modals.js",
+      "frontend/pages/contacts/contacts-page.js",
+      "frontend/pages/requests/requests-shared.js", "frontend/pages/requests/requests-list.js",
+      "frontend/pages/requests/request-detail.js", "frontend/pages/requests/request-form.js",
+      "frontend/pages/requests/requests-page.js", "js/modals.js",
       "frontend/shared/files/file-preview.js", "frontend/pages/settings/archive-page.js",
       "js/settings-page.js", "app.js",
     ]);
@@ -85,13 +88,15 @@ describe("full production-order frontend startup", () => {
 
   it("keeps moved lexical state and guarded listener registrations singular", () => {
     const production = localScripts.map(({ file }) => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
-    for (const declaration of ["siteListFilters", "operationalRecordFilters", "faultTrendChartInstance"]) {
+    for (const declaration of ["siteListFilters", "operationalRecordFilters", "faultTrendChartInstance", "REQUEST_CATEGORIES", "REQUEST_PRIORITIES", "requestFilters", "requestPageLoading", "requestPageError"]) {
       const definitions = production.match(new RegExp(`(?:const|let|class)\\s+${declaration}\\b`, "g")) || [];
       expect(definitions, declaration).toHaveLength(1);
     }
     expect((production.match(/dataset\.sitesFiltersBound\s*=\s*"true"/g) || [])).toHaveLength(1);
     expect((production.match(/event\.target\.id === "global-search"/g) || [])).toHaveLength(1);
     expect((production.match(/event\.target\.closest\("\[data-global-result\]"\)/g) || [])).toHaveLength(1);
+    expect((production.match(/event\.target\.id !== "requests-search"/g) || [])).toHaveLength(1);
+    expect((production.match(/const filterMap = \{ "requests-status"/g) || [])).toHaveLength(1);
     for (const name of [
       "baseFilesForTitle", "filteredFiles", "fileRows", "fileActionButtons", "contentRecord",
       "contentTypeLabel", "openContentRecordDetail", "openContentDeleteConfirmation",
@@ -102,6 +107,22 @@ describe("full production-order frontend startup", () => {
       "loadOperationalData", "refreshOpenProfiles", "removeSiteVisitReportAttachment",
     ]) {
       expect(production.match(new RegExp(`(?:async\\s+)?function\\s+${name}\\(`, "g")) || [], name).toHaveLength(1);
+    }
+  });
+
+  it("locks the Requests split cache and single-definition contract", () => {
+    const requestSources = [
+      "frontend/pages/requests/requests-shared.js?v=20260820-requests-shared-v1",
+      "frontend/pages/requests/requests-list.js?v=20260820-requests-list-v1",
+      "frontend/pages/requests/request-detail.js?v=20260820-request-detail-v1",
+      "frontend/pages/requests/request-form.js?v=20260820-request-form-v1",
+      "frontend/pages/requests/requests-page.js?v=20260820-requests-page-v1",
+    ];
+    for (const source of requestSources) expect(scriptSources).toContain(source);
+    expect(scriptSources.some((source) => source.startsWith("js/requests-page.js?"))).toBe(false);
+    expect(fs.existsSync(path.join(root, "js/requests-page.js"))).toBe(false);
+    for (const name of ["renderRequestsPage", "loadRequestsPage", "loadRequestsPageFresh", "updateRequestsNavigation", "submitRequestForm", "openRequestDetails", "updateRequestStatusFromTable"]) {
+      expect(productionDefinitionCount(name), name).toBe(1);
     }
   });
 

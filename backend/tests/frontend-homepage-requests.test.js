@@ -112,7 +112,7 @@ describe("Homepage Requests integration", () => {
   it("loads the shared Requests contract before every consumer", () => {
     const sources = browserScripts().map(({ source }) => source);
     const sharedIndex = sources.indexOf("js/state.js");
-    for (const consumer of ["js/auth-router.js", "frontend/pages/homepage/requests-status.js", "frontend/pages/homepage/home-page.js", "frontend/pages/sites/sites-data.js", "js/requests-page.js"]) {
+    for (const consumer of ["js/auth-router.js", "frontend/pages/homepage/requests-status.js", "frontend/pages/homepage/home-page.js", "frontend/pages/sites/sites-data.js", "frontend/pages/requests/requests-shared.js", "frontend/pages/requests/requests-list.js", "frontend/pages/requests/request-detail.js", "frontend/pages/requests/request-form.js", "frontend/pages/requests/requests-page.js"]) {
       expect(sources.indexOf(consumer)).toBeGreaterThan(sharedIndex);
     }
   });

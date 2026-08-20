@@ -57,7 +57,7 @@ describe("shared display utilities", () => {
     );
     expect(definitions).toEqual([path.join(root, utilityPath)]);
 
-    const callers = ["js/requests-page.js", "js/modals.js", "frontend/shared/files/file-preview.js"];
+    const callers = ["frontend/pages/requests/request-detail.js", "js/modals.js", "frontend/shared/files/file-preview.js"];
     for (const caller of callers) expect(read(caller), caller).toContain("formatFileSize(");
     expect(read("frontend/pages/sites/sites-data.js")).not.toContain("function formatFileSize(");
 

@@ -6,7 +6,14 @@ const root = path.resolve(process.cwd(), "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const index = read("index.html");
 const api = read("js/api-client.js");
-const page = read("js/requests-page.js");
+const requestScripts = [
+  "frontend/pages/requests/requests-shared.js",
+  "frontend/pages/requests/requests-list.js",
+  "frontend/pages/requests/request-detail.js",
+  "frontend/pages/requests/request-form.js",
+  "frontend/pages/requests/requests-page.js",
+];
+const page = requestScripts.map(read).join("\n");
 const auth = read("js/auth-router.js");
 const settings = read("js/settings-page.js");
 const state = read("js/state.js");
