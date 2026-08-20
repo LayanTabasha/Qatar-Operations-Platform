@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
 const routes=fs.readFileSync(path.join(root,"src/modules/content-records/content-records.routes.js"),"utf8");
 const apiRoutes=fs.readFileSync(path.join(root,"src/routes/index.js"),"utf8");
-const frontend=fs.readFileSync(path.resolve(root,"../js/sites-page.js"),"utf8");
+const frontend=fs.readFileSync(path.resolve(root,"../frontend/pages/sites/operational-records.js"),"utf8");
 const modals=fs.readFileSync(path.resolve(root,"../js/modals.js"),"utf8");
 const app=fs.readFileSync(path.resolve(root,"../app.js"),"utf8");
 const repository=fs.readFileSync(path.join(root,"src/modules/content-records/content-records.repository.js"),"utf8");

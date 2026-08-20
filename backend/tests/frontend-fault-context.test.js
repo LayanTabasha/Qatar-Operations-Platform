@@ -12,6 +12,8 @@ const sitesSharedSource = read("frontend/pages/sites/sites-shared.js");
 const sitesListSource = read("frontend/pages/sites/sites-list.js");
 const siteVisitsSource = read("frontend/pages/sites/site-visits.js");
 const faultsSource = read("frontend/pages/sites/faults.js");
+const operationalRecordsSource = read("frontend/pages/sites/operational-records.js");
+const chargerLifecycleSource = read("frontend/pages/sites/charger-lifecycle.js");
 const sitesSource = read("js/sites-page.js");
 const modalsSource = read("js/modals.js");
 const appSource = read("app.js");
@@ -49,6 +51,8 @@ function runtime() {
   run(sitesListSource, "frontend/pages/sites/sites-list.js");
   run(siteVisitsSource, "frontend/pages/sites/site-visits.js");
   run(faultsSource, "frontend/pages/sites/faults.js");
+  run(operationalRecordsSource, "frontend/pages/sites/operational-records.js");
+  run(chargerLifecycleSource, "frontend/pages/sites/charger-lifecycle.js");
   run(sitesSource, "js/sites-page.js");
   run(modalsSource, "js/modals.js");
   run(`

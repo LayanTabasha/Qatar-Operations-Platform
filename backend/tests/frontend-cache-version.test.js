@@ -25,6 +25,9 @@ const SITES_LIST_VERSION = "20260818-sites-list-v1";
 const SITE_VISITS_VERSION = "20260818-site-visits-v1";
 const SITES_FAULTS_VERSION = "20260818-sites-faults-v1";
 const SITES_PAGE_VERSION = "20260818-sites-split-cache-fix-v1";
+const OPERATIONAL_RECORDS_VERSION = "20260820-operational-records-v1";
+const CHARGER_LIFECYCLE_VERSION = "20260820-charger-lifecycle-v1";
+const SITES_PAGE_SPLIT_VERSION = "20260820-operational-records-split-v1";
 const HOMEPAGE_REQUESTS_VERSION = "20260813-homepage-requests";
 const REQUESTS_BOOTSTRAP_VERSION = "20260813-requests-bootstrap";
 const ROLE_PERMISSIONS_VERSION = "20260817-charger-natural-sort";
@@ -73,7 +76,9 @@ describe("frontend cache-version integrity", () => {
     const sitesListIndex = sources.indexOf(`frontend/pages/sites/sites-list.js?v=${SITES_LIST_VERSION}`);
     const siteVisitsIndex = sources.indexOf(`frontend/pages/sites/site-visits.js?v=${SITE_VISITS_VERSION}`);
     const sitesFaultsIndex = sources.indexOf(`frontend/pages/sites/faults.js?v=${SITES_FAULTS_VERSION}`);
-    const sitesPageIndex = sources.indexOf(`js/sites-page.js?v=${SITES_PAGE_VERSION}`);
+    const operationalRecordsIndex = sources.indexOf(`frontend/pages/sites/operational-records.js?v=${OPERATIONAL_RECORDS_VERSION}`);
+    const chargerLifecycleIndex = sources.indexOf(`frontend/pages/sites/charger-lifecycle.js?v=${CHARGER_LIFECYCLE_VERSION}`);
+    const sitesPageIndex = sources.indexOf(`js/sites-page.js?v=${SITES_PAGE_SPLIT_VERSION}`);
 
     expect(stateIndex).toBeGreaterThanOrEqual(0);
     expect(displayUtilsIndex).toBeGreaterThan(stateIndex);
@@ -93,7 +98,9 @@ describe("frontend cache-version integrity", () => {
     expect(sitesListIndex).toBeGreaterThan(sitesSharedIndex);
     expect(siteVisitsIndex).toBeGreaterThan(sitesListIndex);
     expect(sitesFaultsIndex).toBeGreaterThan(siteVisitsIndex);
-    expect(sitesPageIndex).toBeGreaterThan(sitesFaultsIndex);
+    expect(operationalRecordsIndex).toBeGreaterThan(sitesFaultsIndex);
+    expect(chargerLifecycleIndex).toBeGreaterThan(operationalRecordsIndex);
+    expect(sitesPageIndex).toBeGreaterThan(chargerLifecycleIndex);
     expect(sources.indexOf(`app.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sitesPageIndex).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`js/api-client.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
@@ -116,7 +123,8 @@ describe("frontend cache-version integrity", () => {
     expect(index).toContain(`js/requests-page.js?v=${ROLE_PERMISSIONS_VERSION}`);
     expect(index).toContain(`js/auth-router.js?v=${REQUESTS_BOOTSTRAP_VERSION}`);
     expect(index).toContain(`frontend/pages/homepage/home-page.js?v=${HOMEPAGE_STRUCTURE_VERSION}`);
-    expect(index).toContain(`js/sites-page.js?v=${SITES_PAGE_VERSION}`);
+    expect(index).toContain(`js/sites-page.js?v=${SITES_PAGE_SPLIT_VERSION}`);
+    expect(index).not.toContain(`js/sites-page.js?v=${SITES_PAGE_VERSION}`);
     expect(index).not.toContain("js/sites-page.js?v=20260818-fault-lifecycle-v1");
     expect(index).toContain(`frontend/pages/contacts/contacts-page.js?v=${FRONTEND_STRUCTURE_VERSION}`);
     expect(index).toContain(`js/modals.js?v=${FAULT_LIFECYCLE_VERSION}`);

@@ -56,7 +56,8 @@ describe("full production-order frontend startup", () => {
       "frontend/pages/homepage/fault-trend.js", "frontend/pages/homepage/kpi-cards.js",
       "frontend/pages/homepage/home-page.js", "frontend/pages/sites/sites-data-mappers.js",
       "frontend/pages/sites/sites-shared.js", "frontend/pages/sites/sites-list.js",
-      "frontend/pages/sites/site-visits.js", "frontend/pages/sites/faults.js", "js/sites-page.js",
+      "frontend/pages/sites/site-visits.js", "frontend/pages/sites/faults.js",
+      "frontend/pages/sites/operational-records.js", "frontend/pages/sites/charger-lifecycle.js", "js/sites-page.js",
       "frontend/pages/contacts/contacts-page.js", "js/requests-page.js", "js/modals.js",
       "frontend/shared/files/file-preview.js", "frontend/pages/settings/archive-page.js",
       "js/settings-page.js", "app.js",
@@ -84,10 +85,22 @@ describe("full production-order frontend startup", () => {
     expect((production.match(/dataset\.sitesFiltersBound\s*=\s*"true"/g) || [])).toHaveLength(1);
     expect((production.match(/event\.target\.id === "global-search"/g) || [])).toHaveLength(1);
     expect((production.match(/event\.target\.closest\("\[data-global-result\]"\)/g) || [])).toHaveLength(1);
+    for (const name of [
+      "baseFilesForTitle", "filteredFiles", "fileRows", "fileActionButtons", "contentRecord",
+      "contentTypeLabel", "openContentRecordDetail", "openContentDeleteConfirmation",
+      "openLegacyContentDeleteConfirmation", "openOperationalDeleteConfirmation", "moduleFilterControls",
+      "moduleTableBody", "recordsModule", "updateOperationalRecordResults", "restoreArchivedCharger",
+      "permanentlyDeleteArchivedCharger",
+    ]) {
+      expect(production.match(new RegExp(`(?:async\\s+)?function\\s+${name}\\(`, "g")) || [], name).toHaveLength(1);
+    }
   });
 
   it("locks the Sites cache-fix contract", () => {
-    expect(scriptSources).toContain("js/sites-page.js?v=20260818-sites-split-cache-fix-v1");
+    expect(scriptSources).toContain("js/sites-page.js?v=20260820-operational-records-split-v1");
+    expect(scriptSources).toContain("frontend/pages/sites/operational-records.js?v=20260820-operational-records-v1");
+    expect(scriptSources).toContain("frontend/pages/sites/charger-lifecycle.js?v=20260820-charger-lifecycle-v1");
+    expect(scriptSources).not.toContain("js/sites-page.js?v=20260818-sites-split-cache-fix-v1");
     expect(scriptSources).not.toContain("js/sites-page.js?v=20260818-fault-lifecycle-v1");
     expect(fs.readFileSync(path.join(root, "js/sites-page.js"), "utf8")).not.toMatch(/(?:const|let|class)\s+siteListFilters\b/);
   });
