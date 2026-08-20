@@ -10,7 +10,7 @@ describe("Contacts optional Site frontend", () => {
   it("removes Scope and exposes the optional Assigned Site contract", () => {
     const contacts = read("frontend/pages/contacts/contacts-page.js");
     const state = read("js/state.js");
-    const modals = read("js/modals.js");
+    const modals = ["frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(read).join("\n");
     expect(state).toContain('["Assigned Site", "select:Not site-specific"]');
     expect(state).toContain('["Organization / Department", "text"]');
     expect(state).not.toContain('["Scope"');
@@ -66,7 +66,7 @@ describe("Contacts optional Site frontend", () => {
     const stateScript = read("js/state.js");
     const displayUtilsScript = read("frontend/shared/utils/display-utils.js");
     const contactsScript = read("frontend/pages/contacts/contacts-page.js");
-    const modalsScript = read("js/modals.js");
+    const modalsScript = ["frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(read).join("\n");
     const virtualConsole = new VirtualConsole();
     const errors = [];
     virtualConsole.on("jsdomError", (error) => errors.push(error));

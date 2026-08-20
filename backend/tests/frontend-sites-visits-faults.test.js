@@ -9,7 +9,7 @@ const index = read("index.html");
 const siteVisits = read("frontend/pages/sites/site-visits.js");
 const faults = read("frontend/pages/sites/faults.js");
 const operationalRecords = read("frontend/pages/sites/operational-records.js");
-const modals = read("js/modals.js");
+const modals = ["frontend/shared/modals/modal-files.js", "frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(read).join("\n");
 
 function featureRuntime(canManage = true) {
   const filters = {
@@ -43,7 +43,7 @@ describe("extracted Sites Visit and Fault renderers", () => {
     const visitsIndex = index.indexOf("frontend/pages/sites/site-visits.js");
     const faultsIndex = index.indexOf("frontend/pages/sites/faults.js");
     const sitesIndex = index.indexOf("frontend/pages/sites/sites-data.js");
-    const modalsIndex = index.indexOf("js/modals.js");
+    const modalsIndex = index.indexOf("frontend/shared/modals/modal-core.js");
     expect(listIndex).toBeLessThan(visitsIndex);
     expect(visitsIndex).toBeLessThan(faultsIndex);
     expect(faultsIndex).toBeLessThan(sitesIndex);

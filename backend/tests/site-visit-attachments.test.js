@@ -14,7 +14,7 @@ const sitesData = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/si
 const siteVisits = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/site-visits.js"), "utf8");
 const operationalRecords = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/operational-records.js"), "utf8");
 const sitesDataMappers = fs.readFileSync(path.resolve(root, "../frontend/pages/sites/sites-data-mappers.js"), "utf8");
-const modals = fs.readFileSync(path.resolve(root, "../js/modals.js"), "utf8");
+const modals = ["modal-files.js", "fault-modals.js", "modal-core.js", "modal-submit.js"].map((file) => fs.readFileSync(path.resolve(root, "../frontend/shared/modals", file), "utf8")).join("\n");
 const dedupeSource = sitesDataMappers.slice(
   sitesDataMappers.indexOf("function deduplicateSiteVisitAttachments"),
   sitesDataMappers.indexOf("function siteVisitStatusLabel"),

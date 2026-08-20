@@ -10,7 +10,7 @@ const callerPaths = [
   "frontend/pages/homepage/fault-trend.js",
   "frontend/pages/sites/sites-shared.js",
   "frontend/pages/sites/site-profile.js",
-  "js/modals.js",
+  "frontend/shared/modals/modal-core.js",
 ];
 
 function productionJavaScriptFiles(directory = root) {
@@ -37,7 +37,7 @@ describe("shared display utilities", () => {
     );
     expect(definitions).toEqual([path.join(root, utilityPath)]);
     for (const caller of callerPaths) expect(read(caller), `${caller} must use the shared utility`).toContain("safeDetailValue(");
-    expect(read("js/modals.js")).not.toContain("function safeDetailValue(");
+    expect(read("frontend/shared/modals/modal-core.js")).not.toContain("function safeDetailValue(");
   });
 
   it("preserves escaping behavior for Homepage, Sites, and Modal renderers", () => {
@@ -57,7 +57,7 @@ describe("shared display utilities", () => {
     );
     expect(definitions).toEqual([path.join(root, utilityPath)]);
 
-    const callers = ["frontend/pages/requests/request-detail.js", "js/modals.js", "frontend/shared/files/file-preview.js"];
+    const callers = ["frontend/pages/requests/request-detail.js", "frontend/shared/modals/modal-core.js", "frontend/shared/files/file-preview.js"];
     for (const caller of callers) expect(read(caller), caller).toContain("formatFileSize(");
     expect(read("frontend/pages/sites/sites-data.js")).not.toContain("function formatFileSize(");
 

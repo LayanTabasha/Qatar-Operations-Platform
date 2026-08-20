@@ -60,7 +60,7 @@ describe("Homepage KPI Cards component", () => {
   });
 
   it("preserves external renderCounts and renderDashboardCharts callers", () => {
-    for (const caller of ["app.js", "frontend/pages/sites/sites-data.js", "js/modals.js"]) {
+    for (const caller of ["app.js", "frontend/pages/sites/sites-data.js", "frontend/shared/modals/modal-submit.js"]) {
       expect(read(caller), caller).toMatch(/\brenderCounts\s*\(/);
     }
     expect(read("app.js")).toContain('addEventListener("change", renderDashboardCharts)');

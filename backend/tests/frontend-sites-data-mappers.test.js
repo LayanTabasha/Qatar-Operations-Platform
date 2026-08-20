@@ -8,7 +8,7 @@ const root = path.resolve(process.cwd(), "..");
 const mapperPath = "frontend/pages/sites/sites-data-mappers.js";
 const mapperSource = fs.readFileSync(path.join(root, mapperPath), "utf8");
 const sitesSource = fs.readFileSync(path.join(root, "frontend/pages/sites/sites-data.js"), "utf8");
-const modalsSource = fs.readFileSync(path.join(root, "js/modals.js"), "utf8");
+const modalsSource = ["frontend/shared/modals/modal-files.js", "frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map((file) => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
 const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
 
 function runtime() {
@@ -69,7 +69,7 @@ describe("Sites data mappers", () => {
     const mapperIndex = sources.indexOf(mapperPath);
     expect(mapperIndex).toBeGreaterThan(sources.indexOf("js/state.js"));
     expect(mapperIndex).toBeLessThan(sources.indexOf("frontend/pages/sites/sites-data.js"));
-    expect(mapperIndex).toBeLessThan(sources.indexOf("js/modals.js"));
+    expect(mapperIndex).toBeLessThan(sources.indexOf("frontend/shared/modals/modal-core.js"));
     const context = runtime();
     for (const name of ["mapBackendSiteVisit", "mapBackendAttachment", "deduplicateSiteVisitAttachments", "backendSiteVisitStatus"]) {
       expect(typeof context[name], name).toBe("function");

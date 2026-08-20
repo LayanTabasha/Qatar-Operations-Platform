@@ -13,7 +13,7 @@ describe("frontend Archive workflow", () => {
     chargerProfile: readRootFile("frontend/pages/sites/charger-profile.js"),
     sitesList: readRootFile("frontend/pages/sites/sites-list.js"),
     mappers: readRootFile("frontend/pages/sites/sites-data-mappers.js"),
-    state: readRootFile("js/state.js"), modals: readRootFile("js/modals.js"),
+    state: readRootFile("js/state.js"), modals: ["frontend/shared/modals/modal-files.js", "frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(readRootFile).join("\n"),
     index: readRootFile("index.html"), styles: readRootFile("styles.css"),
   });
 
@@ -131,7 +131,7 @@ describe("frontend Archive workflow", () => {
     expect(index).toContain("js/state.js?v=20260818-fault-lifecycle-v1");
     expect(index).toContain("frontend/pages/sites/sites-data.js?v=20260820-sites-data-refresh-v1");
     expect(index).not.toContain("js/sites-page.js?v=");
-    expect(index).toContain("js/modals.js?v=20260818-fault-lifecycle-v1");
+    expect(index).toContain("frontend/shared/modals/modal-submit.js?v=20260820-modal-submit-v1");
     expect(index).toContain("styles.css?v=20260816-homepage-compact");
   });
 });

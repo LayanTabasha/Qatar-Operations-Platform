@@ -10,7 +10,7 @@ function readRootFile(relativePath) {
 
 describe("frontend site image workflow", () => {
   it("keeps the selected site image File separate from the temporary preview", () => {
-    const modalsSource = readRootFile("js/modals.js");
+    const modalsSource = ["frontend/shared/modals/modal-files.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(readRootFile).join("\n");
 
     expect(modalsSource).toContain("let pendingModalImage = null;");
     expect(modalsSource).toContain("let pendingSiteImageFile = null;");
@@ -19,7 +19,7 @@ describe("frontend site image workflow", () => {
   });
 
   it("does not send Base64 image data in the normal site JSON save payload", () => {
-    const modalsSource = readRootFile("js/modals.js");
+    const modalsSource = ["frontend/shared/modals/modal-files.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(readRootFile).join("\n");
     const saveWorkflowStart = modalsSource.indexOf("async function simulateUpdate");
     const siteBranchStart = modalsSource.indexOf('if (type === "site")', saveWorkflowStart);
     const chargerBranchStart = modalsSource.indexOf('if (type === "charger")', siteBranchStart);
@@ -31,7 +31,7 @@ describe("frontend site image workflow", () => {
   });
 
   it("uploads the selected File through the site image API before the modal closes", () => {
-    const modalsSource = readRootFile("js/modals.js");
+    const modalsSource = ["frontend/shared/modals/modal-files.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(readRootFile).join("\n");
 
     expect(modalsSource).toContain("if (pendingSiteImageFile) {");
     expect(modalsSource).toContain("await window.QatarOpsApi.Sites.uploadImage(response.site.id, pendingSiteImageFile);");

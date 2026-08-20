@@ -74,7 +74,7 @@ describe("frontend charger display ordering", () => {
 
   it("uses the shared helper for cards and every active charger dropdown", () => {
     const sites = fs.readFileSync(path.join(repoRoot, "frontend/pages/sites/site-profile.js"), "utf8");
-    const modals = fs.readFileSync(path.join(repoRoot, "js/modals.js"), "utf8");
+    const modals = fs.readFileSync(path.join(repoRoot, "frontend/shared/modals/modal-core.js"), "utf8");
     const requests = fs.readFileSync(path.join(repoRoot, "frontend/pages/requests/requests-shared.js"), "utf8");
 
     expect(sites).toContain("const chargers = sortChargersForDisplay(siteRecord?.chargers || [])");

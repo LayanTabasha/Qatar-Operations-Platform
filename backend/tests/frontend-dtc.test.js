@@ -34,7 +34,7 @@ describe("frontend DTC catalogue workflow", () => {
   });
 
   it("allows faults without a DTC code and shows catalogue details when selected", () => {
-    const modalsSource = readRootFile("js/modals.js");
+    const modalsSource = ["frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(readRootFile).join("\n");
 
     expect(modalsSource).toContain("Search DTC, FTB, ECU, title, or description");
     expect(modalsSource).toContain("async function searchFaultCatalogue");
@@ -53,7 +53,7 @@ describe("frontend DTC catalogue workflow", () => {
   });
 
   it("keeps DTC optional in the simplified operational Fault form", () => {
-    const modalsSource = readRootFile("js/modals.js");
+    const modalsSource = ["frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(readRootFile).join("\n");
 
     expect(modalsSource).toContain("A. Fault Location");
     expect(modalsSource).toContain("B. What Happened?");
@@ -66,7 +66,7 @@ describe("frontend DTC catalogue workflow", () => {
   });
 
   it("allows manual saving when DTC search is empty or unavailable", () => {
-    const modalsSource = readRootFile("js/modals.js");
+    const modalsSource = ["frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(readRootFile).join("\n");
 
     expect(modalsSource).toContain("No matching DTC records found. You can continue recording the fault manually.");
     expect(modalsSource).toContain("The DTC catalogue is temporarily unavailable. You can continue recording the fault manually.");
@@ -74,7 +74,7 @@ describe("frontend DTC catalogue workflow", () => {
   });
 
   it("keeps Fault Code optional and provides a separate severity selector", () => {
-    const modalsSource = readRootFile("js/modals.js");
+    const modalsSource = ["frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(readRootFile).join("\n");
     const sitesSource = readRootFile("frontend/pages/sites/faults.js");
 
     expect(modalsSource).toContain('id="severity"');

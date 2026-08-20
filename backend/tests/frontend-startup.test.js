@@ -68,7 +68,9 @@ describe("full production-order frontend startup", () => {
       "frontend/pages/contacts/contacts-page.js",
       "frontend/pages/requests/requests-shared.js", "frontend/pages/requests/requests-list.js",
       "frontend/pages/requests/request-detail.js", "frontend/pages/requests/request-form.js",
-      "frontend/pages/requests/requests-page.js", "js/modals.js",
+      "frontend/pages/requests/requests-page.js", "frontend/shared/modals/modal-files.js",
+      "frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-core.js",
+      "frontend/shared/modals/modal-submit.js",
       "frontend/shared/files/file-preview.js", "frontend/pages/settings/settings-shared.js",
       "frontend/pages/settings/archive-page.js", "frontend/pages/settings/account-settings.js",
       "frontend/pages/settings/platform-health.js", "frontend/pages/settings/user-management.js",
@@ -148,6 +150,25 @@ describe("full production-order frontend startup", () => {
     expect((production.match(/getElementById\("modal-form"\)\?\.addEventListener\("click"/g) || [])).toHaveLength(1);
   });
 
+  it("locks the modal split cache and single-definition contract", () => {
+    const modalSources = [
+      "frontend/shared/modals/modal-files.js?v=20260820-modal-files-v1",
+      "frontend/shared/modals/fault-modals.js?v=20260820-fault-modals-v1",
+      "frontend/shared/modals/modal-core.js?v=20260820-modal-core-v1",
+      "frontend/shared/modals/modal-submit.js?v=20260820-modal-submit-v1",
+    ];
+    for (const source of modalSources) expect(scriptSources).toContain(source);
+    expect(scriptSources.some((source) => source.startsWith("js/modals.js?"))).toBe(false);
+    expect(fs.existsSync(path.join(root, "js/modals.js"))).toBe(false);
+    for (const name of ["openModal", "closeModal", "prefillModal", "openSiteVisitDetail", "openFaultDetail", "handleModalSubmit", "simulateUpdate", "refreshChargerSelect", "renderCurrentAttachment", "persistOperationalFiles"]) {
+      expect(productionDefinitionCount(name), name).toBe(1);
+    }
+    const production = localScripts.map(({ file }) => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
+    for (const declaration of ["IMAGE_UPLOAD_MAX_BYTES", "IMAGE_UPLOAD_TYPES", "pendingModalImage", "pendingSiteImageFile", "removeExistingSiteImage", "faultCatalogueSearchTimer"]) {
+      expect(production.match(new RegExp(`(?:const|let|class)\\s+${declaration}\\b`, "g")) || [], declaration).toHaveLength(1);
+    }
+  });
+
   it("locks the Sites cache-fix contract", () => {
     expect(scriptSources).toContain("frontend/pages/sites/site-profile.js?v=20260820-site-profile-v1");
     expect(scriptSources).toContain("frontend/pages/sites/charger-profile.js?v=20260820-charger-profile-v1");
@@ -164,8 +185,8 @@ describe("full production-order frontend startup", () => {
 
   it("preserves external global callers after final Sites ownership moves", () => {
     const callers = {
-      loadOperationalData: ["app.js", "js/auth-router.js", "js/modals.js", "frontend/pages/settings/archive-page.js"],
-      refreshOpenProfiles: ["js/modals.js", "frontend/pages/sites/site-visits.js"],
+      loadOperationalData: ["app.js", "js/auth-router.js", "frontend/shared/modals/modal-submit.js", "frontend/pages/settings/archive-page.js"],
+      refreshOpenProfiles: ["frontend/shared/modals/modal-submit.js", "frontend/pages/sites/site-visits.js"],
       removeSiteVisitReportAttachment: ["app.js"],
     };
     for (const [name, files] of Object.entries(callers)) {

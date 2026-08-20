@@ -10,7 +10,7 @@ function readRootFile(relativePath) {
 
 describe("frontend site visit workflow", () => {
   it("reads the actual Visit Date, Time In, and Time Out form fields", () => {
-    const modalsSource = readRootFile("js/modals.js");
+    const modalsSource = ["frontend/shared/modals/modal-files.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(readRootFile).join("\n");
     const saveWorkflowStart = modalsSource.indexOf("async function simulateUpdate");
     const siteVisitStart = modalsSource.indexOf('if (type === "siteVisit")', saveWorkflowStart);
     const uploadStart = modalsSource.indexOf('if (["siteVisit"', siteVisitStart);
@@ -23,7 +23,7 @@ describe("frontend site visit workflow", () => {
   });
 
   it("sends visit_date, time_in, and time_out to the Site Visits API", () => {
-    const modalsSource = readRootFile("js/modals.js");
+    const modalsSource = ["frontend/shared/modals/modal-files.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(readRootFile).join("\n");
 
     expect(modalsSource).toContain("visit_date: visitDate");
     expect(modalsSource).toContain("time_in: timeIn || null");
@@ -47,7 +47,7 @@ describe("frontend site visit workflow", () => {
 
   it("provides role-aware edit/delete actions and exact confirmation", () => {
     const siteVisits = readRootFile("frontend/pages/sites/site-visits.js");
-    const modals = readRootFile("js/modals.js");
+    const modals = ["frontend/shared/modals/modal-files.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(readRootFile).join("\n");
     const api = readRootFile("js/api-client.js");
     expect(siteVisits).toContain('data-delete-type="siteVisit"');
     expect(siteVisits).toContain("canManageOperations()");

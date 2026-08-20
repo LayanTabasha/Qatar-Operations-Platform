@@ -41,6 +41,10 @@ const ACCOUNT_SETTINGS_VERSION = "20260820-account-settings-v1";
 const PLATFORM_HEALTH_VERSION = "20260820-platform-health-v1";
 const USER_MANAGEMENT_VERSION = "20260820-user-management-v1";
 const SETTINGS_PAGE_VERSION = "20260820-settings-page-v1";
+const MODAL_FILES_VERSION = "20260820-modal-files-v1";
+const FAULT_MODALS_VERSION = "20260820-fault-modals-v1";
+const MODAL_CORE_VERSION = "20260820-modal-core-v1";
+const MODAL_SUBMIT_VERSION = "20260820-modal-submit-v1";
 const HOMEPAGE_COMPACT_VERSION = "20260816-homepage-compact";
 const CONTENT_RECORD_ACTIONS_VERSION = "20260818-legacy-content-actions-v3";
 const FAULT_LIFECYCLE_VERSION = "20260818-fault-lifecycle-v1";
@@ -117,7 +121,10 @@ describe("frontend cache-version integrity", () => {
     expect(sources.indexOf(`app.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
     expect(sitesDataIndex).toBeGreaterThan(stateIndex);
     expect(sources.indexOf(`js/api-client.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`)).toBeGreaterThan(stateIndex);
-    expect(sources.indexOf(`js/modals.js?v=${FAULT_LIFECYCLE_VERSION}`)).toBeGreaterThan(stateIndex);
+    expect(sources.indexOf(`frontend/shared/modals/modal-files.js?v=${MODAL_FILES_VERSION}`)).toBeGreaterThan(stateIndex);
+    expect(sources.indexOf(`frontend/shared/modals/fault-modals.js?v=${FAULT_MODALS_VERSION}`)).toBeGreaterThan(stateIndex);
+    expect(sources.indexOf(`frontend/shared/modals/modal-core.js?v=${MODAL_CORE_VERSION}`)).toBeGreaterThan(stateIndex);
+    expect(sources.indexOf(`frontend/shared/modals/modal-submit.js?v=${MODAL_SUBMIT_VERSION}`)).toBeGreaterThan(stateIndex);
   });
 
   it("pairs the post-Fault state token with the persisted Fault normalization contract", () => {
@@ -149,7 +156,11 @@ describe("frontend cache-version integrity", () => {
     expect(index).toContain(`frontend/pages/sites/sites-data.js?v=${SITES_DATA_VERSION}`);
     expect(index).not.toContain("js/sites-page.js?v=");
     expect(index).toContain(`frontend/pages/contacts/contacts-page.js?v=${FRONTEND_STRUCTURE_VERSION}`);
-    expect(index).toContain(`js/modals.js?v=${FAULT_LIFECYCLE_VERSION}`);
+    expect(index).toContain(`frontend/shared/modals/modal-files.js?v=${MODAL_FILES_VERSION}`);
+    expect(index).toContain(`frontend/shared/modals/fault-modals.js?v=${FAULT_MODALS_VERSION}`);
+    expect(index).toContain(`frontend/shared/modals/modal-core.js?v=${MODAL_CORE_VERSION}`);
+    expect(index).toContain(`frontend/shared/modals/modal-submit.js?v=${MODAL_SUBMIT_VERSION}`);
+    expect(index).not.toContain("js/modals.js?v=");
     expect(index).toContain(`app.js?v=${CONTENT_RECORD_ACTIONS_VERSION}`);
   });
 });
