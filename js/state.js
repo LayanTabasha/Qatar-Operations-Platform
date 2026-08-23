@@ -1,55 +1,89 @@
-const AUTH_EMAIL = "admin@zeedaenergy.com";
-const AUTH_PASSWORD_HASH = "5245532f21c8425e6436e74cbd80d44d6ce33d48d3d04529461c42359b7d24e9";
 const sites = ["Musheireb", "Mowasalat", "Al Mana"];
-const routes = ["home", "sites", "contacts", "settings"];
 const STORAGE_KEY = "zeeda-qatar-ops-state";
 const USERS_KEY = "zeeda-qatar-ops-users";
-const DEV_TEMP_PASSWORD_KEY = "zeeda-qatar-ops-dev-temp-password";
-const AUTH_SESSION_KEY = "zeeda-qatar-ops-auth-session";
-const VIEW_CONTEXT_KEY = "zeeda-qatar-ops-view-context";
-const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
-const REMEMBER_SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+
+const chargerNameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+const FAULT_STATUS_OPTIONS = Object.freeze(["Open", "In Progress", "Resolved"]);
+
+function chargerTypeForDisplay(charger = {}) {
+  const explicitType = String(charger.type || "").trim().toUpperCase();
+  if (explicitType === "AC" || explicitType === "DC") return explicitType;
+  const nameType = String(charger.name || "").match(/(?:^|\s)(AC|DC)(?=\s|$)/i);
+  return nameType ? nameType[1].toUpperCase() : "";
+}
+
+function chargerTypeDisplayRank(charger) {
+  const type = chargerTypeForDisplay(charger);
+  if (type === "AC") return 0;
+  if (type === "DC") return 1;
+  return 2;
+}
+
+function compareChargersForDisplay(a = {}, b = {}) {
+  const siteCompare = chargerNameCollator.compare(String(a.siteName || ""), String(b.siteName || ""));
+  if (siteCompare !== 0) return siteCompare;
+
+  const typeCompare = chargerTypeDisplayRank(a) - chargerTypeDisplayRank(b);
+  if (typeCompare !== 0) return typeCompare;
+
+  const nameCompare = chargerNameCollator.compare(String(a.name || ""), String(b.name || ""));
+  if (nameCompare !== 0) return nameCompare;
+
+  const codeCompare = chargerNameCollator.compare(String(a.code || ""), String(b.code || ""));
+  return codeCompare || 0;
+}
+
+function sortChargersForDisplay(chargers = []) {
+  return [...chargers].sort(compareChargersForDisplay);
+}
 
 const state = {
   authenticated: false,
-  currentUser: "Admin",
+  authUser: null,
+  currentUser: "",
   currentUserEmail: "",
   currentUserRole: "",
+  currentUserRoleKey: "",
   mustChangePassword: false,
   users: [],
   currentSiteName: "",
   currentChargerId: "",
+  currentVisitId: "",
+  currentFaultId: "",
+  pendingLegacyReplacementId: "",
+  currentContentRecordId: "",
+  currentLegacyContentId: "",
+  currentContactId: "",
   currentSiteTab: "Overview",
   currentChargerTab: "Overview",
+  backendLoading: false,
+  backendError: "",
   sites: sites.map((name) => ({ name, location: "To Be Updated", status: "Pending Data", client: "Not Available Yet", notes: "", image: "", chargers: [] })),
+  dashboardChargers: [],
+  archive: { tab: "sites", sites: [], chargers: [], loading: false, error: "", search: "", feedback: "" },
   uploads: [],
   faults: [],
   visits: [],
+  requests: [],
+  contacts: [],
+  homepageRequestsLoading: false,
+  homepageRequestsError: "",
+  requestUsers: [],
   faultCatalogue: [],
-  counts: { faults: null, visits: null, documents: null, chargers: null },
+  counts: { faults: null, visits: null, chargers: null },
   recent: [],
 };
 
-const modalConfigs = {
-  site: { title: "Site Details", fields: [["Site name", "text"], ["Location", "text"], ["Client / organization", "text"], ["Status", "select:Pending Data,Healthy,Warning,Critical"], ["Description", "textarea"], ["Notes", "textarea"], ["Upload site image", "file"]] },
-  charger: { title: "Charger Details", fields: [["Charger name", "text"], ["Charger type", "select:AC,DC,Robotic Arm"], ["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Operator", "text"], ["Administrator", "text"], ["Manufacturer", "text"], ["Model", "text"], ["Serial number", "text"], ["Capacity", "text"], ["Installation date", "date"], ["Status", "select:Pending Data,Available,Warning,Critical"], ["Notes", "textarea"], ["Upload charger image", "file"]] },
-  siteVisit: { title: "Add Site Visit", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Visit date", "date"], ["Visit status", "select:Scheduled,Completed,Cancelled,Follow-Up Required"], ["Time in", "time"], ["Time out", "time"], ["Visit type", "text"], ["Engineer name", "text"], ["Technician name", "text"], ["Purpose", "textarea"], ["Work completed", "textarea"], ["Findings", "textarea"], ["Notes", "textarea"], ["Site Visit Report upload", "file"]] },
-  visitReport: { title: "Upload Site Visit Report", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Visit date", "date"], ["Report title", "text"], ["File upload", "file"], ["Notes", "textarea"]] },
-  fault: { title: "Report Fault", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Generated Fault ID", "fault-id"], ["Fault Code", "fault-code-select"], ["Fault details", "fault-code-details"], ["Fault status", "select:Open,In Progress,Resolved,Closed"], ["Date reported", "date"], ["Time reported", "time"], ["Description", "textarea"], ["Photo evidence", "image-file"], ["Comments", "textarea"]] },
-  document: { title: "Upload Charger Document", fields: [["Related site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Document title", "text"], ["Document category", "select:Specification,Warranty,Installation,Commissioning,Electrical Drawing,Certificate,Manual,Asset Record,Inspection Certificate,Other"], ["Description", "textarea"], ["File upload", "file"]] },
-  weeklyReport: { title: "Upload Weekly Report", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Week start", "date"], ["Week end", "date"], ["Report title", "text"], ["Summary", "textarea"], ["File upload", "file"]] },
-  guide: { title: "Add Troubleshooting Guide", fields: [["Site", "select:Musheireb,Mowasalat,Al Mana"], ["Charger", "charger-select"], ["Relevant fault code", "fault-code-select-optional"], ["Guide title", "text"], ["Category", "select:Reset Procedure,Replacement Guide,Error-Code Troubleshooting,Communication Failure,Preventive Maintenance,Manufacturer Repair,Other"], ["Version", "text"], ["Description", "textarea"], ["File upload", "file"]] },
-  contact: { title: "Contact", fields: [["Name", "text"], ["Role", "text"], ["Company / Department", "text"], ["Phone", "tel"], ["Email", "email"], ["Related site", "select:Musheireb,Mowasalat,Al Mana"], ["Notes", "textarea"]] },
-  profile: { title: "Profile", fields: [["Name", "text"], ["Department", "text"]] },
-  user: { title: "Add User", fields: [["Full Name", "text"], ["Work Email", "email"], ["Role", "select:Operations Staff,Viewer,Administrator"], ["Department", "select:Operations,Maintenance,Administration,Management"], ["Account Status", "select:Active,Invited,Disabled,Locked"], ["Temporary Password", "text"], ["Require Password Change on First Login", "select:Yes,No"]] },
-  faultCode: { title: "Fault Catalogue Entry", fields: [["Fault code", "text"], ["Fault name", "text"], ["Meaning", "textarea"], ["Severity", "select:Low,Medium,High,Critical,Not Classified"], ["Recommended action", "textarea"], ["Status", "select:Active,Disabled"]] },
-  deleteCharger: { title: "Remove Charger", fields: [["Type REMOVE to confirm", "text"]] },
-  confirmDelete: { title: "Delete Record", fields: [["Confirmation notes", "textarea"]] },
-};
-
-const personalSettingsItems = ["Profile", "Account Security", "Session Management"];
-const administrationSettingsItems = ["User Management", "Roles & Permissions", "Site & Charger Configuration", "Fault Catalogue", "Fault Categories", "Error Codes", "Upload Permissions", "Data Backup", "Export Data", "System Preferences", "Audit Logs"];
-const settingsItems = [...personalSettingsItems, ...administrationSettingsItems];
+window.QatarOpsRequests = Object.freeze({
+  statuses: Object.freeze([
+    Object.freeze({ value: "open", label: "Open", color: "#4f8dff" }),
+    Object.freeze({ value: "in_progress", label: "In Progress", color: "#dca94b" }),
+    Object.freeze({ value: "completed", label: "Completed", color: "#37c985" }),
+  ]),
+  canAccess() {
+    return ["admin", "hq_user"].includes(normalizedRoleKey(state.currentUserRoleKey || state.currentUserRole));
+  },
+});
 
 function normalizeUser(user, fallbackName = "User") {
   if (!user.id) user.id = `user-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -68,138 +102,68 @@ function loadStoredState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
     let migrated = false;
-    if (Array.isArray(saved.sites)) state.sites = saved.sites;
     if (saved.counts) state.counts = { ...state.counts, ...saved.counts };
     if (Array.isArray(saved.recent)) state.recent = normalizeActivityLog(saved.recent);
-    if (Array.isArray(saved.uploads)) state.uploads = saved.uploads.map(normalizeUploadRecord);
-    if (Array.isArray(saved.faults)) state.faults = saved.faults.map((fault, index) => normalizeFaultRecord(fault, index));
+    if (Array.isArray(saved.uploads)) state.uploads = saved.uploads.filter((file) => file.module !== "fault" && file.kind !== "fault").map(normalizeUploadRecord);
     if (Array.isArray(saved.visits)) state.visits = saved.visits.map(normalizeVisitRecord);
     if (Array.isArray(saved.faultCatalogue)) state.faultCatalogue = saved.faultCatalogue.map(normalizeFaultCatalogueRecord);
     migrated = recoverUnlinkedSiteVisitReports() || migrated;
     if (migrated) saveState();
   } catch {
-    localStorage.removeItem(STORAGE_KEY);
+    // Leave malformed or legacy browser data untouched for supervised recovery.
   }
 }
 
-async function hashPassword(password) {
-  const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
-  return Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-function generateTemporaryPassword() {
-  const existing = localStorage.getItem(DEV_TEMP_PASSWORD_KEY);
-  if (existing) return existing;
-  const temp = `Temp-${Math.random().toString(36).slice(2, 6).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-  localStorage.setItem(DEV_TEMP_PASSWORD_KEY, temp);
-  return temp;
-}
-
-async function loadUsers() {
-  const savedUsers = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
-  if (Array.isArray(savedUsers) && savedUsers.length) {
-    const normalizedChanged = savedUsers.some((user) => !user.department || !user.lastPasswordChange || !user.status);
-    state.users = savedUsers.map((user) => normalizeUser(user));
-    let changed = false;
-    if (!state.users.some((user) => user.email === AUTH_EMAIL)) {
-      state.users.push({
-        id: "user-admin",
-        name: "Admin",
-        email: AUTH_EMAIL,
-        passwordHash: AUTH_PASSWORD_HASH,
-        role: "Administrator",
-        status: "Active",
-        department: "Administration",
-        mustChangePassword: false,
-        lastLogin: "Not Available Yet",
-        lastPasswordChange: "Not Available Yet",
-        createdAt: new Date().toISOString().slice(0, 10),
-        createdBy: "System",
-      });
-      changed = true;
-    }
-    if (!state.users.some((user) => user.email === "operations.user@zeeda.local")) {
-      const tempPassword = generateTemporaryPassword();
-      state.users.push({
-        id: "user-operations-test",
-        name: "Test Operations User",
-        email: "operations.user@zeeda.local",
-        passwordHash: await hashPassword(tempPassword),
-        role: "Operations Staff",
-        status: "Active",
-        department: "Operations",
-        mustChangePassword: true,
-        lastLogin: "Not Available Yet",
-        lastPasswordChange: "Not Available Yet",
-        createdAt: new Date().toISOString().slice(0, 10),
-        createdBy: "System",
-      });
-      changed = true;
-    }
-    if (changed || normalizedChanged) saveUsers();
-    renderDevCredentials();
-    return;
+function loadUsers() {
+  try {
+    const savedUsers = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
+    state.users = Array.isArray(savedUsers) ? savedUsers.map((user) => normalizeUser(user)) : [];
+  } catch {
+    localStorage.removeItem(USERS_KEY);
+    state.users = [];
   }
-
-  const tempPassword = generateTemporaryPassword();
-  state.users = [
-    {
-      id: "user-admin",
-      name: "Admin",
-      email: AUTH_EMAIL,
-      passwordHash: AUTH_PASSWORD_HASH,
-      role: "Administrator",
-      status: "Active",
-      department: "Administration",
-      mustChangePassword: false,
-      lastLogin: "Not Available Yet",
-      lastPasswordChange: "Not Available Yet",
-      createdAt: new Date().toISOString().slice(0, 10),
-      createdBy: "System",
-    },
-    {
-      id: "user-operations-test",
-      name: "Test Operations User",
-      email: "operations.user@zeeda.local",
-      passwordHash: await hashPassword(tempPassword),
-      role: "Operations Staff",
-      status: "Active",
-      department: "Operations",
-      mustChangePassword: true,
-      lastLogin: "Not Available Yet",
-      lastPasswordChange: "Not Available Yet",
-      createdAt: new Date().toISOString().slice(0, 10),
-      createdBy: "System",
-    },
-  ];
-  saveUsers();
-  renderDevCredentials();
 }
 
 function saveUsers() {
-  localStorage.setItem(USERS_KEY, JSON.stringify(state.users));
+  const safeUsers = state.users.map(({ passwordHash, ...user }) => user);
+  localStorage.setItem(USERS_KEY, JSON.stringify(safeUsers));
 }
 
 function renderDevCredentials() {
   const panel = document.getElementById("dev-credentials");
   if (!panel) return;
-  const tempPassword = localStorage.getItem(DEV_TEMP_PASSWORD_KEY) || generateTemporaryPassword();
-  panel.innerHTML = `<strong>Development test user</strong><span>Email: operations.user@zeeda.local</span><span>Temporary password: ${tempPassword}</span>`;
+  panel.innerHTML = "";
 }
 
 function getCurrentUserRecord() {
-  return state.users.find((user) => user.email === state.currentUserEmail);
+  return state.authUser || state.users.find((user) => user.email === state.currentUserEmail);
 }
 
 function isAdmin() {
-  return state.currentUserRole === "Administrator";
+  return [state.currentUserRoleKey, state.currentUserRole].some((role) => normalizedRoleKey(role) === "admin");
+}
+
+function canManageOperations() {
+  return [state.currentUserRoleKey, state.currentUserRole]
+    .map(normalizedRoleKey)
+    .some((role) => ["admin", "hq_user", "operations_staff"].includes(role));
+}
+
+function normalizedRoleKey(role) {
+  const normalized = String(role || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (["admin", "administrator"].includes(normalized)) return "admin";
+  if (["operations", "operations_staff", "operation_staff"].includes(normalized)) return "operations_staff";
+  if (normalized === "viewer") return "viewer";
+  return normalized;
 }
 
 function saveState() {
+  let existing = {};
+  try { existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return; }
+  const preservedFaultUploads = Array.isArray(existing.uploads) ? existing.uploads.filter((file) => file.module === "fault" || file.kind === "fault") : [];
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
-    sites: state.sites,
-    uploads: state.uploads,
-    faults: state.faults,
+    ...existing,
+    uploads: [...preservedFaultUploads, ...state.uploads.filter((file) => file.module !== "fault" && file.kind !== "fault")],
     visits: state.visits,
     faultCatalogue: state.faultCatalogue,
     counts: state.counts,
@@ -230,6 +194,20 @@ function formatDateTime(value) {
   const parsed = parseDateValue(value);
   if (Number.isNaN(parsed.getTime())) return value || "Not Available Yet";
   return `${String(parsed.getDate()).padStart(2, "0")}/${String(parsed.getMonth() + 1).padStart(2, "0")}/${parsed.getFullYear()} at ${String(parsed.getHours()).padStart(2, "0")}:${String(parsed.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatMediumDate(value) {
+  if (!value || value === "Not Available Yet" || value === "To Be Updated") return value || "Not Available Yet";
+  const parsed = parseDateValue(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(parsed);
+}
+
+function formatMediumDateTime(value) {
+  if (!value || value === "Not Available Yet" || value === "To Be Updated") return value || "Not Available Yet";
+  const parsed = parseDateValue(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return `${formatMediumDate(value)} at ${String(parsed.getHours()).padStart(2, "0")}:${String(parsed.getMinutes()).padStart(2, "0")}`;
 }
 
 function parseDateValue(value) {
@@ -348,12 +326,19 @@ function categoryForUpload(file) {
 function normalizeFaultCatalogueRecord(record) {
   return {
     id: record.id || `fault-code-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    faultCode: record.faultCode || record.fault_code || "",
-    faultName: record.faultName || record.fault_name || "",
-    meaning: record.meaning || "",
+    faultCode: record.faultCode || record.fault_code || record.dtc_code || "",
+    ftbCode: record.ftbCode || record.ftb_code || "",
+    faultName: record.faultName || record.fault_name || record.fault_title || "",
+    meaning: record.meaning || record.description || "",
+    possibleCauses: record.possibleCauses || record.possible_causes || "",
     severity: record.severity || "Not Classified",
-    recommendedAction: record.recommendedAction || record.recommended_action || "",
-    active: record.active !== false,
+    category: record.category || "",
+    chargerModel: record.chargerModel || record.charger_model || "",
+    component: record.component || "",
+    sourceVersion: record.sourceVersion || record.source_version || "",
+    sourceSheet: record.sourceSheet || record.source_sheet || "",
+    recommendedAction: record.recommendedAction || record.recommended_action || record.recommended_actions || "",
+    active: record.active !== false && record.is_active !== false,
     createdAt: record.createdAt || record.created_at || new Date().toISOString(),
     updatedAt: record.updatedAt || record.updated_at || new Date().toISOString(),
   };
@@ -365,28 +350,44 @@ function normalizeVisitRecord(visit) {
     : state.uploads.filter((file) => file.siteVisitId === visit.id).map((file) => file.id);
   return {
     ...visit,
-    timeIn: visit.timeIn || "",
-    timeOut: visit.timeOut || "",
-    duration: visit.duration || calculateDurationFromTimes(visit.timeIn, visit.timeOut),
+    visitDate: visit.visitDate || visit.visit_date || visit.createdAt || visit.created_at || "",
+    timeIn: visit.timeIn || visit.time_in || "",
+    timeOut: visit.timeOut || visit.time_out || "",
+    duration: visit.duration || calculateDurationFromTimes(visit.timeIn || visit.time_in, visit.timeOut || visit.time_out),
     attachments,
     updatedAt: visit.updatedAt || visit.createdAt || new Date().toISOString(),
   };
 }
 
 function normalizeFaultRecord(fault, index = 0) {
-  const year = new Date(fault.reportedAt || fault.createdAt || Date.now()).getFullYear();
-  const faultId = fault.faultId || `FLT-${year}-${String(index + 1).padStart(4, "0")}`;
+  const year = new Date(fault.reportedAt || fault.reported_at || fault.createdAt || fault.created_at || Date.now()).getFullYear();
+  const faultId = fault.faultId || fault.fault_reference || `FLT-${year}-${String(index + 1).padStart(4, "0")}`;
   return {
     ...fault,
     faultId,
-    faultCatalogueId: fault.faultCatalogueId || "",
-    faultCode: fault.faultCode || fault.errorCode || "",
-    faultName: fault.faultName || fault.category || "Needs Catalogue Classification",
-    faultDescription: fault.faultDescription || "",
-    severity: fault.severity || fault.priority || "Not Classified",
+    faultCatalogueId: fault.faultCatalogueId || fault.fault_catalogue_id || "",
+    faultCode: fault.faultCode || fault.fault_code || fault.errorCode || "",
+    ftbCode: fault.ftbCode || fault.ftb_code || "", component: fault.component || "",
+    faultName: fault.faultName || fault.title || fault.category || "Needs Catalogue Classification",
+    faultDescription: fault.faultDescription || fault.technician_observation || "",
+    siteName: fault.siteName || fault.site_name || "", chargerId: fault.chargerId || fault.charger_id || "", chargerName: fault.chargerName || fault.charger_name || "",
+    possibleCauses: fault.possibleCauses || fault.possible_causes || "", recommendedAction: fault.recommendedAction || fault.recommended_actions || "",
+    technicalCategory: fault.technicalCategory || fault.technical_category || "", chargerStatus: fault.chargerStatus || fault.charger_status || "Active",
+    siteVisitRequired: fault.siteVisitRequired ?? fault.requires_site_visit ?? false, reportedBy: fault.reportedBy || fault.reported_by_name || fault.created_by_name || "",
+    reportedAt: fault.reportedAt || fault.reported_at || "", reportedDate: fault.reportedDate || String(fault.reported_at || "").slice(0,10), reportedTime: fault.reportedTime || String(fault.reported_at || "").slice(11,16),
+    createdAt: fault.createdAt || fault.created_at, updatedAt: fault.updatedAt || fault.updated_at,
+    status: ({ open:"Open", in_progress:"In Progress", resolved:"Resolved" }[fault.status] || fault.status),
+    priority: normalizedFaultSeverity(fault.priority, "Medium"), category: fault.category || fault.fault_type || "Other",
+    comments: fault.comments || fault.resolution_notes || "", attachmentRecords: fault.attachments || [],
+    severity: normalizedFaultSeverity(fault.severity),
     recommendedAction: fault.recommendedAction || "",
-    photos: Array.isArray(fault.photos) ? fault.photos : state.uploads.filter((file) => file.faultId === faultId || file.faultId === fault.id).map((file) => file.id),
+    photos: Array.isArray(fault.attachments) ? fault.attachments.map((file) => file.id) : Array.isArray(fault.photos) ? fault.photos : [],
   };
+}
+
+function normalizedFaultSeverity(value, fallback = "Not Classified") {
+  const normalized = String(value || "").trim().toLowerCase();
+  return { low: "Low", medium: "Medium", high: "High", critical: "Critical", "not classified": "Not Classified", not_classified: "Not Classified" }[normalized] || fallback;
 }
 
 function calculateDurationFromTimes(timeIn, timeOut) {
@@ -486,16 +487,25 @@ function refreshDerivedCounts() {
   state.counts.chargers = chargerTotal;
   state.counts.faults = state.faults.filter((fault) => ["Open", "In Progress"].includes(fault.status)).length;
   state.counts.visits = state.visits.length;
-  state.counts.documents = getValidUploads().length;
   return state.counts;
 }
 
 function imageBlock(src, label, className = "") {
   const imageSource = typeof src === "object" ? src?.display || src?.original : src;
+  const resolvedImageSource = typeof apiAssetUrl === "function" ? apiAssetUrl(imageSource) : imageSource;
   const placeholderText = className.includes("charger") ? "No Charger Image Available" : "No Site Image Available";
   return src
-    ? `<div class="image-placeholder ${className} has-image"><img src="${imageSource}" alt="${label}" loading="lazy" /></div>`
+    ? `<div class="image-placeholder ${className} has-image" data-placeholder-text="${placeholderText}"><img src="${resolvedImageSource}" alt="${label}" loading="lazy" onerror="showImageFallback(this)" /></div>`
     : `<div class="image-placeholder ${className} branded-placeholder"><div class="brand-mark"><strong>ZEEDA</strong><span>ENERGY</span></div><small>${placeholderText}</small></div>`;
+}
+
+function showImageFallback(image) {
+  const wrapper = image?.closest?.(".image-placeholder");
+  if (!wrapper) return;
+  const placeholderText = wrapper.dataset.placeholderText || "No Site Image Available";
+  wrapper.classList.remove("has-image");
+  wrapper.classList.add("branded-placeholder");
+  wrapper.innerHTML = `<div class="brand-mark"><strong>ZEEDA</strong><span>ENERGY</span></div><small>${placeholderText}</small>`;
 }
 
 function placeholder(label, value = "Not Available Yet") {

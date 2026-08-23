@@ -1,0 +1,33 @@
+[
+  {
+    "id": "fault-1785142323493-sqesn",
+    "faultId": "FLT-2026-0001",
+    "faultCatalogueId": "",
+    "faultCode": "",
+    "faultName": "Charger screen glitching",
+    "faultDescription": "",
+    "severity": "Medium",
+    "recommendedAction": "",
+    "siteName": "Msheireb",
+    "chargerId": "ede42290-5155-4ba9-b91f-56fda870964d",
+    "chargerName": "Msheireb DC Charger 02",
+    "status": "Closed",
+    "description": "Screen issues",
+    "comments": "Re-Wiring might be needed",
+    "photos": [],
+    "reportedBy": "Zeeda Energy Admin",
+    "reportedDate": "2026-07-27",
+    "reportedTime": "11:52",
+    "reportedAt": "2026-07-27T08:52:00.000Z",
+    "createdAt": "2026-07-27T08:52:03.493Z",
+    "updatedAt": "2026-08-05T06:40:52.418Z",
+    "ftbCode": "",
+    "component": "",
+    "possibleCauses": "",
+    "category": "Screen or interface",
+    "technicalCategory": "",
+    "chargerStatus": "Active",
+    "priority": "High",
+    "siteVisitRequired": true
+  }
+]

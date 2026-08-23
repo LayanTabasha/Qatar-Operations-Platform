@@ -1,0 +1,27 @@
+import request from "supertest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+const authMocks = vi.hoisted(() => ({ findSafeUserById: vi.fn() }));
+const repository = vi.hoisted(() => ({ listFaults:vi.fn(), findFaultById:vi.fn(), insertFault:vi.fn(), updateFaultById:vi.fn(), archiveFaultById:vi.fn() }));
+vi.mock("../src/modules/auth/auth.repository.js", () => ({ findUserWithPasswordByEmail:vi.fn(), findSafeUserById:authMocks.findSafeUserById, updateLastLoginAt:vi.fn() }));
+vi.mock("../src/modules/faults/faults.repository.js", () => repository);
+const relationship = vi.hoisted(() => ({ chargerBelongsToSite: vi.fn() }));
+vi.mock("../src/modules/operational-relations/operational-relations.repository.js", () => relationship);
+let app, jwt;
+const users = { admin:{ id:"11111111-1111-4111-8111-111111111111", full_name:"Admin", email:"admin@example.com", role:"admin", is_active:true } };
+users.operations={...users.admin, role:"operations_staff"}; users.hq={...users.admin, role:"hq_user"}; users.viewer={...users.admin, role:"viewer"};
+const siteId="33333333-3333-4333-8333-333333333333", chargerId="44444444-4444-4444-8444-444444444444", id="55555555-5555-4555-8555-555555555555";
+const fault={ id, fault_reference:"FLT-2026-000001", site_id:siteId, charger_id:chargerId, title:"Shared fault", fault_type:"Electrical", severity:"high", priority:"high", status:"open", reported_at:"2026-08-05T10:00:00.000Z", attachments:[] };
+beforeAll(async()=>{ Object.assign(process.env,{ NODE_ENV:"test",PORT:"3000",DATABASE_URL:"postgresql://x:x@localhost/x",DATABASE_SSL:"false",FRONTEND_ORIGIN:"http://localhost:5500",LOG_LEVEL:"silent",TRUST_PROXY:"false",JWT_SECRET:"test-secret-value-that-is-long-enough-for-validation",JWT_EXPIRES_IN:"8h",AUTH_COOKIE_NAME:"qatar_ops_token",COOKIE_SECURE:"false",COOKIE_SAME_SITE:"lax" }); ({app}=await import("../src/app.js")); jwt=await import("jsonwebtoken"); });
+beforeEach(()=>{ vi.clearAllMocks(); relationship.chargerBelongsToSite.mockResolvedValue(true); repository.listFaults.mockResolvedValue([fault]); repository.findFaultById.mockResolvedValue(fault); repository.insertFault.mockResolvedValue(fault); repository.updateFaultById.mockResolvedValue(fault); repository.archiveFaultById.mockResolvedValue({id}); });
+function cookie(user){ authMocks.findSafeUserById.mockResolvedValue(user); return [`qatar_ops_token=${jwt.default.sign({sub:user.id,role:user.role},process.env.JWT_SECRET)}`]; }
+const payload={ site_id:siteId, charger_id:chargerId, fault_type:"Electrical", title:"Shared fault", severity:"high", priority:"high", status:"open", reported_at:"2026-08-05T10:00:00.000Z" };
+describe("fault persistence API",()=>{
+  it.each([["admin",users.admin],["HQ user",users.hq],["operations staff",users.operations]])("allows %s to create a PostgreSQL fault",async(_label,user)=>{ await request(app).post("/api/v1/faults").set("Cookie",cookie(user)).send(payload).expect(201); expect(repository.insertFault).toHaveBeenCalledWith(expect.objectContaining({site_id:siteId,charger_id:chargerId,created_by:user.id})); });
+  it("lets another authenticated user retrieve the same stored fault",async()=>{ const response=await request(app).get(`/api/v1/faults/${id}`).set("Cookie",cookie(users.viewer)).expect(200); expect(response.body.fault.fault_reference).toBe("FLT-2026-000001"); });
+  it.each(["post","patch","delete"])("prevents viewers from %s writes",async(method)=>{ let call=request(app)[method](`/api/v1/faults${method==="post"?"":`/${id}`}`).set("Cookie",cookie(users.viewer)); if(method!=="delete") call=call.send(method==="post"?payload:{status:"resolved"}); await call.expect(403); });
+  it.each(["open","in_progress","resolved"])("accepts the %s lifecycle status",async(status)=>{ await request(app).patch(`/api/v1/faults/${id}`).set("Cookie",cookie(users.operations)).send({status}).expect(200); expect(repository.updateFaultById).toHaveBeenCalledWith(id,expect.objectContaining({status}),expect.any(Object)); });
+  it.each(["closed","unknown"])("rejects the invalid %s lifecycle status",async(status)=>{ await request(app).patch(`/api/v1/faults/${id}`).set("Cookie",cookie(users.operations)).send({status}).expect(400); expect(repository.updateFaultById).not.toHaveBeenCalled(); });
+  it("passes site, charger, status, severity and date filters to the repository",async()=>{ await request(app).get(`/api/v1/faults?site_id=${siteId}&charger_id=${chargerId}&status=open&severity=high&date_from=2026-08-01&date_to=2026-08-05`).set("Cookie",cookie(users.viewer)).expect(200); expect(repository.listFaults).toHaveBeenCalledWith(expect.objectContaining({site_id:siteId,charger_id:chargerId,status:"open",severity:"high",date_from:"2026-08-01",date_to:"2026-08-05"})); });
+  it("rejects cross-site charger reassignment",async()=>{ relationship.chargerBelongsToSite.mockResolvedValue(false); await request(app).patch(`/api/v1/faults/${id}`).set("Cookie",cookie(users.operations)).send({site_id:siteId,charger_id:chargerId}).expect(400); expect(repository.updateFaultById).not.toHaveBeenCalled(); });
+  it("archives instead of hard-deleting operational fault records",async()=>{ await request(app).delete(`/api/v1/faults/${id}`).set("Cookie",cookie(users.operations)).expect(204); expect(repository.archiveFaultById).toHaveBeenCalledWith(id,users.operations.id,fault,expect.any(Object)); });
+});

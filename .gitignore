@@ -1,5 +1,7 @@
 # Environment variables and secrets
 .env
+.env.*
+!.env.example
 .env.local
 .env.development
 .env.production
@@ -13,6 +15,24 @@ build/
 
 # Log files
 *.log
+logs/
+
+# Secrets, private keys, and certificates
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Local uploads, generated previews, and test coverage
+uploads/
+previews/
+coverage/
+
+# Database dumps and generated output
+*.dump
+*.sql.gz
+*.backup
+outputs/
 
 # VS Code personal settings
 .vscode/
@@ -27,3 +47,6 @@ Desktop.ini
 # Temporary files
 *.tmp
 *.temp
+*.swp
+*.swo
+*~
