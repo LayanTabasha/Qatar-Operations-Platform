@@ -31,8 +31,9 @@ function runtime({ admin = true, sites, backendLoading = false, backendError = "
     currentChargerId: "",
     sites: sites ?? [
       { id: "1", name: "Al Mana", code: "AM", location: "Doha", status: "Active", chargers: [{}, {}] },
-      { id: "2", name: "Mowasalat", code: "MW", location: "Depot", status: "Maintenance", chargers: [{}] },
+      { id: "2", name: "Mowasalat", code: "MW", location: "Depot", status: "Under Maintenance", chargers: [{}] },
       { id: "3", name: "Msheireb", code: "MS", location: "Central", status: "Active", chargers: [] },
+      { id: "4", name: "Inactive Depot", code: "ID", location: "Depot", status: "Inactive", chargers: [] },
     ],
   };
   context.getRecordDate = (record) => record.visitDate || record.createdAt;
@@ -53,7 +54,10 @@ describe("Main Sites list component", () => {
     const admin = runtime();
     admin.context.buildSites();
     const html = admin.document.getElementById("site-list").innerHTML;
-    for (const site of ["Al Mana", "Mowasalat", "Msheireb"]) expect(html).toContain(site);
+    for (const site of ["Al Mana", "Mowasalat", "Msheireb", "Inactive Depot"]) expect(html).toContain(site);
+    expect(html).toContain("site-status-active");
+    expect(html).toContain("site-status-inactive");
+    expect(html).toContain("site-status-under-maintenance");
     expect(html).toContain("Number of Chargers:2");
     expect(html).toContain("Open Faults:1");
     expect(html).toContain("Edit");
@@ -77,21 +81,21 @@ describe("Main Sites list component", () => {
     expect(document.getElementById("site-list").textContent).toContain("Al Mana");
     expect(document.getElementById("site-list").textContent).not.toContain("Mowasalat");
 
-    status.value = "Maintenance";
+    status.value = "Under Maintenance";
     status.dispatchEvent(new context.Event("change", { bubbles: true }));
     expect(document.getElementById("site-list").textContent).toContain("No sites match the selected filters");
     search.value = "";
     search.dispatchEvent(new context.Event("input", { bubbles: true }));
     expect(document.getElementById("site-list").textContent).toContain("Mowasalat");
 
-    context.state.sites.push({ id: "4", name: "West Depot", status: "Maintenance", chargers: [] });
+    context.state.sites.push({ id: "5", name: "West Depot", status: "Under Maintenance", chargers: [] });
     context.buildSites();
     expect(document.getElementById("site-list").textContent).toContain("West Depot");
     expect(search.value).toBe("");
-    expect(status.value).toBe("Maintenance");
+    expect(status.value).toBe("Under Maintenance");
     status.value = "";
     status.dispatchEvent(new context.Event("change", { bubbles: true }));
-    for (const site of ["Al Mana", "Mowasalat", "Msheireb", "West Depot"]) expect(document.getElementById("site-list").textContent).toContain(site);
+    for (const site of ["Al Mana", "Mowasalat", "Msheireb", "Inactive Depot", "West Depot"]) expect(document.getElementById("site-list").textContent).toContain(site);
   });
 
   it("preserves loading, API error, empty, and no-match states", () => {

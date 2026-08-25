@@ -156,7 +156,7 @@ describe("site visit routes", () => {
     await request(app).delete(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(hqUser)).expect(204);
   });
 
-  it("allows ongoing visits without time out", async () => {
+  it("allows scheduled visits without time out", async () => {
     await request(app)
       .post("/api/v1/site-visits")
       .set("Cookie", authCookie(operationsUser))
@@ -166,16 +166,16 @@ describe("site visit routes", () => {
         time_in: "09:30",
         visited_by: "Engineer One",
         purpose: "Inspection",
-        status: "ongoing",
+        status: "scheduled",
       })
       .expect(201);
 
     const insertedVisit = siteVisitsRepositoryMocks.insertSiteVisit.mock.calls[0][0];
-    expect(insertedVisit).toMatchObject({ status: "ongoing", time_in: "09:30" });
+    expect(insertedVisit).toMatchObject({ status: "scheduled", time_in: "09:30" });
     expect(insertedVisit.time_out).toBeUndefined();
   });
 
-  it("requires time out unless the visit is ongoing", async () => {
+  it("requires time out for completed visits", async () => {
     await request(app)
       .post("/api/v1/site-visits")
       .set("Cookie", authCookie(operationsUser))
@@ -188,6 +188,16 @@ describe("site visit routes", () => {
         status: "completed",
       })
       .expect(400);
+  });
+
+  it.each(["scheduled", "completed", "follow_up_required"])("accepts the %s lifecycle status", async (status) => {
+    await request(app).patch(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(operationsUser)).send({ status }).expect(200);
+    expect(siteVisitsRepositoryMocks.updateSiteVisitById).toHaveBeenCalledWith(siteVisitId, expect.objectContaining({ status }), expect.any(Object));
+  });
+
+  it.each(["ongoing", "cancelled"])("rejects the removed %s lifecycle status", async (status) => {
+    await request(app).patch(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(operationsUser)).send({ status }).expect(400);
+    expect(siteVisitsRepositoryMocks.updateSiteVisitById).not.toHaveBeenCalled();
   });
 
   it("allows operations staff to update visit date and times", async () => {

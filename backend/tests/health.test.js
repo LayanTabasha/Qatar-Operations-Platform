@@ -104,10 +104,12 @@ describe("health routes", () => {
     expect(response.body).toMatchObject({
       success: true,
       status: "healthy",
-      components: { backend: { status: "healthy" }, database: { status: "healthy" }, storage: { status: "healthy" } },
-      application: { version: "0.1.0", uptimeSeconds: expect.any(Number) },
-      migrations: { latest: "018_persist_content_records.sql" },
+      components: { backend: { status: "healthy" }, database: { status: "healthy" }, storage: { status: "healthy" }, core: { status: "healthy" } },
+      application: { version: "0.1.0" },
     });
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.body.application).not.toHaveProperty("uptimeSeconds");
+    expect(response.body).not.toHaveProperty("migrations");
     expect(response.body.serverTimestamp).toEqual(expect.any(String));
     expect(response.body.lastHealthCheck).toEqual(expect.any(String));
     expect(JSON.stringify(response.body)).not.toMatch(/DATABASE_URL|JWT_SECRET|password|qatar_ops_token|\/tmp|username/i);

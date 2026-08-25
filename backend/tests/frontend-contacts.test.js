@@ -28,7 +28,7 @@ describe("Contacts optional Site frontend", () => {
     const virtualConsole = new VirtualConsole();
     virtualConsole.on("jsdomError", (error) => errors.push(error));
     const dom = new JSDOM(`<!doctype html><section id="contacts"></section>
-      <script>var state={contacts:[],sites:[{id:"site-1",name:"Msheireb"},{id:"site-2",name:"Al Mana"}]};function canManageOperations(){return true;}</script>
+      <script>var state={contacts:[],sites:[{id:"site-1",name:"Msheireb"},{id:"site-2",name:"Al Mana"}]};function isAdmin(){return true;}</script>
       <script>${contactsScript}</script>`, { runScripts: "dangerously", virtualConsole });
     dom.window.state.contacts = [
       { id: "contact-site", contact_name: "Site Technician", job_title: "Site Technician", organization: "Zeeda Energy", site_id: "site-1", site_name: "Msheireb" },
@@ -61,6 +61,15 @@ describe("Contacts optional Site frontend", () => {
     expect([...dom.window.document.querySelectorAll(".contact-card:not(.hidden)")].map((card) => card.dataset.contactId)).toEqual(["contact-site"]);
   });
 
+  it.each([["admin", true], ["hq_user", false], ["operations_staff", false], ["viewer", false]])("shows Contact management controls for %s only when authorized", (role, canManage) => {
+    const contactsScript = read("frontend/pages/contacts/contacts-page.js");
+    const dom = new JSDOM(`<!doctype html><section id="contacts"></section><script>var state={contacts:[{id:"contact-1",contact_name:"Contact"}],sites:[]};function isAdmin(){return ${canManage};}</script><script>${contactsScript}</script>`, { runScripts: "dangerously" });
+    expect(Boolean(dom.window.document.querySelector('[data-modal="contact"][data-mode="create"]'))).toBe(canManage);
+    expect(Boolean(dom.window.document.querySelector('[data-modal="contact"][data-mode="edit"]'))).toBe(canManage);
+    expect(Boolean(dom.window.document.querySelector("[data-contact-delete]"))).toBe(canManage);
+    expect(dom.window.document.querySelectorAll(".contact-card")).toHaveLength(1);
+  });
+
   it("opens Add/Edit forms with the correct optional Site selection", () => {
     const stateScript = read("js/state.js");
     const displayUtilsScript = read("frontend/shared/utils/display-utils.js");
@@ -72,7 +81,7 @@ describe("Contacts optional Site frontend", () => {
     const dom = new JSDOM(`<!doctype html><section id="contacts"></section><div id="modal-backdrop" class="hidden"><div class="modal"><h2 id="modal-title"></h2><p id="modal-eyebrow"></p><form id="modal-form"></form></div></div>
       <script>HTMLElement.prototype.scrollTo=function(){};</script><script>${stateScript}</script><script>${displayUtilsScript}</script><script>${contactsScript}</script><script>${modalsScript}</script>
       <script>
-        state.currentUserRoleKey="operations_staff";
+        state.currentUserRoleKey="admin";
         state.sites=[{id:"site-1",name:"Msheireb",chargers:[]}];
         openModal("contact","create");
         document.body.dataset.createSite=document.getElementById("assigned-site").value;

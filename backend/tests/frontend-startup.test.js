@@ -134,7 +134,7 @@ describe("full production-order frontend startup", () => {
     const settingsSources = [
       "frontend/pages/settings/settings-shared.js?v=20260820-settings-shared-ownership-v1",
       "frontend/pages/settings/account-settings.js?v=20260820-account-settings-v1",
-      "frontend/pages/settings/platform-health.js?v=20260820-platform-health-v1",
+      "frontend/pages/settings/platform-health.js?v=20260825-platform-health-v2",
       "frontend/pages/settings/user-management.js?v=20260820-user-management-v1",
       "frontend/pages/settings/settings-page.js?v=20260820-settings-page-v1",
     ];
@@ -153,10 +153,10 @@ describe("full production-order frontend startup", () => {
   it("locks the modal split cache and single-definition contract", () => {
     const modalSources = [
       "frontend/shared/modals/modal-files.js?v=20260820-modal-files-v1",
-      "frontend/shared/modals/fault-modals.js?v=20260820-fault-modals-v1",
-      "frontend/shared/modals/modal-configs.js?v=20260820-modal-configs-v1",
-      "frontend/shared/modals/modal-core.js?v=20260820-modal-core-v1",
-      "frontend/shared/modals/modal-submit.js?v=20260820-modal-submit-v1",
+      "frontend/shared/modals/fault-modals.js?v=20260825-fault-resolution-v1",
+      "frontend/shared/modals/modal-configs.js?v=20260825-site-visit-lifecycle-v1",
+      "frontend/shared/modals/modal-core.js?v=20260825-contacts-admin-v1",
+      "frontend/shared/modals/modal-submit.js?v=20260825-contacts-admin-v1",
     ];
     for (const source of modalSources) expect(scriptSources).toContain(source);
     expect(scriptSources.some((source) => source.startsWith("js/modals.js?"))).toBe(false);
@@ -171,9 +171,9 @@ describe("full production-order frontend startup", () => {
   });
 
   it("locks final shared ownership and foundational cache tokens", () => {
-    expect(scriptSources).toContain("js/state.js?v=20260820-state-ownership-v1");
+    expect(scriptSources).toContain("js/state.js?v=20260825-fault-resolution-v1");
     expect(scriptSources).toContain("js/auth-router.js?v=20260820-auth-router-ownership-v1");
-    expect(scriptSources).toContain("frontend/shared/modals/modal-configs.js?v=20260820-modal-configs-v1");
+    expect(scriptSources).toContain("frontend/shared/modals/modal-configs.js?v=20260825-site-visit-lifecycle-v1");
     expect(scriptSources).toContain("frontend/pages/settings/settings-shared.js?v=20260820-settings-shared-ownership-v1");
     const production = localScripts.map(({ file }) => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
     for (const declaration of ["modalConfigs", "personalSettingsItems", "administrationSettingsItems", "systemSettingsItems", "settingsItems", "routes", "VIEW_CONTEXT_KEY"]) {

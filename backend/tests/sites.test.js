@@ -12,7 +12,7 @@ const sitesRepositoryMocks = vi.hoisted(() => ({
   listSites: vi.fn(),
   listArchivedSites: vi.fn(),
   findSiteById: vi.fn(),
-  findActiveSiteById: vi.fn(),
+  findOperationalSiteById: vi.fn(),
   archiveSiteById: vi.fn(),
   restoreSiteById: vi.fn(),
   permanentlyDeleteSiteById: vi.fn(),
@@ -84,7 +84,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   sitesRepositoryMocks.listSites.mockResolvedValue([siteSummary]);
   sitesRepositoryMocks.findSiteById.mockResolvedValue(siteSummary);
-  sitesRepositoryMocks.findActiveSiteById.mockResolvedValue(siteSummary);
+  sitesRepositoryMocks.findOperationalSiteById.mockResolvedValue(siteSummary);
   sitesRepositoryMocks.insertSite.mockResolvedValue(siteSummary);
   sitesRepositoryMocks.updateSiteById.mockResolvedValue(siteSummary);
   sitesRepositoryMocks.updateSiteImagePathById.mockResolvedValue({ ...siteSummary, image_path: "/uploads/site-images/test.webp" });
@@ -193,7 +193,7 @@ describe("sites routes", () => {
   });
 
   it("returns 404 before upload when the site is unknown", async () => {
-    sitesRepositoryMocks.findActiveSiteById.mockResolvedValueOnce(null);
+    sitesRepositoryMocks.findOperationalSiteById.mockResolvedValueOnce(null);
 
     const response = await request(app)
       .post(`/api/v1/sites/${siteId}/image`)
@@ -267,18 +267,39 @@ describe("sites routes", () => {
       .expect(200);
   });
 
-  it("uses active as the default list status", async () => {
+  it("uses all non-archived sites as the default list status", async () => {
     await request(app).get("/api/v1/sites").set("Cookie", authCookie(viewerUser)).expect(200);
 
-    expect(sitesRepositoryMocks.listSites).toHaveBeenCalledWith(expect.objectContaining({ status: "active" }));
+    expect(sitesRepositoryMocks.listSites).toHaveBeenCalledWith(expect.objectContaining({ status: "all" }));
+  });
+
+  it("returns active, inactive, and maintenance sites for the all sentinel", async () => {
+    const operationalSites = [
+      { ...siteSummary, id: "33333333-3333-4333-8333-333333333331", status: "active" },
+      { ...siteSummary, id: "33333333-3333-4333-8333-333333333332", status: "inactive" },
+      { ...siteSummary, id: "33333333-3333-4333-8333-333333333333", status: "maintenance" },
+    ];
+    sitesRepositoryMocks.listSites.mockResolvedValueOnce(operationalSites);
+
+    const response = await request(app).get("/api/v1/sites?status=all").set("Cookie", authCookie(viewerUser)).expect(200);
+
+    expect(response.body.sites.map(({ status }) => status)).toEqual(["active", "inactive", "maintenance"]);
+    expect(response.body.sites).not.toEqual(expect.arrayContaining([expect.objectContaining({ status: "archived" })]));
+    expect(sitesRepositoryMocks.listSites).toHaveBeenCalledWith(expect.objectContaining({ status: "all" }));
   });
 
   it("keeps archived sites out of normal list filters", async () => {
     await request(app).get("/api/v1/sites?status=archived").set("Cookie", authCookie(viewerUser)).expect(400);
   });
 
-  it("rejects inactive as a status filter", async () => {
-    await request(app).get("/api/v1/sites?status=inactive").set("Cookie", authCookie(viewerUser)).expect(400);
+  it.each(["active", "inactive", "maintenance", "all"])("accepts %s as a normal site list filter", async (status) => {
+    await request(app).get(`/api/v1/sites?status=${status}`).set("Cookie", authCookie(viewerUser)).expect(200);
+    expect(sitesRepositoryMocks.listSites).toHaveBeenCalledWith(expect.objectContaining({ status }));
+  });
+
+  it("rejects invalid normal site list filters", async () => {
+    await request(app).get("/api/v1/sites?status=unknown").set("Cookie", authCookie(viewerUser)).expect(400);
+    expect(sitesRepositoryMocks.listSites).not.toHaveBeenCalled();
   });
 
   it("returns validation error for invalid UUIDs", async () => {
@@ -308,7 +329,7 @@ describe("sites routes", () => {
   });
 
   it("returns 404 when a site is not found", async () => {
-    sitesRepositoryMocks.findActiveSiteById.mockResolvedValue(null);
+    sitesRepositoryMocks.findOperationalSiteById.mockResolvedValue(null);
 
     await request(app).get(`/api/v1/sites/${siteId}`).set("Cookie", authCookie(viewerUser)).expect(404);
   });
@@ -335,6 +356,25 @@ describe("sites routes", () => {
       .patch(`/api/v1/sites/${siteId}/status`)
       .set("Cookie", authCookie(adminUser))
       .send({ status: "archived" })
+      .expect(400);
+  });
+
+  it.each(["active", "inactive", "maintenance"])("allows admins to set normal site status to %s", async (status) => {
+    sitesRepositoryMocks.updateSiteStatusById.mockResolvedValue({ ...siteSummary, status });
+    const response = await request(app)
+      .patch(`/api/v1/sites/${siteId}/status`)
+      .set("Cookie", authCookie(adminUser))
+      .send({ status })
+      .expect(200);
+    expect(sitesRepositoryMocks.updateSiteStatusById).toHaveBeenCalledWith(siteId, status);
+    expect(response.body.site.status).toBe(status);
+  });
+
+  it.each(["all", "archived", "faulted", "under_maintenance", "unknown"])("rejects unsupported normal site status %s", async (status) => {
+    await request(app)
+      .patch(`/api/v1/sites/${siteId}/status`)
+      .set("Cookie", authCookie(adminUser))
+      .send({ status })
       .expect(400);
   });
 

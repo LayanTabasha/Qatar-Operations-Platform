@@ -124,14 +124,14 @@ describe("frontend Archive workflow", () => {
 
   it("loads every changed browser asset with a current cache token", () => {
     const { index } = sources();
-    expect(index).toContain("app.js?v=20260820-final-production-cleanup-v1");
+    expect(index).toContain("app.js?v=20260825-contacts-admin-v1");
     expect(index).toContain("frontend/pages/settings/archive-page.js?v=20260818-frontend-structure-v1");
     expect(index).toContain("frontend/pages/settings/settings-page.js?v=20260820-settings-page-v1");
     expect(index).toContain("js/api-client.js?v=20260818-legacy-content-actions-v3");
-    expect(index).toContain("js/state.js?v=20260820-state-ownership-v1");
+    expect(index).toContain("js/state.js?v=20260825-fault-resolution-v1");
     expect(index).toContain("frontend/pages/sites/sites-data.js?v=20260820-sites-data-refresh-v1");
     expect(index).not.toContain("js/sites-page.js?v=");
-    expect(index).toContain("frontend/shared/modals/modal-submit.js?v=20260820-modal-submit-v1");
-    expect(index).toContain("styles.css?v=20260816-homepage-compact");
+    expect(index).toContain("frontend/shared/modals/modal-submit.js?v=20260825-contacts-admin-v1");
+    expect(index).toContain("styles.css?v=20260825-visit-activity-v2");
   });
 });

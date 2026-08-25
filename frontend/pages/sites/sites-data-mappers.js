@@ -7,11 +7,16 @@ function imagePathWithVersion(imagePath, updatedAt) {
 function statusLabel(status) {
   const labels = {
     active: "Active",
+    inactive: "Inactive",
     archived: "Archived",
     maintenance: "Maintenance",
     faulted: "Faulted",
   };
   return labels[status] || valueOrPlaceholder(status);
+}
+
+function siteStatusLabel(status) {
+  return status === "maintenance" ? "Under Maintenance" : statusLabel(status);
 }
 
 function mapBackendCharger(charger) {
@@ -60,7 +65,7 @@ function mapBackendSite(site, chargers) {
     location: site.location || site.address || "To Be Updated",
     address: site.address || "",
     client: site.address || "Not Available Yet",
-    status: statusLabel(site.status),
+    status: siteStatusLabel(site.status),
     backendStatus: site.status,
     description: site.description || "",
     notes: "",
@@ -172,9 +177,7 @@ function deduplicateSiteVisitAttachments(files = [], parentId = "") {
 function siteVisitStatusLabel(status) {
   return {
     scheduled: "Scheduled",
-    ongoing: "Ongoing",
     completed: "Completed",
-    cancelled: "Cancelled",
     follow_up_required: "Follow-Up Required",
   }[status] || valueOrPlaceholder(status);
 }
@@ -182,9 +185,7 @@ function siteVisitStatusLabel(status) {
 function backendSiteVisitStatus(status) {
   return {
     Scheduled: "scheduled",
-    Ongoing: "ongoing",
     Completed: "completed",
-    Cancelled: "cancelled",
     "Follow-Up Required": "follow_up_required",
   }[status] || "completed";
 }

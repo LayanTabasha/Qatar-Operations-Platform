@@ -78,7 +78,7 @@ describe("Homepage Requests integration", () => {
     expect(app).toContain('[data-fault-trend-site]');
     expect(faultTrend).toContain('No faults reported for this site during this period.');
     expect(faultTrend).toContain("const days = Number(document.getElementById(\"fault-trend-range\")?.value || 30)");
-    expect(app).toContain('["fault-trend-site", "fault-trend-range", "visit-activity-mode"]');
+    expect(app).toContain('["fault-trend-site", "fault-trend-range"]');
   });
 
   it("removes placeholder KPI subtitles while retaining useful secondary text", () => {

@@ -21,5 +21,6 @@ export const getDatabaseHealth = asyncHandler(async (_req, res) => {
 });
 
 export const getDetailedPlatformHealth = asyncHandler(async (_req, res) => {
+  res.set("Cache-Control", "no-store");
   res.json(await getPlatformHealth());
 });

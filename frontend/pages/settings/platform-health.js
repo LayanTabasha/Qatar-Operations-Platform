@@ -6,14 +6,6 @@ function healthTone(status) {
   return { healthy: "status-good", degraded: "status-warning", unavailable: "status-bad" }[status] || "status-neutral";
 }
 
-function formatUptime(seconds) {
-  if (!Number.isFinite(seconds)) return "Unknown";
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  return [days && `${days}d`, (days || hours) && `${hours}h`, `${minutes}m`].filter(Boolean).join(" ");
-}
-
 function healthInfoItem(label, value, status = "unknown", message = "") {
   return `<div class="settings-info-item health-card ${healthTone(status)}"><span>${formatSettingValue(label)}</span><strong>${formatSettingValue(value)}</strong>${message ? `<small>${formatSettingValue(message)}</small>` : ""}</div>`;
 }
@@ -32,12 +24,10 @@ function renderPlatformHealth(data = null, stateName = "loading", error = null) 
     healthInfoItem("Backend API", healthStatusLabel(data.components?.backend?.status), data.components?.backend?.status, data.components?.backend?.message),
     healthInfoItem("Database", healthStatusLabel(data.components?.database?.status), data.components?.database?.status, data.components?.database?.message),
     healthInfoItem("File Storage", healthStatusLabel(data.components?.storage?.status), data.components?.storage?.status, data.components?.storage?.message),
-    healthInfoItem("Application Uptime", formatUptime(data.application?.uptimeSeconds), "healthy"),
+    healthInfoItem("Core Platform", healthStatusLabel(data.components?.core?.status), data.components?.core?.status, data.components?.core?.message),
     healthInfoItem("Application Version", data.application?.version, "healthy"),
     healthInfoItem("Last Health Check", formatDateTime(data.lastHealthCheck), "healthy"),
   ];
-  if (data.migrations) cards.push(healthInfoItem("Latest Database Migration", data.migrations.latest || healthStatusLabel(data.migrations.status), data.migrations.status, data.migrations.message));
-  if (data.backup) cards.push(healthInfoItem("Backup Status", healthStatusLabel(data.backup.status), data.backup.status, data.backup.message));
   return `<div class="settings-section platform-health"><div class="panel-head"><div><h2>Platform Health</h2><p>Live status of critical application dependencies.</p></div><button class="primary-button" id="platform-health-refresh" type="button">Refresh Status</button></div><div class="settings-info-grid">${cards.join("")}</div><p class="settings-note">Retrieved ${formatSettingValue(formatDateTime(data.retrievedAt))}</p></div>`;
 }
 
@@ -48,7 +38,7 @@ async function loadPlatformHealth() {
   panel.innerHTML = renderPlatformHealth(null, "loading");
   try {
     const data = await window.QatarOpsApi.PlatformHealth.platform();
-    data.retrievedAt = new Date().toISOString();
+    data.retrievedAt = data.lastHealthCheck;
     if (document.querySelector('#settings-menu [data-setting="Platform Health"].active')) panel.innerHTML = renderPlatformHealth(data, "ready");
   } catch (error) {
     if (document.querySelector('#settings-menu [data-setting="Platform Health"].active')) panel.innerHTML = renderPlatformHealth(null, "error", error);

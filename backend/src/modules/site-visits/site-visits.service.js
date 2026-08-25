@@ -24,7 +24,7 @@ export async function getSiteVisit(id) {
 }
 
 async function validateRelationship(siteId, chargerId) {
-  if (!(await chargerBelongsToSite(chargerId, siteId))) throw new ApiError(400, "INVALID_SITE_VISIT_RELATIONSHIP", "The selected charger does not belong to the selected active site");
+  if (!(await chargerBelongsToSite(chargerId, siteId))) throw new ApiError(400, "INVALID_SITE_VISIT_RELATIONSHIP", "The selected charger does not belong to the selected operational site");
 }
 
 export async function createSiteVisit(input, currentUserId) {

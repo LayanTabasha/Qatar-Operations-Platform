@@ -1,5 +1,9 @@
 const siteListFilters = { search: "", status: "" };
 
+function siteStatusClass(status) {
+  return `site-status-${String(status || "").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+}
+
 function sitesFilterControl(target) {
   if (!target?.closest?.("#sites .site-header-tools")) return "";
   if (target.matches?.('#sites .site-header-tools input[type="search"]')) return "search";
@@ -47,7 +51,7 @@ function buildSites() {
     return;
   }
   if (!state.sites.length) {
-    siteList.innerHTML = `<div class="empty-state"><h2>No sites found</h2><p>No active site records are available from the backend yet.</p></div>`;
+    siteList.innerHTML = `<div class="empty-state"><h2>No sites found</h2><p>No operational site records are available from the backend yet.</p></div>`;
     return;
   }
 
@@ -65,7 +69,7 @@ function buildSites() {
     <article class="site-card">
       ${imageBlock(site.image, site.name)}
       <div class="site-content">
-        <div class="card-heading"><h2>${site.name}</h2><span class="status-pill warning">${site.status}</span></div>
+        <div class="card-heading"><h2>${site.name}</h2><span class="status-pill ${siteStatusClass(site.status)}">${site.status}</span></div>
         <div class="data-list">
           ${placeholder("Location", site.location || "To Be Updated")}
           ${placeholder("Site Status", site.status || "Pending Data")}

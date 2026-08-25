@@ -3,7 +3,7 @@ function openModal(type, mode = "edit", context = {}) {
   delete document.getElementById("modal-form").dataset.requestId;
   const config = modalConfigs[type];
   if (!config) return;
-  if (!isAdmin() && ["user", "faultCode"].includes(type)) {
+  if (!isAdmin() && ["user", "faultCode", "contact"].includes(type)) {
     alert("Access denied. This action requires administrator permission.");
     return;
   }
@@ -11,7 +11,7 @@ function openModal(type, mode = "edit", context = {}) {
     alert("Access denied. This action requires operations permission.");
     return;
   }
-  if (!canManageOperations() && ["siteVisit", "visitReport", "fault", "document", "weeklyReport", "guide", "contact", "confirmDelete"].includes(type)) {
+  if (!canManageOperations() && ["siteVisit", "visitReport", "fault", "document", "weeklyReport", "guide", "confirmDelete"].includes(type)) {
     alert("Access denied. Viewer accounts can view, preview, and download permitted records only.");
     return;
   }
@@ -252,12 +252,15 @@ function prefillModal(type) {
       setFieldValue("site-visit-required", fault.siteVisitRequired ? "Yes" : "No");
       setFieldValue("dtc-code", fault.faultCode); setFieldValue("ftb-code", fault.ftbCode);
       setFieldValue("component-ecu", fault.component); setFieldValue("fault-title", fault.faultName);
-      setFieldValue("catalogue-description", fault.faultDescription); setFieldValue("possible-causes", fault.possibleCauses);
+      setFieldValue("catalogue-description", fault.faultDescription); setFieldValue("catalogue-possible-causes", fault.possibleCauses);
+      setFieldValue("catalogue-recommended-actions", fault.recommendedAction); setFieldValue("possible-causes", fault.possibleCauses);
       setFieldValue("recommended-actions", fault.recommendedAction); setFieldValue("severity", normalizedFaultSeverity(fault.severity));
       setFieldValue("technical-category", fault.technicalCategory); setFieldValue("fault-status", fault.status);
       setFieldValue("date-reported", fault.reportedDate || String(fault.reportedAt || "").slice(0, 10));
       setFieldValue("time-reported", fault.reportedTime || String(fault.reportedAt || "").slice(11, 16));
       setFieldValue("description", fault.description); setFieldValue("comments", fault.comments);
+      setFieldValue("confirmed-cause", fault.confirmedCause); setFieldValue("resolution-action-taken", fault.resolutionActionTaken);
+      setFieldValue("resolution-notes", fault.resolutionNotes); toggleFaultResolutionDetails();
       if (fault.faultCatalogueId || fault.faultCode) {
         setFieldValue("has-technical-code", "Yes");
         document.querySelector(".fault-technical-details")?.setAttribute("open", "");
@@ -344,9 +347,9 @@ function openFaultDetail(faultId) {
     ${detailRow("Site", fault.siteName)}${detailRow("Charger", fault.chargerName)}${detailRow("Status", fault.status)}
     ${fault.faultCode ? detailRow("Fault Code / DTC", fault.faultCode) : ""}${fault.ftbCode ? detailRow("FTB Code", fault.ftbCode) : ""}${fault.component ? detailRow("Component / ECU", fault.component) : ""}
     ${detailRow("Fault Title", fault.faultName)}${detailRow("Catalogue Description", fault.faultDescription)}
-    ${detailRow("Possible Causes", fault.possibleCauses)}${detailRow("Recommended Actions", fault.recommendedAction)}
+    ${detailRow("Possible Causes", valueOrPlaceholder(fault.possibleCauses))}${detailRow("Recommended Actions", valueOrPlaceholder(fault.recommendedAction))}${detailRow("Follow-up Notes", valueOrPlaceholder(fault.comments))}
     ${detailRow("Priority (response urgency)", fault.priority || "Medium")}${detailRow("Severity (technical impact)", normalizedFaultSeverity(fault.severity))}${detailRow("Category", fault.category)}${detailRow("Technician Description", fault.description)}
-  </div></div><div class="settings-section"><div><h2>Photo Evidence</h2></div>${faultPhotosMarkup(fault)}</div>
+  </div></div>${fault.status === "Resolved" ? `<div class="settings-section"><div><h2>Resolution Details</h2></div><div class="data-list">${detailRow("Confirmed Cause", valueOrPlaceholder(fault.confirmedCause))}${detailRow("Resolution / Action Taken", valueOrPlaceholder(fault.resolutionActionTaken))}${fault.resolutionNotes ? detailRow("Resolution Notes", fault.resolutionNotes) : ""}${detailRow("Resolved At", fault.resolvedAt ? formatMediumDateTime(fault.resolvedAt) : valueOrPlaceholder(""))}</div></div>` : ""}<div class="settings-section"><div><h2>Photo Evidence</h2></div>${faultPhotosMarkup(fault)}</div>
   <div class="modal-actions">${canManageOperations() ? `<button class="secondary-button" data-modal="fault" data-mode="edit" data-fault-id="${fault.id}" type="button">Edit Fault</button><button class="danger-button" data-operational-delete="${fault.id}" data-delete-type="fault" type="button">Delete</button>` : ""}<button class="secondary-button" id="cancel-modal" type="button">Close</button></div>`;
   document.getElementById("modal-backdrop").classList.remove("hidden");
   resetModalScroll();

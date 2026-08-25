@@ -15,7 +15,7 @@ const timeField = z
   .nullable()
   .optional();
 const requiredTimeField = z.string().regex(/^\d{2}:\d{2}$/, "Time must use HH:mm format");
-const siteVisitStatus = z.enum(["scheduled", "ongoing", "completed", "cancelled", "follow_up_required"]);
+const siteVisitStatus = z.enum(["scheduled", "completed", "follow_up_required"]);
 
 export const siteVisitIdParamsSchema = z.object({
   id: z.string().uuid(),
@@ -47,8 +47,8 @@ export const createSiteVisitSchema = siteVisitFieldsSchema
     message: "Time Out cannot be earlier than Time In",
     path: ["time_out"],
   })
-  .refine((value) => value.status === "ongoing" || value.time_out, {
-    message: "Time Out is required unless the visit is ongoing",
+  .refine((value) => value.status === "scheduled" || value.time_out, {
+    message: "Time Out is required for completed visits",
     path: ["time_out"],
   });
 
@@ -68,11 +68,11 @@ export const updateSiteVisitSchema = siteVisitFieldsSchema.partial().strict().su
     });
   }
 
-  if (value.status && value.status !== "ongoing" && value.time_out === null) {
+  if (value.status && value.status !== "scheduled" && value.time_out === null) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["time_out"],
-      message: "Time Out is required unless the visit is ongoing",
+      message: "Time Out is required for completed visits",
     });
   }
 });

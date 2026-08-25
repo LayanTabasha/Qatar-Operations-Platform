@@ -174,7 +174,9 @@ document.addEventListener("click", (event) => {
     }).catch((error) => alert(error.message || "The report could not be removed."));
   }
   const contactDeleteButton = event.target.closest("[data-contact-delete]");
-  if (contactDeleteButton && window.confirm("Delete this contact?")) {
+  if (contactDeleteButton && !isAdmin()) {
+    alert("Access denied. This action requires administrator permission.");
+  } else if (contactDeleteButton && window.confirm("Delete this contact?")) {
     window.QatarOpsApi.Contacts.remove(contactDeleteButton.dataset.contactDelete).then(async () => {
       await loadOperationalData();
       renderContactsPage();
@@ -237,6 +239,7 @@ document.getElementById("modal-form").addEventListener("change", (event) => {
   if (event.target.id === "site" || event.target.id === "related-site") refreshChargerSelect();
   if (event.target.id === "fault-code") renderFaultCodeDetails("fault-code");
   if (event.target.id === "has-technical-code") toggleFaultTechnicalDetails();
+  if (event.target.id === "fault-status") toggleFaultResolutionDetails();
 });
 document.getElementById("modal-form").addEventListener("input", (event) => {
   if (event.target.id === "dtc-catalogue-search") queueFaultCatalogueSearch(event.target.value);
@@ -286,7 +289,7 @@ document.getElementById("settings-panel").addEventListener("submit", (event) => 
 document.getElementById("settings-panel").addEventListener("click", (event) => {
   if (event.target.closest("#platform-health-refresh, #platform-health-retry")) loadPlatformHealth();
 });
-["fault-trend-site", "fault-trend-range", "visit-activity-mode"].forEach((id) => {
+["fault-trend-site", "fault-trend-range"].forEach((id) => {
   document.getElementById(id)?.addEventListener("change", renderDashboardCharts);
 });
 document.getElementById("fault-trend-site-list")?.addEventListener("click", (event) => {

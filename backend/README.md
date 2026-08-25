@@ -104,9 +104,11 @@ Current backend routes are mounted under `/api/v1`:
 - `POST /users/:id/reset-password`: admin-only temporary password reset.
 - `GET /sites`: authenticated site list.
 - `GET /sites/:id`: authenticated site detail.
-- `POST /sites`: admin/operations_staff site creation.
-- `PATCH /sites/:id`: admin/operations_staff site update.
-- `PATCH /sites/:id/status`: admin/operations_staff archive or restore.
+- `POST /sites`: admin-only site creation.
+- `PATCH /sites/:id`: admin-only site update.
+- `PATCH /sites/:id/status`: admin-only operational status change.
+- `PATCH /sites/:id/archive`: admin-only site archive.
+- `PATCH /sites/:id/restore`: admin-only site restore.
 - `GET /chargers`: authenticated charger list.
 - `GET /chargers/:id`: authenticated charger detail.
 - `POST /chargers`: admin/operations_staff charger creation.
@@ -258,16 +260,16 @@ Always run migrations before seeds. Do not run seeds against production unless t
 
 ## Sites API
 
-Sites use a soft-archive model:
+Sites have operational statuses and a separate soft-archive lifecycle:
 
-- `active` sites appear in the normal site list.
+- `active`, `inactive`, and `maintenance` sites appear in the normal site list.
 - `archived` sites are hidden from the default list, but their chargers, faults, visits, documents, reports, and activity history are preserved.
-- Archived sites can be restored by setting their status back to `active`.
+- Archived sites are restored through the dedicated restore endpoint, which returns them to `active`.
 
-`GET /api/v1/sites` returns active sites by default. Supported query parameters:
+`GET /api/v1/sites` returns all non-archived sites by default. Supported query parameters:
 
 ```text
-status=active|archived
+status=active|inactive|maintenance|all
 search=text
 sort=name|created_at|updated_at
 order=asc|desc
@@ -300,20 +302,19 @@ Update example:
 }
 ```
 
-Archive example:
+Operational status example:
 
 ```json
 {
-  "status": "archived"
+  "status": "maintenance"
 }
 ```
 
-Restore example:
+Archive and restore use dedicated endpoints:
 
-```json
-{
-  "status": "active"
-}
+```text
+PATCH /api/v1/sites/:id/archive
+PATCH /api/v1/sites/:id/restore
 ```
 
 Upload or replace a site image with multipart form data:

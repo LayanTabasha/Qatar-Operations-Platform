@@ -94,7 +94,7 @@ describe("legacy content reconciliation", () => {
     expect(duplicate.plan[0]).toMatchObject({ status: "duplicate", parentId: "existing-parent" });
     const ambiguousClient = clientFor({ sites: [{ id: "a", name: "Same" }, { id: "b", name: "Same" }] });
     const ambiguous = await runLegacyContentRecovery({ client: ambiguousClient, records: [{ kind: "guide", title: "trb", guideCategory: "Reset", siteName: "Same" }] });
-    expect(ambiguous.plan[0]).toMatchObject({ status: "skipped", reason: "Ambiguous active site" });
+    expect(ambiguous.plan[0]).toMatchObject({ status: "skipped", reason: "Ambiguous operational site" });
   });
 
   it("requires an explicit actor when commit is requested", async () => {

@@ -372,15 +372,16 @@ function normalizeFaultRecord(fault, index = 0) {
     faultDescription: fault.faultDescription || fault.technician_observation || "",
     siteName: fault.siteName || fault.site_name || "", chargerId: fault.chargerId || fault.charger_id || "", chargerName: fault.chargerName || fault.charger_name || "",
     possibleCauses: fault.possibleCauses || fault.possible_causes || "", recommendedAction: fault.recommendedAction || fault.recommended_actions || "",
+    confirmedCause: fault.confirmedCause || fault.confirmed_cause || "", resolutionActionTaken: fault.resolutionActionTaken || fault.resolution_action_taken || "",
+    resolutionNotes: fault.resolutionNotes || fault.resolution_notes || "", resolvedAt: fault.resolvedAt || fault.resolved_at || "",
     technicalCategory: fault.technicalCategory || fault.technical_category || "", chargerStatus: fault.chargerStatus || fault.charger_status || "Active",
     siteVisitRequired: fault.siteVisitRequired ?? fault.requires_site_visit ?? false, reportedBy: fault.reportedBy || fault.reported_by_name || fault.created_by_name || "",
     reportedAt: fault.reportedAt || fault.reported_at || "", reportedDate: fault.reportedDate || String(fault.reported_at || "").slice(0,10), reportedTime: fault.reportedTime || String(fault.reported_at || "").slice(11,16),
     createdAt: fault.createdAt || fault.created_at, updatedAt: fault.updatedAt || fault.updated_at,
     status: ({ open:"Open", in_progress:"In Progress", resolved:"Resolved" }[fault.status] || fault.status),
     priority: normalizedFaultSeverity(fault.priority, "Medium"), category: fault.category || fault.fault_type || "Other",
-    comments: fault.comments || fault.resolution_notes || "", attachmentRecords: fault.attachments || [],
+    comments: fault.comments || "", attachmentRecords: fault.attachments || [],
     severity: normalizedFaultSeverity(fault.severity),
-    recommendedAction: fault.recommendedAction || "",
     photos: Array.isArray(fault.attachments) ? fault.attachments.map((file) => file.id) : Array.isArray(fault.photos) ? fault.photos : [],
   };
 }

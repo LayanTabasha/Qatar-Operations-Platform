@@ -62,7 +62,7 @@ const chargerSummarySelect = `
 
 export async function listChargers({ site_id, status, type, search, sort, order, limit }) {
   const values = [];
-  const filters = ["chargers.deleted_at IS NULL", "sites.status = 'active'"];
+  const filters = ["chargers.deleted_at IS NULL", "sites.status <> 'archived'"];
 
   if (site_id) {
     values.push(site_id);
@@ -118,7 +118,7 @@ export async function findChargerById(id) {
       WHERE chargers.id = $1
         AND chargers.deleted_at IS NULL
         AND chargers.status <> 'archived'
-        AND sites.status = 'active'
+        AND sites.status <> 'archived'
       LIMIT 1
     `,
     [id],
