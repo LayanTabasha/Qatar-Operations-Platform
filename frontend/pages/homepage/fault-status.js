@@ -1,6 +1,7 @@
 const FAULT_STATUSES = Object.freeze([
   { label: "Open", color: "#4f8dff" },
   { label: "In Progress", color: "#dca94b" },
+  { label: "Monitoring", color: "#9b7de3" },
   { label: "Resolved", color: "#37c985" },
 ]);
 const FAULT_STATUS_COLORS = Object.freeze(Object.fromEntries(FAULT_STATUSES.map(({ label, color }) => [label, color])));

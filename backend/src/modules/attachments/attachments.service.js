@@ -103,10 +103,12 @@ export async function removeAttachment(id) {
 // enforces unique storage paths, so a returned path is owned exclusively by the
 // deleted row. Missing files are intentionally harmless.
 export async function removeDeletedAttachmentFiles(attachments = []) {
+  const errors = [];
   for (const attachment of attachments) {
-    await safeUnlink(attachment.storage_path, operationalUploadRoot);
-    await safeUnlink(attachment.preview_path, operationalPreviewRoot);
+    try { await safeUnlink(attachment.storage_path, operationalUploadRoot); } catch (error) { errors.push(error); }
+    try { await safeUnlink(attachment.preview_path, operationalPreviewRoot); } catch (error) { errors.push(error); }
   }
+  if (errors.length) throw new AggregateError(errors, "One or more deleted attachment files could not be removed");
 }
 
 export async function getAttachmentDownload(id) {

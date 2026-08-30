@@ -4,15 +4,20 @@ import request from "supertest";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMocks = vi.hoisted(() => ({ findSafeUserById: vi.fn() }));
-const repository = vi.hoisted(() => ({ listRequests: vi.fn(), findRequestById: vi.fn(), findRequestByIdIncludingDeleted: vi.fn(), insertRequest: vi.fn(), updateRequestById: vi.fn(), softDeleteRequestById: vi.fn() }));
+const repository = vi.hoisted(() => ({ listRequests: vi.fn(), findLinkableFaultById: vi.fn(), findRequestById: vi.fn(), findRequestByIdIncludingDeleted: vi.fn(), insertRequest: vi.fn(), updateRequestById: vi.fn(), softDeleteRequestById: vi.fn() }));
+const relationships = vi.hoisted(() => ({ chargerBelongsToSite: vi.fn() }));
 vi.mock("../src/modules/auth/auth.repository.js", () => ({ findUserWithPasswordByEmail: vi.fn(), findSafeUserById: authMocks.findSafeUserById, updateLastLoginAt: vi.fn() }));
 vi.mock("../src/modules/requests/requests.repository.js", () => repository);
+vi.mock("../src/modules/operational-relations/operational-relations.repository.js", () => relationships);
 
 let app, jwt;
 const userId = "11111111-1111-4111-8111-111111111111";
 const requestId = "22222222-2222-4222-8222-222222222222";
 const siteId = "33333333-3333-4333-8333-333333333333";
 const chargerId = "44444444-4444-4444-8444-444444444444";
+const faultId = "55555555-5555-4555-8555-555555555555";
+const otherSiteId = "66666666-6666-4666-8666-666666666666";
+const otherChargerId = "77777777-7777-4777-8777-777777777777";
 const base = { id: requestId, request_reference: "REQ-2026-000001", title: "Firmware support", description: "Investigate issue", category: "firmware", priority: "high", status: "open", site_id: siteId, charger_id: chargerId, requested_by: userId, started_at: null, completed_at: null, hq_response: null, deleted_at: null };
 const users = Object.fromEntries(["admin", "hq_user", "viewer", "operations_staff"].map((role) => [role, { id: userId, full_name: role, email: `${role}@example.com`, role, is_active: true }]));
 
@@ -24,6 +29,83 @@ beforeEach(() => {
   vi.clearAllMocks(); repository.listRequests.mockResolvedValue([base]); repository.findRequestById.mockResolvedValue(base);
   repository.findRequestByIdIncludingDeleted.mockResolvedValue(base); repository.softDeleteRequestById.mockResolvedValue({ ...base, deleted_at: new Date().toISOString(), deleted_by: userId });
   repository.insertRequest.mockResolvedValue(base); repository.updateRequestById.mockImplementation(async (_id, updates) => ({ ...base, ...updates }));
+  repository.findLinkableFaultById.mockResolvedValue({ id: faultId, site_id: siteId, charger_id: chargerId, archived_at: null });
+  relationships.chargerBelongsToSite.mockResolvedValue(true);
+});
+
+describe("Request context consistency", () => {
+  it("accepts a matching Site and Charger", async () => {
+    await request(app).post("/api/v1/requests").set("Cookie", cookie("admin")).send(createPayload).expect(201);
+    expect(relationships.chargerBelongsToSite).toHaveBeenCalledWith(chargerId, siteId);
+  });
+
+  it("rejects a Charger outside the selected Site", async () => {
+    relationships.chargerBelongsToSite.mockResolvedValue(false);
+    const response = await request(app).post("/api/v1/requests").set("Cookie", cookie("admin")).send(createPayload).expect(400);
+    expect(response.body.error.message).toBe("Selected charger does not belong to the selected site.");
+    expect(repository.insertRequest).not.toHaveBeenCalled();
+  });
+
+  it("accepts a Fault matching the Request Site and Charger", async () => {
+    await request(app).post("/api/v1/requests").set("Cookie", cookie("admin")).send({ ...createPayload, fault_id: faultId }).expect(201);
+    expect(repository.insertRequest).toHaveBeenCalledWith(expect.objectContaining({ site_id: siteId, charger_id: chargerId, fault_id: faultId }), userId, expect.any(Object));
+  });
+
+  it("rejects a Fault outside the Request Site", async () => {
+    repository.findLinkableFaultById.mockResolvedValue({ id: faultId, site_id: otherSiteId, charger_id: chargerId, archived_at: null });
+    const response = await request(app).post("/api/v1/requests").set("Cookie", cookie("admin")).send({ ...createPayload, fault_id: faultId }).expect(400);
+    expect(response.body.error.message).toBe("Selected fault does not belong to the selected site.");
+  });
+
+  it("rejects a Fault attached to a different Charger", async () => {
+    repository.findLinkableFaultById.mockResolvedValue({ id: faultId, site_id: siteId, charger_id: otherChargerId, archived_at: null });
+    const response = await request(app).post("/api/v1/requests").set("Cookie", cookie("admin")).send({ ...createPayload, fault_id: faultId }).expect(400);
+    expect(response.body.error.message).toBe("Selected fault does not belong to the selected charger.");
+  });
+
+  it("inherits Site and Charger from a linked Fault when omitted", async () => {
+    const payload = { title: base.title, description: base.description, priority: "high", fault_id: faultId };
+    await request(app).post("/api/v1/requests").set("Cookie", cookie("admin")).send(payload).expect(201);
+    expect(repository.insertRequest).toHaveBeenCalledWith(expect.objectContaining({ site_id: siteId, charger_id: chargerId }), userId, expect.any(Object));
+  });
+
+  it("inherits only Site when the linked Fault has no Charger", async () => {
+    repository.findLinkableFaultById.mockResolvedValue({ id: faultId, site_id: siteId, charger_id: null, archived_at: null });
+    const payload = { title: base.title, description: base.description, priority: "high", fault_id: faultId };
+    await request(app).post("/api/v1/requests").set("Cookie", cookie("admin")).send(payload).expect(201);
+    expect(repository.insertRequest).toHaveBeenCalledWith(expect.objectContaining({ site_id: siteId }), userId, expect.any(Object));
+    expect(repository.insertRequest.mock.calls[0][0]).not.toHaveProperty("charger_id");
+  });
+
+  it("rejects PATCH changing only Site when the existing Charger or Fault conflicts", async () => {
+    repository.findRequestById.mockResolvedValue({ ...base, fault_id: faultId });
+    const response = await request(app).patch(`/api/v1/requests/${requestId}`).set("Cookie", cookie("admin")).send({ site_id: otherSiteId }).expect(400);
+    expect(response.body.error.message).toBe("Selected fault does not belong to the selected site.");
+  });
+
+  it("rejects PATCH changing only Charger when existing context conflicts", async () => {
+    repository.findRequestById.mockResolvedValue({ ...base, fault_id: faultId });
+    const response = await request(app).patch(`/api/v1/requests/${requestId}`).set("Cookie", cookie("admin")).send({ charger_id: otherChargerId }).expect(400);
+    expect(response.body.error.message).toBe("Selected fault does not belong to the selected charger.");
+  });
+
+  it("rejects PATCH changing only Fault when it conflicts with existing context", async () => {
+    repository.findLinkableFaultById.mockResolvedValue({ id: faultId, site_id: otherSiteId, charger_id: otherChargerId, archived_at: null });
+    const response = await request(app).patch(`/api/v1/requests/${requestId}`).set("Cookie", cookie("admin")).send({ fault_id: faultId }).expect(400);
+    expect(response.body.error.message).toBe("Selected fault does not belong to the selected site.");
+  });
+
+  it("preserves existing Site and Charger when removing a Fault", async () => {
+    repository.findRequestById.mockResolvedValue({ ...base, fault_id: faultId });
+    await request(app).patch(`/api/v1/requests/${requestId}`).set("Cookie", cookie("admin")).send({ fault_id: null }).expect(200);
+    expect(repository.updateRequestById).toHaveBeenCalledWith(requestId, { fault_id: null }, userId, expect.any(Object));
+  });
+
+  it.each([null, { id: faultId, site_id: siteId, charger_id: chargerId, archived_at: "2026-08-01T00:00:00.000Z" }])("rejects nonexistent or archived Faults", async (fault) => {
+    repository.findLinkableFaultById.mockResolvedValue(fault);
+    const response = await request(app).post("/api/v1/requests").set("Cookie", cookie("admin")).send({ ...createPayload, fault_id: faultId }).expect(400);
+    expect(response.body.error.message).toBe("Choose an active Fault");
+  });
 });
 function cookie(role) { const user = users[role]; authMocks.findSafeUserById.mockResolvedValue(user); return [`qatar_ops_token=${jwt.default.sign({ sub: user.id, role }, process.env.JWT_SECRET)}`]; }
 const createPayload = { title: base.title, description: base.description, category: "firmware", priority: "high", site_id: siteId, charger_id: chargerId, due_date: "2026-08-20" };
@@ -114,8 +196,14 @@ describe("Operations Requests API", () => {
     await request(app).patch(`/api/v1/requests/${requestId}`).set("Cookie", cookie("hq_user")).send({ hq_response: "Working on it" }).expect(200);
   });
 
-  it("keeps Admin processing fields read-only", async () => {
-    await request(app).patch(`/api/v1/requests/${requestId}`).set("Cookie", cookie("admin")).send({ status: "in_progress" }).expect(403);
+  it("allows authorized users to update Request priority", async () => {
+    await request(app).patch(`/api/v1/requests/${requestId}`).set("Cookie", cookie("hq_user")).send({ priority: "low" }).expect(200);
+    expect(repository.updateRequestById).toHaveBeenLastCalledWith(requestId, expect.objectContaining({ priority: "low" }), userId, expect.any(Object));
+  });
+
+  it("allows Admin status updates while keeping the HQ response read-only", async () => {
+    await request(app).patch(`/api/v1/requests/${requestId}`).set("Cookie", cookie("admin")).send({ status: "in_progress" }).expect(200);
+    expect(repository.updateRequestById).toHaveBeenLastCalledWith(requestId, expect.objectContaining({ status: "in_progress", started_at: expect.any(String) }), userId, expect.any(Object));
     await request(app).patch(`/api/v1/requests/${requestId}`).set("Cookie", cookie("admin")).send({ hq_response: "Not allowed" }).expect(403);
   });
 });
@@ -134,7 +222,7 @@ describe("Operations Requests migration", () => {
     expect(repositorySource).toContain("JOIN roles uploader_role ON uploader_role.id = uploader.role_id");
     expect(repositorySource).toContain("'uploaded_by_role', uploader_role.name");
     expect(repositorySource).not.toContain("uploader.role,");
-    for (const action of ["request_created", "request_updated", "request_status_changed", "request_assigned", "request_response_updated", "request_deleted"]) expect(repositorySource).toContain(action);
+    for (const action of ["request_created", "request_updated", "request_status_changed", "request_priority_changed", "request_assigned", "request_response_updated", "request_deleted"]) expect(repositorySource).toContain(action);
     expect(repositorySource).toContain('filters = ["requests.deleted_at IS NULL"]');
     expect(repositorySource).toContain("SET deleted_at=now(), deleted_by=$2");
     expect(repositorySource).not.toContain("DELETE FROM requests");
@@ -155,7 +243,7 @@ describe("Operations Requests migration", () => {
     expect(softDeleteSql).toContain("deleted_by uuid references users");
     const attachmentRepository = fs.readFileSync(path.resolve("src/modules/attachments/attachments.repository.js"), "utf8");
     const attachmentRoutes = fs.readFileSync(path.resolve("src/modules/attachments/attachments.routes.js"), "utf8");
-    expect(attachmentRepository).toContain('parentType === "requests" ? " AND deleted_at IS NULL"');
+    expect(attachmentRepository).toContain('requests: { table: "requests", condition: "deleted_at IS NULL" }');
     expect(attachmentRoutes).toContain("operationalAttachmentParentIsActive");
   });
 });

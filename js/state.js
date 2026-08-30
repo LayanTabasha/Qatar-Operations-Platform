@@ -3,7 +3,7 @@ const STORAGE_KEY = "zeeda-qatar-ops-state";
 const USERS_KEY = "zeeda-qatar-ops-users";
 
 const chargerNameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
-const FAULT_STATUS_OPTIONS = Object.freeze(["Open", "In Progress", "Resolved"]);
+const FAULT_STATUS_OPTIONS = Object.freeze(["Open", "In Progress", "Monitoring", "Resolved"]);
 
 function chargerTypeForDisplay(charger = {}) {
   const explicitType = String(charger.type || "").trim().toUpperCase();
@@ -50,6 +50,7 @@ const state = {
   currentChargerId: "",
   currentVisitId: "",
   currentFaultId: "",
+  pendingFaultVisitId: "",
   pendingLegacyReplacementId: "",
   currentContentRecordId: "",
   currentLegacyContentId: "",
@@ -378,11 +379,13 @@ function normalizeFaultRecord(fault, index = 0) {
     siteVisitRequired: fault.siteVisitRequired ?? fault.requires_site_visit ?? false, reportedBy: fault.reportedBy || fault.reported_by_name || fault.created_by_name || "",
     reportedAt: fault.reportedAt || fault.reported_at || "", reportedDate: fault.reportedDate || String(fault.reported_at || "").slice(0,10), reportedTime: fault.reportedTime || String(fault.reported_at || "").slice(11,16),
     createdAt: fault.createdAt || fault.created_at, updatedAt: fault.updatedAt || fault.updated_at,
-    status: ({ open:"Open", in_progress:"In Progress", resolved:"Resolved" }[fault.status] || fault.status),
+    status: ({ open:"Open", in_progress:"In Progress", monitoring:"Monitoring", resolved:"Resolved" }[fault.status] || fault.status),
     priority: normalizedFaultSeverity(fault.priority, "Medium"), category: fault.category || fault.fault_type || "Other",
     comments: fault.comments || "", attachmentRecords: fault.attachments || [],
     severity: normalizedFaultSeverity(fault.severity),
     photos: Array.isArray(fault.attachments) ? fault.attachments.map((file) => file.id) : Array.isArray(fault.photos) ? fault.photos : [],
+    relatedSiteVisits: fault.relatedSiteVisits || fault.related_site_visits || [],
+    relatedRequests: fault.relatedRequests || fault.related_requests || [],
   };
 }
 

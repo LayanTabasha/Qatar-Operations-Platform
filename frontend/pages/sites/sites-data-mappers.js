@@ -140,6 +140,7 @@ function mapBackendSiteVisit(visit) {
     lastModifiedBy: visit.last_modified_by_name || "",
     createdAt: visit.created_at,
     updatedAt: visit.updated_at,
+    relatedFaults: visit.related_faults || [],
   };
 }
 

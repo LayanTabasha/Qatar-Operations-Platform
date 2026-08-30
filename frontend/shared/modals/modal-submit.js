@@ -32,6 +32,16 @@ async function handleModalSubmit(event) {
   }, 350);
 }
 
+async function persistFaultFormVisitLinks(fault) {
+  for (const link of pendingFaultVisitLinks.values()) {
+    if (!link.dirty) continue;
+    const visit = state.visits.find((item) => item.id === link.site_visit_id);
+    if (!visit?.id || visit.siteId !== fault.site_id) throw new Error("A selected Site Visit does not belong to the Fault site.");
+    const otherLinks = (visit.relatedFaults || []).filter((item) => item.fault_id !== fault.id).map((item) => ({ fault_id: item.fault_id, progress_update: item.progress_update || null, status_after_visit: item.status_after_visit }));
+    await window.QatarOpsApi.SiteVisits.update(visit.id, { related_faults: [...otherLinks, { fault_id: fault.id, progress_update: link.progress_update || null, status_after_visit: link.status_after_visit }] });
+  }
+}
+
 function validateVisitTimes() {
   const error = document.getElementById("modal-error");
   if (error) error.textContent = "";
@@ -341,8 +351,18 @@ async function simulateUpdate(type, mode = "edit") {
     };
     const response = existing ? await window.QatarOpsApi.Faults.update(existing.id, payload) : await window.QatarOpsApi.Faults.create(payload);
     const fault = normalizeFaultRecord(response.fault);
+    if (!existing && state.pendingFaultVisitId) {
+      const sourceVisit = state.visits.find((item) => item.id === state.pendingFaultVisitId);
+      if (sourceVisit) {
+        const priorLinks = (sourceVisit.relatedFaults || []).map((link) => ({ fault_id: link.fault_id, progress_update: link.progress_update || null, status_after_visit: link.status_after_visit }));
+        await window.QatarOpsApi.SiteVisits.update(sourceVisit.id, { related_faults: [...priorLinks, { fault_id: fault.id, progress_update: "Fault identified during this visit.", status_after_visit: payload.status }] });
+      }
+      state.pendingFaultVisitId = "";
+    }
     try { await persistOperationalFiles("faults", fault.id, type, existing?.attachmentRecords || []); }
     catch (error) { await loadOperationalData(); throw new Error(`The fault was saved, but its photo upload failed. Reopen the fault to retry. ${error.message}`); }
+    try { await persistFaultFormVisitLinks(fault); }
+    catch (error) { await loadOperationalData(); throw new Error(`The fault was saved, but one or more Site Visits could not be linked. Reopen Edit Fault to retry. ${error.message}`); }
     state.currentFaultId = fault.id;
     await loadOperationalData();
     activity = {
@@ -373,6 +393,7 @@ async function simulateUpdate(type, mode = "edit") {
       status: backendSiteVisitStatus(document.getElementById("visit-status")?.value || "Completed"),
       observations: document.getElementById("findings")?.value.trim() || document.getElementById("notes")?.value.trim() || null,
       actions_taken: document.getElementById("work-completed")?.value.trim() || null,
+      related_faults: selectedRelatedFaults(),
     };
     const existing = mode !== "create" ? state.visits.find((item) => item.id === state.currentVisitId) : null;
     const response = existing?.id

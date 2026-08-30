@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=20260825-visit-activity-v2" />
+    <link rel="stylesheet" href="styles.css?v=20260830-platform-health-alert-v1" />
   </head>
   <body>
     <section class="login-screen" id="auth-loading-screen">
@@ -77,6 +77,8 @@
           </div>
         </div>
       </header>
+
+      <div id="global-platform-health-alert" class="global-health-alert hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 
       <main class="main-area">
         <section class="page active" id="home">
@@ -210,14 +212,15 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-    <script src="js/state.js?v=20260825-fault-resolution-v1"></script>
+    <script src="js/state.js?v=20260827-request-fault-link-v1"></script>
     <script src="js/api-client.js?v=20260818-legacy-content-actions-v3"></script>
-    <script src="js/auth-router.js?v=20260820-auth-router-ownership-v1"></script>
+    <script src="frontend/shared/platform-health-alert.js?v=20260830-platform-health-alert-v1"></script>
+    <script src="js/auth-router.js?v=20260830-platform-health-alert-v1"></script>
     <script src="frontend/shared/utils/display-utils.js?v=20260818-display-utils-v2"></script>
     <script src="frontend/pages/homepage/home-shared.js?v=20260818-home-shared-v1"></script>
     <script src="frontend/pages/homepage/records-by-site.js?v=20260818-records-by-site-v1"></script>
     <script src="frontend/pages/homepage/visit-activity.js?v=20260825-site-visit-lifecycle-v1"></script>
-    <script src="frontend/pages/homepage/fault-status.js?v=20260818-fault-status-v1"></script>
+    <script src="frontend/pages/homepage/fault-status.js?v=20260825-fault-visit-links-v2"></script>
     <script src="frontend/pages/homepage/charger-status.js?v=20260818-charger-status-v1"></script>
     <script src="frontend/pages/homepage/recent-activity.js?v=20260818-recent-activity-v1"></script>
     <script src="frontend/pages/homepage/requests-status.js?v=20260818-requests-status-v1"></script>
@@ -225,10 +228,10 @@
     <script src="frontend/pages/homepage/fault-trend.js?v=20260818-fault-trend-v1"></script>
     <script src="frontend/pages/homepage/kpi-cards.js?v=20260818-kpi-cards-v1"></script>
     <script src="frontend/pages/homepage/home-page.js?v=20260818-homepage-kpi-orchestrator-v1"></script>
-    <script src="frontend/pages/sites/sites-data-mappers.js?v=20260825-site-visit-lifecycle-v1"></script>
+    <script src="frontend/pages/sites/sites-data-mappers.js?v=20260825-fault-visit-links-v2"></script>
     <script src="frontend/pages/sites/sites-shared.js?v=20260818-sites-shared-v1"></script>
     <script src="frontend/pages/sites/sites-list.js?v=20260818-sites-list-v1"></script>
-    <script src="frontend/pages/sites/site-visits.js?v=20260820-site-visits-lifecycle-v1"></script>
+    <script src="frontend/pages/sites/site-visits.js?v=20260825-related-fault-selector-v3"></script>
     <script src="frontend/pages/sites/faults.js?v=20260818-sites-faults-v1"></script>
     <script src="frontend/pages/sites/operational-records.js?v=20260820-operational-records-v1"></script>
     <script src="frontend/pages/sites/site-profile.js?v=20260820-site-profile-v1"></script>
@@ -236,16 +239,16 @@
     <script src="frontend/pages/sites/charger-lifecycle.js?v=20260820-charger-lifecycle-v1"></script>
     <script src="frontend/pages/sites/sites-data.js?v=20260820-sites-data-refresh-v1"></script>
     <script src="frontend/pages/contacts/contacts-page.js?v=20260825-contacts-admin-v1"></script>
-    <script src="frontend/pages/requests/requests-shared.js?v=20260820-requests-shared-v1"></script>
-    <script src="frontend/pages/requests/requests-list.js?v=20260820-requests-list-v1"></script>
-    <script src="frontend/pages/requests/request-detail.js?v=20260820-request-detail-v1"></script>
-    <script src="frontend/pages/requests/request-form.js?v=20260820-request-form-v1"></script>
-    <script src="frontend/pages/requests/requests-page.js?v=20260820-requests-page-v1"></script>
+    <script src="frontend/pages/requests/requests-shared.js?v=20260827-request-priority-inline-v2"></script>
+    <script src="frontend/pages/requests/requests-list.js?v=20260827-request-priority-inline-v2"></script>
+    <script src="frontend/pages/requests/request-detail.js?v=20260827-request-fault-link-v1"></script>
+    <script src="frontend/pages/requests/request-form.js?v=20260827-request-fault-link-v1"></script>
+    <script src="frontend/pages/requests/requests-page.js?v=20260827-request-priority-inline-v2"></script>
     <script src="frontend/shared/modals/modal-files.js?v=20260820-modal-files-v1"></script>
-    <script src="frontend/shared/modals/fault-modals.js?v=20260825-fault-resolution-v1"></script>
+    <script src="frontend/shared/modals/fault-modals.js?v=20260825-fault-visit-selector-v2"></script>
     <script src="frontend/shared/modals/modal-configs.js?v=20260825-site-visit-lifecycle-v1"></script>
-    <script src="frontend/shared/modals/modal-core.js?v=20260825-contacts-admin-v1"></script>
-    <script src="frontend/shared/modals/modal-submit.js?v=20260825-contacts-admin-v1"></script>
+    <script src="frontend/shared/modals/modal-core.js?v=20260827-request-fault-link-v1"></script>
+    <script src="frontend/shared/modals/modal-submit.js?v=20260825-fault-visit-ux-v1"></script>
     <script src="frontend/shared/files/file-preview.js?v=20260818-frontend-structure-v1"></script>
     <script src="frontend/pages/settings/settings-shared.js?v=20260820-settings-shared-ownership-v1"></script>
     <script src="frontend/pages/settings/archive-page.js?v=20260818-frontend-structure-v1"></script>
@@ -253,6 +256,6 @@
     <script src="frontend/pages/settings/platform-health.js?v=20260825-platform-health-v2"></script>
     <script src="frontend/pages/settings/user-management.js?v=20260820-user-management-v1"></script>
     <script src="frontend/pages/settings/settings-page.js?v=20260820-settings-page-v1"></script>
-    <script src="app.js?v=20260825-contacts-admin-v1"></script>
+    <script src="app.js?v=20260825-related-fault-selector-v3"></script>
   </body>
 </html>

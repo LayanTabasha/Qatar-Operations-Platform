@@ -75,14 +75,15 @@ describe("frontend DTC catalogue workflow", () => {
 
   it("keeps Fault Code optional and provides a separate severity selector", () => {
     const modalsSource = ["frontend/shared/modals/fault-modals.js", "frontend/shared/modals/modal-core.js", "frontend/shared/modals/modal-submit.js"].map(readRootFile).join("\n");
+    const modalCoreSource = readRootFile("frontend/shared/modals/modal-core.js");
     const sitesSource = readRootFile("frontend/pages/sites/faults.js");
 
     expect(modalsSource).toContain('id="severity"');
     expect(modalsSource).toContain("Select the technical impact of the fault.");
     expect(modalsSource).toContain('setFieldValue("severity", normalizedFaultSeverity(item.severity, "Medium"))');
-    expect(modalsSource).toContain('fault.faultCode ? detailRow("Fault Code / DTC"');
-    expect(modalsSource).toContain("Priority (response urgency)");
-    expect(modalsSource).toContain("Severity (technical impact)");
+    expect(modalCoreSource).toContain('fault.faultCode ? detailFact("Fault Code / DTC"');
+    expect(modalsSource).toContain("<span>Priority</span>");
+    expect(modalsSource).toContain("<span>Severity</span>");
     expect(sitesSource).toContain('fault.faultCode ? safeDetailValue(fault.faultCode) : "—"');
     expect(sitesSource).toContain("normalizedFaultSeverity(fault.severity)");
   });

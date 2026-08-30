@@ -18,15 +18,15 @@ export const listRequestsQuerySchema = z.object({
 export const createRequestSchema = z.object({
   title: z.string().trim().min(2).max(500), description: z.string().trim().min(1).max(10000),
   category: category.nullable().optional(), priority, site_id: nullableUuid.optional(),
-  charger_id: nullableUuid.optional(), assigned_to: nullableUuid.optional(), due_date: z.string().date().nullable().optional(),
+  charger_id: nullableUuid.optional(), fault_id: nullableUuid.optional(), assigned_to: nullableUuid.optional(), due_date: z.string().date().nullable().optional(),
 }).strict();
 
 export const adminUpdateRequestSchema = z.object({
   title: z.string().trim().min(2).max(500).optional(), description: z.string().trim().min(1).max(10000).optional(),
   category: category.nullable().optional(), priority: priority.optional(),
-  site_id: nullableUuid.optional(), charger_id: nullableUuid.optional(), assigned_to: nullableUuid.optional(),
-  due_date: z.string().date().nullable().optional(),
+  site_id: nullableUuid.optional(), charger_id: nullableUuid.optional(), fault_id: nullableUuid.optional(), assigned_to: nullableUuid.optional(),
+  due_date: z.string().date().nullable().optional(), status: status.optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "At least one update field is required");
 
-export const hqUpdateRequestSchema = z.object({ status: status.optional(), hq_response: optionalText(10000) })
+export const hqUpdateRequestSchema = z.object({ status: status.optional(), priority: priority.optional(), hq_response: optionalText(10000) })
   .strict().refine((value) => Object.keys(value).length > 0, "At least one update field is required");

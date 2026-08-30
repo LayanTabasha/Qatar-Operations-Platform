@@ -2,13 +2,28 @@ import { query, withTransaction } from "../../config/database.js";
 import { insertActivityLog } from "../activity-logs/activity-logs.repository.js";
 
 const select = `SELECT faults.*, sites.name AS site_name, chargers.name AS charger_name,
-  creator.full_name AS created_by_name, updater.full_name AS updated_by_name,
+  COALESCE(creator.full_name, 'Deleted user') AS created_by_name,
+  COALESCE(updater.full_name, 'Deleted user') AS updated_by_name,
   COALESCE((SELECT jsonb_agg(jsonb_build_object('id', a.id, 'original_filename', a.original_filename,
     'mime_type', a.mime_type, 'file_size_bytes', a.file_size_bytes, 'created_at', a.created_at,
     'preview_url', '/api/v1/attachments/' || a.id || '/preview', 'download_url', '/api/v1/attachments/' || a.id || '/download') ORDER BY a.created_at)
-    FROM operational_attachments a WHERE a.parent_type = 'faults' AND a.parent_record_id = faults.id::text), '[]'::jsonb) AS attachments
+    FROM operational_attachments a WHERE a.parent_type = 'faults' AND a.parent_record_id = faults.id::text), '[]'::jsonb) AS attachments,
+  COALESCE((SELECT jsonb_agg(jsonb_build_object(
+    'id', fsv.id, 'site_visit_id', sv.id, 'visit_date', sv.visit_date,
+    'visit_type', sv.purpose, 'time_in', sv.time_in, 'time_out', sv.time_out,
+    'visit_status', sv.status, 'engineer', COALESCE(visit_creator.full_name, 'Deleted user'),
+    'progress_update', fsv.progress_update, 'status_after_visit', fsv.status_after_visit
+  ) ORDER BY sv.visit_date, sv.created_at, fsv.created_at)
+  FROM fault_site_visits fsv JOIN site_visits sv ON sv.id=fsv.site_visit_id
+  LEFT JOIN users visit_creator ON visit_creator.id=sv.created_by
+  WHERE fsv.fault_id=faults.id), '[]'::jsonb) AS related_site_visits,
+  COALESCE((SELECT jsonb_agg(jsonb_build_object(
+    'id', r.id, 'request_reference', r.request_reference, 'title', r.title,
+    'status', r.status, 'created_at', r.created_at
+  ) ORDER BY r.created_at DESC)
+  FROM requests r WHERE r.fault_id=faults.id AND r.deleted_at IS NULL), '[]'::jsonb) AS related_requests
   FROM faults JOIN sites ON sites.id=faults.site_id JOIN chargers ON chargers.id=faults.charger_id
-  JOIN users creator ON creator.id=faults.created_by LEFT JOIN users updater ON updater.id=faults.updated_by`;
+  LEFT JOIN users creator ON creator.id=faults.created_by LEFT JOIN users updater ON updater.id=faults.updated_by`;
 
 export async function listFaults(options = {}) {
   const values = [], filters = ["faults.archived_at IS NULL", "sites.status <> 'archived'", "chargers.status <> 'archived'"];

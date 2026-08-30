@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const optionalText = (max) => z.string().trim().max(max).transform((value) => value || null).nullable().optional();
-const status = z.enum(["open", "in_progress", "resolved"]);
+const status = z.enum(["open", "in_progress", "monitoring", "resolved"]);
 const severity = z.enum(["low", "medium", "high", "critical", "not_classified"]);
 const priority = z.enum(["low", "medium", "high", "critical"]);
 

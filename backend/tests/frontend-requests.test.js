@@ -86,11 +86,22 @@ describe("Operations Requests frontend", () => {
     expect(page).toContain('button[data-request-view]');
   });
 
-  it("makes Request status editable only for HQ and Operations Staff", () => {
-    expect(page).toContain("const statusControl = isRequestResponder()");
+  it("supports permission-gated, color-coded inline Priority updates", () => {
+    expect(page).toContain("const priorityControl = canEditRequestPriority()");
+    expect(page).toContain('data-request-priority="');
+    expect(page).toContain("updateRequestPriorityFromTable(requestPriority)");
+    expect(page).toContain("window.QatarOpsApi.Requests.update(requestItem.id, { priority: select.value })");
+    expect(page).toContain('`<span class="request-pill priority-${requestText(item.priority)}">');
+    expect(page).toContain("if (!canEditRequestPriority()) return;");
+  });
+
+  it("makes Request status editable only for Admin and HQ", () => {
+    expect(page).toContain("const statusControl = canEditRequestStatus()");
     expect(page).toContain('data-request-status="');
     expect(page).toContain('`<span class="request-pill status-${requestText(item.status)}">');
-    expect(page).toContain("if (!isRequestResponder()) return;");
+    expect(page).toContain("if (!canEditRequestStatus()) return;");
+    expect(page).toContain('["admin", "hq_user"].includes');
+    expect(page).toContain('form.dataset.requestMode === "status-edit"');
     expect(page).not.toContain('payload.status = document.getElementById("request-status").value');
     expect(page).toContain('["hq_user", "operations_staff"].includes');
   });

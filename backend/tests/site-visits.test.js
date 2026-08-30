@@ -11,10 +11,21 @@ const siteVisitsRepositoryMocks = vi.hoisted(() => ({
   insertSiteVisit: vi.fn(),
   updateSiteVisitById: vi.fn(),
   deleteSiteVisitById: vi.fn(),
+  findLinkedFaultIds: vi.fn(),
 }));
 
 const relationshipMocks = vi.hoisted(() => ({ chargerBelongsToSite: vi.fn() }));
-const attachmentMocks = vi.hoisted(() => ({ getAttachments: vi.fn(), removeAttachment: vi.fn() }));
+const attachmentRepositoryMocks = vi.hoisted(() => ({ deleteSiteVisitAttachmentRecords: vi.fn() }));
+const attachmentMocks = vi.hoisted(() => ({ removeDeletedAttachmentFiles: vi.fn() }));
+const transactionClient = vi.hoisted(() => ({ query: vi.fn() }));
+
+vi.mock("../src/config/database.js", () => ({
+  query: vi.fn(),
+  withTransaction: vi.fn((callback) => callback(transactionClient)),
+  testDatabaseConnection: vi.fn(),
+  closeDatabasePool: vi.fn(),
+  pool: {},
+}));
 
 vi.mock("../src/modules/auth/auth.repository.js", () => ({
   findUserWithPasswordByEmail: vi.fn(),
@@ -24,6 +35,7 @@ vi.mock("../src/modules/auth/auth.repository.js", () => ({
 
 vi.mock("../src/modules/site-visits/site-visits.repository.js", () => siteVisitsRepositoryMocks);
 vi.mock("../src/modules/operational-relations/operational-relations.repository.js", () => relationshipMocks);
+vi.mock("../src/modules/attachments/attachments.repository.js", () => attachmentRepositoryMocks);
 vi.mock("../src/modules/attachments/attachments.service.js", () => attachmentMocks);
 
 let app;
@@ -91,8 +103,10 @@ beforeEach(() => {
   siteVisitsRepositoryMocks.insertSiteVisit.mockResolvedValue(visitSummary);
   siteVisitsRepositoryMocks.updateSiteVisitById.mockResolvedValue(visitSummary);
   siteVisitsRepositoryMocks.deleteSiteVisitById.mockResolvedValue(true);
+  siteVisitsRepositoryMocks.findLinkedFaultIds.mockResolvedValue([]);
   relationshipMocks.chargerBelongsToSite.mockResolvedValue(true);
-  attachmentMocks.getAttachments.mockResolvedValue([]);
+  attachmentRepositoryMocks.deleteSiteVisitAttachmentRecords.mockResolvedValue([]);
+  attachmentMocks.removeDeletedAttachmentFiles.mockResolvedValue(undefined);
 });
 
 function authCookie(user) {
@@ -146,6 +160,7 @@ describe("site visit routes", () => {
         created_by: operationsUser.id,
         updated_by: operationsUser.id,
       }),
+      transactionClient,
     );
   });
 
@@ -176,7 +191,7 @@ describe("site visit routes", () => {
   });
 
   it("requires time out for completed visits", async () => {
-    await request(app)
+    const response = await request(app)
       .post("/api/v1/site-visits")
       .set("Cookie", authCookie(operationsUser))
       .send({
@@ -188,11 +203,56 @@ describe("site visit routes", () => {
         status: "completed",
       })
       .expect(400);
+
+    expect(response.body.error.message).toContain("Time Out is required when a Site Visit is completed.");
+  });
+
+  it("rejects changing a scheduled visit to completed without Time Out", async () => {
+    siteVisitsRepositoryMocks.findSiteVisitById.mockResolvedValue({ ...visitSummary, status: "scheduled", time_out: null });
+    const response = await request(app).patch(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(operationsUser))
+      .send({ status: "completed" }).expect(400);
+    expect(response.body.error).toMatchObject({
+      code: "SITE_VISIT_TIME_OUT_REQUIRED",
+      message: "Time Out is required when a Site Visit is completed.",
+    });
+    expect(siteVisitsRepositoryMocks.updateSiteVisitById).not.toHaveBeenCalled();
+  });
+
+  it("allows changing a scheduled visit to completed with Time Out", async () => {
+    siteVisitsRepositoryMocks.findSiteVisitById.mockResolvedValue({ ...visitSummary, status: "scheduled", time_out: null });
+    await request(app).patch(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(operationsUser))
+      .send({ status: "completed", time_out: "11:15" }).expect(200);
+    expect(siteVisitsRepositoryMocks.updateSiteVisitById).toHaveBeenCalledWith(
+      siteVisitId,
+      expect.objectContaining({ status: "completed", time_out: "11:15" }),
+      expect.any(Object),
+      transactionClient,
+    );
+  });
+
+  it("allows unrelated updates to a completed visit with an existing Time Out", async () => {
+    await request(app).patch(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(operationsUser))
+      .send({ observations: "Updated notes" }).expect(200);
+    expect(siteVisitsRepositoryMocks.updateSiteVisitById).toHaveBeenCalled();
+  });
+
+  it("rejects clearing Time Out from a completed visit", async () => {
+    const response = await request(app).patch(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(operationsUser))
+      .send({ time_out: null }).expect(400);
+    expect(response.body.error.message).toBe("Time Out is required when a Site Visit is completed.");
+    expect(siteVisitsRepositoryMocks.updateSiteVisitById).not.toHaveBeenCalled();
+  });
+
+  it("allows a non-completed visit to retain a null Time Out", async () => {
+    siteVisitsRepositoryMocks.findSiteVisitById.mockResolvedValue({ ...visitSummary, status: "scheduled", time_out: null });
+    await request(app).patch(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(operationsUser))
+      .send({ observations: "Visit rescheduled" }).expect(200);
+    expect(siteVisitsRepositoryMocks.updateSiteVisitById).toHaveBeenCalled();
   });
 
   it.each(["scheduled", "completed", "follow_up_required"])("accepts the %s lifecycle status", async (status) => {
     await request(app).patch(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(operationsUser)).send({ status }).expect(200);
-    expect(siteVisitsRepositoryMocks.updateSiteVisitById).toHaveBeenCalledWith(siteVisitId, expect.objectContaining({ status }), expect.any(Object));
+    expect(siteVisitsRepositoryMocks.updateSiteVisitById).toHaveBeenCalledWith(siteVisitId, expect.objectContaining({ status }), expect.any(Object), transactionClient);
   });
 
   it.each(["ongoing", "cancelled"])("rejects the removed %s lifecycle status", async (status) => {
@@ -222,6 +282,7 @@ describe("site visit routes", () => {
         updated_by: operationsUser.id,
       }),
       expect.any(Object),
+      transactionClient,
     );
   });
 
@@ -252,10 +313,12 @@ describe("site visit routes", () => {
   });
 
   it("allows admin and operations deletion with attachment cleanup, but denies viewers", async () => {
-    attachmentMocks.getAttachments.mockResolvedValue([{ id: "88888888-8888-4888-8888-888888888888" }]);
+    const attachments = [{ storage_path: "/managed/uploads/report.pdf", preview_path: null }];
+    attachmentRepositoryMocks.deleteSiteVisitAttachmentRecords.mockResolvedValue(attachments);
     await request(app).delete(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(operationsUser)).expect(204);
-    expect(attachmentMocks.removeAttachment).toHaveBeenCalledWith("88888888-8888-4888-8888-888888888888");
-    expect(siteVisitsRepositoryMocks.deleteSiteVisitById).toHaveBeenCalledWith(siteVisitId, operationsUser.id, visitSummary, expect.any(Object));
+    expect(attachmentRepositoryMocks.deleteSiteVisitAttachmentRecords).toHaveBeenCalledWith(siteVisitId, transactionClient);
+    expect(attachmentMocks.removeDeletedAttachmentFiles).toHaveBeenCalledWith(attachments);
+    expect(siteVisitsRepositoryMocks.deleteSiteVisitById).toHaveBeenCalledWith(siteVisitId, operationsUser.id, visitSummary, expect.any(Object), transactionClient);
     await request(app).delete(`/api/v1/site-visits/${siteVisitId}`).set("Cookie", authCookie(viewerUser)).expect(403);
   });
 

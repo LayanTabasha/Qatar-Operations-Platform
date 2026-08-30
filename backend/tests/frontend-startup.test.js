@@ -53,7 +53,7 @@ async function startup() {
 describe("full production-order frontend startup", () => {
   it("derives and executes every active local script in exact index.html order", async () => {
     expect(localScripts.map(({ file }) => file)).toEqual([
-      "js/state.js", "js/api-client.js", "js/auth-router.js", "frontend/shared/utils/display-utils.js",
+      "js/state.js", "js/api-client.js", "frontend/shared/platform-health-alert.js", "js/auth-router.js", "frontend/shared/utils/display-utils.js",
       "frontend/pages/homepage/home-shared.js", "frontend/pages/homepage/records-by-site.js",
       "frontend/pages/homepage/visit-activity.js", "frontend/pages/homepage/fault-status.js",
       "frontend/pages/homepage/charger-status.js", "frontend/pages/homepage/recent-activity.js",
@@ -116,11 +116,11 @@ describe("full production-order frontend startup", () => {
 
   it("locks the Requests split cache and single-definition contract", () => {
     const requestSources = [
-      "frontend/pages/requests/requests-shared.js?v=20260820-requests-shared-v1",
-      "frontend/pages/requests/requests-list.js?v=20260820-requests-list-v1",
-      "frontend/pages/requests/request-detail.js?v=20260820-request-detail-v1",
-      "frontend/pages/requests/request-form.js?v=20260820-request-form-v1",
-      "frontend/pages/requests/requests-page.js?v=20260820-requests-page-v1",
+      "frontend/pages/requests/requests-shared.js?v=20260827-request-priority-inline-v2",
+      "frontend/pages/requests/requests-list.js?v=20260827-request-priority-inline-v2",
+      "frontend/pages/requests/request-detail.js?v=20260827-request-fault-link-v1",
+      "frontend/pages/requests/request-form.js?v=20260827-request-fault-link-v1",
+      "frontend/pages/requests/requests-page.js?v=20260827-request-priority-inline-v2",
     ];
     for (const source of requestSources) expect(scriptSources).toContain(source);
     expect(scriptSources.some((source) => source.startsWith("js/requests-page.js?"))).toBe(false);
@@ -153,10 +153,10 @@ describe("full production-order frontend startup", () => {
   it("locks the modal split cache and single-definition contract", () => {
     const modalSources = [
       "frontend/shared/modals/modal-files.js?v=20260820-modal-files-v1",
-      "frontend/shared/modals/fault-modals.js?v=20260825-fault-resolution-v1",
+      "frontend/shared/modals/fault-modals.js?v=20260825-fault-visit-selector-v2",
       "frontend/shared/modals/modal-configs.js?v=20260825-site-visit-lifecycle-v1",
-      "frontend/shared/modals/modal-core.js?v=20260825-contacts-admin-v1",
-      "frontend/shared/modals/modal-submit.js?v=20260825-contacts-admin-v1",
+      "frontend/shared/modals/modal-core.js?v=20260827-request-fault-link-v1",
+      "frontend/shared/modals/modal-submit.js?v=20260825-fault-visit-ux-v1",
     ];
     for (const source of modalSources) expect(scriptSources).toContain(source);
     expect(scriptSources.some((source) => source.startsWith("js/modals.js?"))).toBe(false);
@@ -171,8 +171,9 @@ describe("full production-order frontend startup", () => {
   });
 
   it("locks final shared ownership and foundational cache tokens", () => {
-    expect(scriptSources).toContain("js/state.js?v=20260825-fault-resolution-v1");
-    expect(scriptSources).toContain("js/auth-router.js?v=20260820-auth-router-ownership-v1");
+    expect(scriptSources).toContain("js/state.js?v=20260827-request-fault-link-v1");
+    expect(scriptSources).toContain("frontend/shared/platform-health-alert.js?v=20260830-platform-health-alert-v1");
+    expect(scriptSources).toContain("js/auth-router.js?v=20260830-platform-health-alert-v1");
     expect(scriptSources).toContain("frontend/shared/modals/modal-configs.js?v=20260825-site-visit-lifecycle-v1");
     expect(scriptSources).toContain("frontend/pages/settings/settings-shared.js?v=20260820-settings-shared-ownership-v1");
     const production = localScripts.map(({ file }) => fs.readFileSync(path.join(root, file), "utf8")).join("\n");
@@ -188,7 +189,7 @@ describe("full production-order frontend startup", () => {
   it("locks the Sites cache-fix contract", () => {
     expect(scriptSources).toContain("frontend/pages/sites/site-profile.js?v=20260820-site-profile-v1");
     expect(scriptSources).toContain("frontend/pages/sites/charger-profile.js?v=20260820-charger-profile-v1");
-    expect(scriptSources).toContain("frontend/pages/sites/site-visits.js?v=20260820-site-visits-lifecycle-v1");
+    expect(scriptSources).toContain("frontend/pages/sites/site-visits.js?v=20260825-related-fault-selector-v3");
     expect(scriptSources).toContain("frontend/pages/sites/sites-data.js?v=20260820-sites-data-refresh-v1");
     expect(scriptSources.some((source) => source.startsWith("js/sites-page.js?"))).toBe(false);
     expect(scriptSources).toContain("frontend/pages/sites/operational-records.js?v=20260820-operational-records-v1");

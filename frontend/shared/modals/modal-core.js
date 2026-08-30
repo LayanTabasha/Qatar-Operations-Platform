@@ -46,9 +46,10 @@ function openModal(type, mode = "edit", context = {}) {
     guide: new Set(["Site", "Guide title", "Category"]),
   };
   const formFields = type === "fault" ? faultFormMarkup() : config.fields.map(([label, kind], index) => fieldMarkup(label, kind, contentRequiredFields[type]?.has(label) ?? index < 2)).join("");
-  form.innerHTML = `<div class="modal-error" id="modal-error"></div>${deleteNote}${formFields}<div class="modal-actions"><button class="secondary-button" type="button" id="cancel-modal">Cancel</button><button class="${saveClass}" type="submit" data-loading-text="Saving...">${saveLabel}</button></div>`;
+  form.innerHTML = `<div class="modal-error" id="modal-error"></div>${deleteNote}${formFields}${type === "siteVisit" ? relatedFaultsEditorMarkup() : ""}<div class="modal-actions"><button class="secondary-button" type="button" id="cancel-modal">Cancel</button><button class="${saveClass}" type="submit" data-loading-text="Saving...">${saveLabel}</button></div>`;
   if (mode === "create" && ["siteVisit", "fault", "document", "weeklyReport", "guide"].includes(type)) populateOperationalContext(type, context);
   if (mode !== "create") prefillModal(type);
+  if (type === "fault") initializeFaultRelatedVisits(mode);
   if (mode !== "create") renderCurrentAttachment(type);
   if (mode === "create" && type === "charger") {
     setFieldValue("site", state.currentSiteName);
@@ -288,6 +289,15 @@ function detailRow(label, value) {
   return `<div class="data-row"><span>${label}</span><strong>${safeDetailValue(value)}</strong></div>`;
 }
 
+function detailFact(label, value, badge = false) {
+  const display = value && String(value).trim() ? safeDetailValue(value) : "—";
+  return `<div class="detail-fact"><span>${label}</span><strong${badge ? ' class="detail-status-badge"' : ""}>${display}</strong></div>`;
+}
+
+function detailNarrative(label, value) {
+  return `<div class="detail-narrative"><span>${label}</span><p>${value && String(value).trim() ? safeDetailValue(value) : "—"}</p></div>`;
+}
+
 function openSiteVisitDetail(visitId) {
   const visit = state.visits.find((item) => item.id === visitId);
   if (!visit) return;
@@ -297,37 +307,9 @@ function openSiteVisitDetail(visitId) {
   document.getElementById("modal-title").textContent = "Site Visit Details";
   document.getElementById("modal-eyebrow").textContent = "Read-only Record";
   form.dataset.type = "siteVisitDetail";
-  form.innerHTML = `
-    <div class="settings-section">
-      <div>
-        <h2>Visit Information</h2>
-        <p>${safeDetailValue(visit.siteName)}${visit.chargerName ? ` - ${safeDetailValue(visit.chargerName)}` : ""}</p>
-      </div>
-      <div class="data-list">
-        ${detailRow("Visit Date", formatMediumDate(visit.visitDate))}
-        ${detailRow("Time In", visit.timeIn || "Not Available Yet")}
-        ${detailRow("Time Out", visit.timeOut || "Not Available Yet")}
-        ${detailRow("Site", visit.siteName)}
-        ${detailRow("Engineer / Technician", visit.createdBy)}
-        ${detailRow("Purpose", visit.purpose)}
-        ${detailRow("Status", visit.status)}
-        ${detailRow("Visit Notes", visit.notes)}
-        ${detailRow("Work Completed", visit.workCompleted)}
-      </div>
-    </div>
-    <div class="settings-section">
-      <div><h2>Audit Information</h2></div>
-      <div class="data-list">
-        ${detailRow("Recorded On", formatMediumDateTime(visit.recordedOn))}
-        ${detailRow("Recorded By", visit.recordedBy)}
-        ${detailRow("Last Modified", formatMediumDateTime(visit.lastModified))}
-        ${detailRow("Last Modified By", visit.lastModifiedBy)}
-      </div>
-    </div>
-    <div class="settings-section">
-      <div><h2>Report / Attachment</h2></div>
+  form.innerHTML = `<div class="operational-detail-layout full"><section class="detail-section"><h2>Visit Information</h2><div class="detail-facts-grid">${detailFact("Visit Date", formatMediumDate(visit.visitDate))}${detailFact("Time", `${visit.timeIn || "—"} – ${visit.timeOut || "—"}`)}${detailFact("Site", visit.siteName)}${detailFact("Charger", visit.chargerName)}${detailFact("Engineer / Technician", visit.createdBy)}${detailFact("Status", visit.status, true)}</div><div class="detail-narrative-grid">${detailNarrative("Purpose", visit.purpose)}${detailNarrative("Work Completed", visit.workCompleted)}${detailNarrative("Visit Notes", visit.notes)}</div></section><section class="detail-section"><h2>Faults Identified / Addressed</h2><div class="linked-fault-card-list">${(visit.relatedFaults || []).length ? visit.relatedFaults.map((link) => `<article class="linked-fault-card"><header><div><strong>${safeDetailValue(link.fault_reference || link.fault_id)}</strong><h3>${safeDetailValue(link.title)}</h3></div><span class="detail-status-badge">${safeDetailValue(String(link.status_after_visit || "").replace(/_/g, " "))}</span></header>${detailNarrative("Progress", link.progress_update || "No progress update provided.")}<div class="linked-fault-statuses">${detailFact("Status after visit", String(link.status_after_visit || "").replace(/_/g, " "), true)}${detailFact("Current Fault Status", String(link.current_status || "").replace(/_/g, " "), true)}</div><button class="secondary-button" data-fault-detail="${link.fault_id}" type="button">View Fault</button></article>`).join("") : `<p class="detail-muted">No faults linked to this visit.</p>`}</div></section></div><section class="detail-section full"><h2>Audit Information</h2><div class="detail-facts-grid">${detailFact("Recorded On", formatMediumDateTime(visit.recordedOn))}${detailFact("Recorded By", visit.recordedBy)}${detailFact("Last Modified", formatMediumDateTime(visit.lastModified))}${detailFact("Last Modified By", visit.lastModifiedBy)}</div></section><section class="detail-section full"><h2>Report / Attachment</h2>
       ${deduplicateSiteVisitAttachments(visit.attachmentRecords || [], visit.id).length ? `<div class="attached-files">${deduplicateSiteVisitAttachments(visit.attachmentRecords || [], visit.id).map((file) => `<div class="attached-file"><span title="${safeDetailValue(file.name)}">${safeDetailValue(file.name)} · ${safeDetailValue(file.type || "File")} · ${formatFileSize(file.size)} · uploaded ${formatMediumDateTime(file.uploadedAt)}</span><div class="file-actions"><button class="secondary-button" data-file-preview="${file.id}" type="button">View</button><button class="secondary-button" data-file-download="${file.id}" type="button">Download</button>${siteVisitRemoveControl(file, "Remove Report")}</div></div>`).join("")}</div>` : `<p>No report attached.</p>`}
-    </div>
+    </section>
     <div class="modal-actions">${canManageOperations() ? `<button class="secondary-button" data-modal="siteVisit" data-mode="edit" data-visit-id="${visit.id}" type="button">Edit Visit / Replace Report</button><button class="danger-button" data-operational-delete="${visit.id}" data-delete-type="siteVisit" type="button">Delete</button>` : ""}<button class="secondary-button" type="button" id="cancel-modal">Close</button></div>
   `;
   document.getElementById("modal-backdrop").classList.remove("hidden");
@@ -343,13 +325,7 @@ function openFaultDetail(faultId) {
   document.getElementById("modal-title").textContent = "Fault Details";
   document.getElementById("modal-eyebrow").textContent = "Operational Record";
   form.dataset.type = "faultDetail";
-  form.innerHTML = `<div class="settings-section"><div><h2>${safeDetailValue(fault.faultId)}</h2></div><div class="data-list">
-    ${detailRow("Site", fault.siteName)}${detailRow("Charger", fault.chargerName)}${detailRow("Status", fault.status)}
-    ${fault.faultCode ? detailRow("Fault Code / DTC", fault.faultCode) : ""}${fault.ftbCode ? detailRow("FTB Code", fault.ftbCode) : ""}${fault.component ? detailRow("Component / ECU", fault.component) : ""}
-    ${detailRow("Fault Title", fault.faultName)}${detailRow("Catalogue Description", fault.faultDescription)}
-    ${detailRow("Possible Causes", valueOrPlaceholder(fault.possibleCauses))}${detailRow("Recommended Actions", valueOrPlaceholder(fault.recommendedAction))}${detailRow("Follow-up Notes", valueOrPlaceholder(fault.comments))}
-    ${detailRow("Priority (response urgency)", fault.priority || "Medium")}${detailRow("Severity (technical impact)", normalizedFaultSeverity(fault.severity))}${detailRow("Category", fault.category)}${detailRow("Technician Description", fault.description)}
-  </div></div>${fault.status === "Resolved" ? `<div class="settings-section"><div><h2>Resolution Details</h2></div><div class="data-list">${detailRow("Confirmed Cause", valueOrPlaceholder(fault.confirmedCause))}${detailRow("Resolution / Action Taken", valueOrPlaceholder(fault.resolutionActionTaken))}${fault.resolutionNotes ? detailRow("Resolution Notes", fault.resolutionNotes) : ""}${detailRow("Resolved At", fault.resolvedAt ? formatMediumDateTime(fault.resolvedAt) : valueOrPlaceholder(""))}</div></div>` : ""}<div class="settings-section"><div><h2>Photo Evidence</h2></div>${faultPhotosMarkup(fault)}</div>
+  form.innerHTML = `<section class="detail-section full"><div class="detail-title-row"><div><span class="detail-kicker">${safeDetailValue(fault.faultId)}</span><h2>Fault Information</h2></div><span class="detail-status-badge">${safeDetailValue(fault.status)}</span></div><div class="detail-facts-grid">${detailFact("Site", fault.siteName)}${detailFact("Charger", fault.chargerName)}${detailFact("Fault Title", fault.faultName)}${detailFact("Priority", fault.priority || "Medium")}${detailFact("Severity", normalizedFaultSeverity(fault.severity))}${detailFact("Category", fault.category)}${fault.faultCode ? detailFact("Fault Code / DTC", fault.faultCode) : ""}${fault.component ? detailFact("Component / ECU", fault.component) : ""}</div></section><section class="detail-section full"><h2>Fault Details</h2><div class="detail-narrative-grid">${detailNarrative("Description", fault.description)}${detailNarrative("Catalogue Description", fault.faultDescription)}${detailNarrative("Possible Causes", fault.possibleCauses)}${detailNarrative("Recommended Actions", fault.recommendedAction)}${detailNarrative("Follow-up Notes", fault.comments)}</div></section><section class="detail-section full"><h2>Fault Progress</h2><div class="fault-progress-timeline">${(fault.relatedSiteVisits || []).length ? fault.relatedSiteVisits.map((link) => `<article class="fault-progress-card"><div class="fault-progress-marker"></div><header><div><time>${formatMediumDate(link.visit_date)}</time><h3>${safeDetailValue(link.visit_type || "Site Visit")}</h3></div><span class="detail-status-badge">${safeDetailValue(String(link.status_after_visit || "").replace(/_/g, " "))}</span></header>${detailNarrative("Progress", link.progress_update)}<button class="secondary-button" data-visit-detail="${link.site_visit_id}" type="button">View Visit</button></article>`).join("") : `<p class="detail-muted">No Site Visits linked to this fault.</p>`}</div></section><section class="detail-section full"><h2>Related Requests</h2><div class="fault-related-requests">${(fault.relatedRequests || []).length ? fault.relatedRequests.map((request) => `<article><div><strong>${safeDetailValue(request.request_reference)} • ${safeDetailValue(request.title)}</strong><small>${formatMediumDate(request.created_at)} • ${safeDetailValue(String(request.status || "").replace(/_/g, " "))}</small></div><button class="secondary-button" data-request-view="${request.id}" type="button">View Request</button></article>`).join("") : `<p class="detail-muted">No Requests linked to this fault.</p>`}</div></section>${fault.status === "Resolved" ? `<section class="detail-section full"><h2>Resolution Details</h2><div class="detail-narrative-grid">${detailNarrative("Confirmed Cause", fault.confirmedCause)}${detailNarrative("Resolution / Action Taken", fault.resolutionActionTaken)}${fault.resolutionNotes ? detailNarrative("Resolution Notes", fault.resolutionNotes) : ""}${detailNarrative("Resolved At", fault.resolvedAt ? formatMediumDateTime(fault.resolvedAt) : "")}</div></section>` : ""}<section class="detail-section full"><h2>Photo Evidence</h2>${faultPhotosMarkup(fault)}</section>
   <div class="modal-actions">${canManageOperations() ? `<button class="secondary-button" data-modal="fault" data-mode="edit" data-fault-id="${fault.id}" type="button">Edit Fault</button><button class="danger-button" data-operational-delete="${fault.id}" data-delete-type="fault" type="button">Delete</button>` : ""}<button class="secondary-button" id="cancel-modal" type="button">Close</button></div>`;
   document.getElementById("modal-backdrop").classList.remove("hidden");
   resetModalScroll();
