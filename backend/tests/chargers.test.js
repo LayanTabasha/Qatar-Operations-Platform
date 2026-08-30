@@ -22,7 +22,7 @@ const chargersRepositoryMocks = vi.hoisted(() => ({
 
 const sitesRepositoryMocks = vi.hoisted(() => ({
   findSiteById: vi.fn(),
-  findActiveSiteById: vi.fn(),
+  findOperationalSiteById: vi.fn(),
   listArchivedSites: vi.fn(),
 }));
 

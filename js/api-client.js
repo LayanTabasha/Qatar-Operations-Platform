@@ -73,7 +73,7 @@ const AuthApi = {
 
 const HealthApi = {
   platform() {
-    return apiRequest("/health/platform", { method: "GET" });
+    return apiRequest(`/health/platform?_=${Date.now()}`, { method: "GET", cache: "no-store" });
   },
 };
 

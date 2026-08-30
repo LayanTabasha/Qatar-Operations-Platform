@@ -167,7 +167,8 @@ describe("frontend search and filter controls", () => {
     const archive = read("frontend/pages/settings/archive-page.js");
     const globalSearch = read("frontend/pages/homepage/global-search.js");
     const contacts = read("frontend/pages/contacts/contacts-page.js");
-    for (const id of ["global-search", "sites-search", "sites-status-filter", "fault-trend-range", "visit-activity-mode"]) expect(index).toContain(`id="${id}"`);
+    for (const id of ["global-search", "sites-search", "sites-status-filter", "fault-trend-range"]) expect(index).toContain(`id="${id}"`);
+    expect(index).not.toContain('id="visit-activity-mode"');
     expect(sites).toContain("bindSitesFilters");
     expect(sitesPage).toContain("updateOperationalRecordResults");
     expect(sites).toContain("No sites match the selected filters");

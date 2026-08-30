@@ -15,7 +15,12 @@ const timeField = z
   .nullable()
   .optional();
 const requiredTimeField = z.string().regex(/^\d{2}:\d{2}$/, "Time must use HH:mm format");
-const siteVisitStatus = z.enum(["scheduled", "ongoing", "completed", "cancelled", "follow_up_required"]);
+const siteVisitStatus = z.enum(["scheduled", "completed", "follow_up_required"]);
+const faultLink = z.object({
+  fault_id: z.string().uuid(),
+  progress_update: optionalText(2000),
+  status_after_visit: z.enum(["open", "in_progress", "monitoring", "resolved"]),
+});
 
 export const siteVisitIdParamsSchema = z.object({
   id: z.string().uuid(),
@@ -39,6 +44,7 @@ const siteVisitFieldsSchema = z.object({
   observations: optionalText(2000),
   actions_taken: optionalText(2000),
   follow_up_required: z.boolean().default(false),
+  related_faults: z.array(faultLink).max(100).default([]),
 });
 
 export const createSiteVisitSchema = siteVisitFieldsSchema
@@ -47,8 +53,8 @@ export const createSiteVisitSchema = siteVisitFieldsSchema
     message: "Time Out cannot be earlier than Time In",
     path: ["time_out"],
   })
-  .refine((value) => value.status === "ongoing" || value.time_out, {
-    message: "Time Out is required unless the visit is ongoing",
+  .refine((value) => value.status === "scheduled" || value.time_out, {
+    message: "Time Out is required when a Site Visit is completed.",
     path: ["time_out"],
   });
 
@@ -68,11 +74,4 @@ export const updateSiteVisitSchema = siteVisitFieldsSchema.partial().strict().su
     });
   }
 
-  if (value.status && value.status !== "ongoing" && value.time_out === null) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["time_out"],
-      message: "Time Out is required unless the visit is ongoing",
-    });
-  }
 });

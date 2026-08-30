@@ -3,6 +3,9 @@ import { constants } from "node:fs";
 import { createRequire } from "node:module";
 import { query } from "../../config/database.js";
 import { requiredOperationalStorage } from "../../config/operational-storage.js";
+import { listSites } from "../sites/sites.repository.js";
+import { listChargers } from "../chargers/chargers.repository.js";
+import { listFaults } from "../faults/faults.repository.js";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../../../package.json");
@@ -39,47 +42,45 @@ async function checkDatabase(queryFn = query) {
   }
 }
 
-async function checkMigrations(queryFn = query) {
-  try {
-    const result = await queryFn("SELECT filename, applied_at FROM schema_migrations ORDER BY applied_at DESC, filename DESC LIMIT 1");
-    return {
-      status: "healthy",
-      message: result.rows[0] ? "Migration history is available" : "No applied migrations recorded",
-      countAvailable: Boolean(result.rows[0]),
-      latest: result.rows[0]?.filename || null,
-      appliedAt: result.rows[0]?.applied_at || null,
-    };
-  } catch {
-    return { status: "unknown", message: "Migration history is unavailable", countAvailable: false, latest: null, appliedAt: null };
-  }
+export async function checkCorePlatform({ sites = listSites, chargers = listChargers, faults = listFaults } = {}) {
+  const checks = await Promise.allSettled([
+    sites({ status: "all", search: undefined, sort: "name", order: "asc", limit: 1 }),
+    chargers({ site_id: undefined, status: undefined, type: undefined, search: undefined, sort: "name", order: "asc", limit: 1 }),
+    faults({ limit: 1 }),
+  ]);
+
+  return checks.every((check) => check.status === "fulfilled")
+    ? safeComponent("healthy", "Sites, chargers, and faults are accessible")
+    : safeComponent("unavailable", "Core platform check failed");
 }
 
-export async function getPlatformHealth({ queryFn = query, storageCheck = checkStorage, now = () => new Date(), uptime = () => process.uptime() } = {}) {
+export async function getPlatformHealth({ queryFn = query, storageCheck = checkStorage, coreCheck = checkCorePlatform, now = () => new Date() } = {}) {
   const checkedAt = now().toISOString();
-  const [database, storage, migrations] = await Promise.all([
+  const [database, storage, core] = await Promise.all([
     checkDatabase(queryFn),
     storageCheck(),
-    checkMigrations(queryFn),
+    coreCheck(),
   ]);
-  const criticalFailure = database.status === "unavailable" || storage.status === "unavailable";
-  const noncriticalWarning = storage.status === "degraded" || migrations.status !== "healthy";
-  const status = criticalFailure ? "unavailable" : noncriticalWarning ? "degraded" : "healthy";
+  const status = database.status === "unavailable"
+    ? "unavailable"
+    : core.status !== "healthy" || storage.status !== "healthy"
+      ? "degraded"
+      : "healthy";
 
   return {
     success: true,
     status,
-    message: status === "healthy" ? "All critical platform services are operational" : status === "degraded" ? "Critical services are operational with a noncritical warning" : "A critical platform dependency is unavailable",
+    message: status === "healthy" ? "All critical platform services are operational" : status === "degraded" ? "One or more platform services are degraded" : "A critical platform dependency is unavailable",
     components: {
       backend: safeComponent("healthy", "API is responding"),
       database,
       storage,
+      core,
     },
     application: {
-      uptimeSeconds: Math.max(0, Math.floor(uptime())),
       version,
     },
     serverTimestamp: checkedAt,
     lastHealthCheck: checkedAt,
-    migrations,
   };
 }

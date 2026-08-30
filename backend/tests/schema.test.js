@@ -41,11 +41,23 @@ describe("database schema files", () => {
     });
   });
 
-  it("uses active and archived site statuses only", () => {
-    const sitesMigration = fs.readFileSync(path.join(migrationsDir, "003_create_sites.sql"), "utf8").toLowerCase();
+  it("adds nullable fault resolution details without duplicating existing follow-up fields", () => {
+    const migration = fs.readFileSync(path.join(migrationsDir, "030_add_fault_resolution_details.sql"), "utf8").toLowerCase();
 
-    expect(sitesMigration).toContain("'archived'");
-    expect(sitesMigration).not.toContain("'inactive'");
+    expect(migration).toContain("add column confirmed_cause text");
+    expect(migration).toContain("add column resolution_action_taken text");
+    expect(migration).not.toContain("possible_causes");
+    expect(migration).not.toContain("recommended_actions");
+    expect(migration).not.toContain("resolved_at");
+  });
+
+  it("expands site operational statuses without editing the historical table migration", () => {
+    const originalMigration = fs.readFileSync(path.join(migrationsDir, "003_create_sites.sql"), "utf8").toLowerCase();
+    const statusMigration = fs.readFileSync(path.join(migrationsDir, "029_expand_site_operational_statuses.sql"), "utf8").toLowerCase();
+
+    expect(originalMigration).toContain("'active', 'archived'");
+    expect(statusMigration).toContain("drop constraint sites_status_check");
+    expect(statusMigration).toContain("'active', 'inactive', 'maintenance', 'archived'");
   });
 
   it("uses the current charger statuses and field names", () => {
@@ -77,6 +89,16 @@ describe("database schema files", () => {
     expect(migration).toContain("add column status");
     expect(migration).toContain("add column updated_by");
     expect(migration).toContain("site_visits_status_check");
+  });
+
+  it("tightens Site Visit status to the three operational lifecycle values", () => {
+    const migration = fs.readFileSync(path.join(migrationsDir, "031_tighten_site_visit_statuses.sql"), "utf8").toLowerCase();
+
+    expect(migration).toContain("'scheduled', 'completed', 'follow_up_required'");
+    expect(migration).not.toContain("'ongoing'");
+    expect(migration).not.toContain("'cancelled'");
+    expect(migration).not.toContain("delete from site_visits");
+    expect(migration).not.toContain("update site_visits");
   });
 
   it("adds charger lifecycle audit fields for archive restore and soft delete", () => {

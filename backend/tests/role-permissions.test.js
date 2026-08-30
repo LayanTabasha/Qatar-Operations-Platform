@@ -6,6 +6,7 @@ import { ROLE_GROUPS } from "../src/modules/auth/permissions.js";
 describe("authoritative role permission groups", () => {
   it("matches the four-role capability matrix", () => {
     expect(ROLE_GROUPS.requestRead).toEqual(["admin", "hq_user"]);
+    expect(ROLE_GROUPS.requestStatusEdit).toEqual(["admin", "hq_user"]);
     expect(ROLE_GROUPS.requestProcess).toEqual(["hq_user"]);
     expect(ROLE_GROUPS.operationalManage).toEqual(["admin", "hq_user", "operations_staff"]);
     expect(ROLE_GROUPS.adminOnly).toEqual(["admin"]);

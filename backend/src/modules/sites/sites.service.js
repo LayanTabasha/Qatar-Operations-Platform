@@ -1,7 +1,7 @@
 import { ApiError } from "../../utils/api-error.js";
 import {
   findSiteById,
-  findActiveSiteById,
+  findOperationalSiteById,
   archiveSiteById,
   insertSite,
   permanentlyDeleteSiteById,
@@ -25,7 +25,7 @@ export async function getSites(options) {
 }
 
 export async function getSite(id) {
-  const site = await findActiveSiteById(id);
+  const site = await findOperationalSiteById(id);
 
   if (!site) {
     throw new ApiError(404, "SITE_NOT_FOUND", "Site not found");

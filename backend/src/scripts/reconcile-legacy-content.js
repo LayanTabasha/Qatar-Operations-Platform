@@ -15,9 +15,9 @@ async function uniqueMatch(client, sql, values, label) {
 }
 
 async function resolveSite(client, record) {
-  if (record.siteId) return uniqueMatch(client, "SELECT id,name FROM sites WHERE id=$1 AND status='active'", [record.siteId], "active site");
+  if (record.siteId) return uniqueMatch(client, "SELECT id,name FROM sites WHERE id=$1 AND status <> 'archived'", [record.siteId], "operational site");
   if (!record.siteName) return { value: null, error: "Site is required" };
-  return uniqueMatch(client, "SELECT id,name FROM sites WHERE lower(name)=lower($1) AND status='active'", [record.siteName], "active site");
+  return uniqueMatch(client, "SELECT id,name FROM sites WHERE lower(name)=lower($1) AND status <> 'archived'", [record.siteName], "operational site");
 }
 
 async function resolveCharger(client, record, siteId) {

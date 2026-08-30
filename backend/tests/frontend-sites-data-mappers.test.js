@@ -33,6 +33,8 @@ describe("Sites data mappers", () => {
     const site = context.mapBackendSite({ id: "site-1", name: "Msheireb", status: "active", image_path: "/uploads/site.jpg", updated_at: "2026-08-18T10:00:00Z" }, chargers);
     expect(site.chargers.map(({ id }) => id)).toEqual(["ac-2", "ac-10", "dc-10"]);
     expect(site.image).toBe("/uploads/site.jpg?v=2026-08-18T10%3A00%3A00Z");
+    expect(context.mapBackendSite({ id: "site-2", name: "Inactive", status: "inactive" }, [])).toMatchObject({ status: "Inactive", backendStatus: "inactive" });
+    expect(context.mapBackendSite({ id: "site-3", name: "Maintenance", status: "maintenance" }, [])).toMatchObject({ status: "Under Maintenance", backendStatus: "maintenance" });
     expect(context.imagePathWithVersion("https://example.test/site.jpg", "date")).toBe("https://example.test/site.jpg");
   });
 
@@ -45,7 +47,9 @@ describe("Sites data mappers", () => {
     expect(visit).toMatchObject({ status: "Follow-Up Required", backendStatus: "follow_up_required", duration: "1h", attachments: ["attachment-1"] });
     expect(visit.attachmentRecords).toHaveLength(1);
     expect(context.backendSiteVisitStatus("Follow-Up Required")).toBe("follow_up_required");
-    expect(context.siteVisitStatusLabel("cancelled")).toBe("Cancelled");
+    expect(context.siteVisitStatusLabel("scheduled")).toBe("Scheduled");
+    expect(context.siteVisitStatusLabel("completed")).toBe("Completed");
+    expect(context.siteVisitStatusLabel("cancelled")).toBe("cancelled");
   });
 
   it("maps persisted content with and without an attachment", () => {

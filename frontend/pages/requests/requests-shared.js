@@ -7,6 +7,12 @@ let requestPageError = "";
 function isRequestResponder() {
   return normalizedRoleKey(state.currentUserRoleKey || state.currentUserRole) === "hq_user";
 }
+function canEditRequestStatus() {
+  return ["admin", "hq_user"].includes(normalizedRoleKey(state.currentUserRoleKey || state.currentUserRole));
+}
+function canEditRequestPriority() {
+  return canEditRequestStatus();
+}
 function requestText(value = "") {
   return escapeHtml(String(value ?? ""));
 }

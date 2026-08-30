@@ -3,27 +3,29 @@ import { insertActivityLog } from "../activity-logs/activity-logs.repository.js"
 
 export const parentTypes = {
   "site-visits": { table: "site_visits" },
-  documents: {}, faults: { table: "faults" }, "weekly-reports": {}, troubleshooting: {}, requests: { table: "requests" },
+  documents: { table: "documents" },
+  faults: { table: "faults", condition: "archived_at IS NULL" },
+  "weekly-reports": { table: "reports", condition: "report_type = 'weekly'" },
+  troubleshooting: { table: "troubleshooting_records" },
+  requests: { table: "requests", condition: "deleted_at IS NULL" },
 };
 
 const attachmentSelect = `
-  SELECT operational_attachments.*, users.full_name AS uploaded_by_name
+  SELECT operational_attachments.*, COALESCE(users.full_name, 'Deleted user') AS uploaded_by_name
   FROM operational_attachments
-  JOIN users ON users.id = operational_attachments.uploaded_by
+  LEFT JOIN users ON users.id = operational_attachments.uploaded_by
 `;
 
 export async function parentExists(parentType, parentId) {
   const config = parentTypes[parentType];
-  if (!config.table) return true;
-  const activeClause = parentType === "requests" ? " AND deleted_at IS NULL" : parentType === "faults" ? " AND archived_at IS NULL" : "";
-  const result = await query(`SELECT id FROM ${config.table} WHERE id = $1${activeClause}`, [parentId]);
+  if (!config?.table) return false;
+  const condition = config.condition ? ` AND ${config.condition}` : "";
+  const result = await query(`SELECT id FROM ${config.table} WHERE id = $1${condition}`, [parentId]);
   return Boolean(result.rows[0]);
 }
 
 export async function operationalAttachmentParentIsActive(attachment) {
-  if (attachment.parent_type === "requests") return parentExists("requests", attachment.parent_record_id);
-  if (attachment.parent_type === "faults") return parentExists("faults", attachment.parent_record_id);
-  return true;
+  return parentExists(attachment.parent_type, attachment.parent_record_id);
 }
 
 export async function listAttachments(parentType, parentId) {
@@ -70,4 +72,14 @@ export async function setAttachmentPreview(id, previewPath) {
 export async function deleteAttachmentRecord(id) {
   const result = await query("DELETE FROM operational_attachments WHERE id=$1 RETURNING *", [id]);
   return result.rows[0] || null;
+}
+
+export async function deleteSiteVisitAttachmentRecords(siteVisitId, client = { query }) {
+  const result = await client.query(
+    `DELETE FROM operational_attachments
+     WHERE site_visit_id=$1 OR (parent_type='site-visits' AND parent_record_id=$1::text)
+     RETURNING storage_path,preview_path`,
+    [siteVisitId],
+  );
+  return result.rows;
 }

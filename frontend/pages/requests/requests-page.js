@@ -16,15 +16,29 @@ document.addEventListener("click", (event) => {
   if (remove) openRequestDeleteConfirmation(remove.dataset.requestDelete);
   const hqEdit = event.target.closest("[data-request-hq-edit]");
   if (hqEdit) openRequestEdit(hqEdit.dataset.requestHqEdit, true);
+  if (event.target.closest("#select-request-fault")) {
+    const picker = document.getElementById("request-fault-picker");
+    renderRequestFaultPicker();
+    picker?.classList.toggle("hidden");
+  }
+  const faultChoice = event.target.closest("[data-request-fault-card]");
+  if (faultChoice) { selectedRequestFaultId = faultChoice.dataset.requestFaultCard; renderRequestFaultSelection(); document.getElementById("request-fault-picker")?.classList.add("hidden"); }
+  if (event.target.closest("#remove-request-fault")) { selectedRequestFaultId = ""; renderRequestFaultSelection(); }
 });
 
 document.addEventListener("input", (event) => {
+  if (event.target.id === "request-fault-search") { filterRequestFaultCards(); return; }
   if (event.target.id !== "requests-search") return;
   requestFilters.search = event.target.value;
   updateRequestResults();
 });
 
 document.addEventListener("change", (event) => {
+  const requestPriority = event.target.closest("[data-request-priority]");
+  if (requestPriority) {
+    updateRequestPriorityFromTable(requestPriority);
+    return;
+  }
   const requestStatus = event.target.closest("[data-request-status]");
   if (requestStatus) {
     updateRequestStatusFromTable(requestStatus);
@@ -40,7 +54,11 @@ document.addEventListener("change", (event) => {
     const charger = document.getElementById("request-charger");
     charger.disabled = !event.target.value;
     charger.innerHTML = `<option value="">No charger</option>${chargerOptions(event.target.value)}`;
+    const selectedFault = requestFaultOptions.find((fault) => fault.id === selectedRequestFaultId);
+    if (selectedFault && event.target.value && selectedFault.site_id !== event.target.value) { selectedRequestFaultId = ""; renderRequestFaultSelection(); }
+    if (!document.getElementById("request-fault-picker")?.classList.contains("hidden")) renderRequestFaultPicker();
   }
+  if (event.target.id === "request-charger" && !document.getElementById("request-fault-picker")?.classList.contains("hidden")) renderRequestFaultPicker();
 });
 
 document.addEventListener("keydown", (event) => {

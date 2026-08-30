@@ -26,12 +26,30 @@ describe("Homepage Charger Status Distribution component", () => {
       { siteName: "Al Mana", status: "Active", backendStatus: "archived" },
     ]);
     context.renderChargerStatusChart();
-    expect(target.innerHTML).toContain('aria-label="All Sites: Active 1, Maintenance 1, Faulted 1"');
-    expect(target.innerHTML).toContain('aria-label="Al Mana: Active 1, Maintenance 0, Faulted 1"');
-    expect(target.innerHTML).toContain('aria-label="Msheireb: Active 0, Maintenance 1, Faulted 0"');
+    expect(target.innerHTML).toContain('aria-label="All Sites: Active 1, Maintenance 1, Faulted 1, Inactive 0"');
+    expect(target.innerHTML).toContain('aria-label="Al Mana: Active 1, Maintenance 0, Faulted 1, Inactive 0"');
+    expect(target.innerHTML).toContain('aria-label="Msheireb: Active 0, Maintenance 1, Faulted 0, Inactive 0"');
     expect(target.innerHTML).toContain("background:#37c985");
     expect(target.innerHTML).toContain("background:#dca94b");
     expect(target.innerHTML).toContain("background:#ef6262");
+  });
+
+  it("uses inactive as a display-only override for chargers at inactive sites", () => {
+    const chargers = [
+      { siteName: "Al Mana", status: "Active", backendStatus: "active" },
+      { siteName: "Al Mana", status: "Faulted", backendStatus: "faulted" },
+      { siteName: "Mowasalat", status: "Maintenance", backendStatus: "maintenance" },
+    ];
+    const { context, target } = runtime(chargers, [
+      { name: "Al Mana", backendStatus: "inactive" },
+      { name: "Mowasalat", backendStatus: "maintenance" },
+    ]);
+    context.renderChargerStatusChart();
+    expect(target.innerHTML).toContain('aria-label="All Sites: Active 0, Maintenance 1, Faulted 0, Inactive 2"');
+    expect(target.innerHTML).toContain('aria-label="Al Mana: Active 0, Maintenance 0, Faulted 0, Inactive 2"');
+    expect(target.innerHTML).toContain('aria-label="Mowasalat: Active 0, Maintenance 1, Faulted 0, Inactive 0"');
+    expect(target.innerHTML).toContain("background:#9cafc6");
+    expect(chargers.map(({ backendStatus }) => backendStatus)).toEqual(["active", "faulted", "maintenance"]);
   });
 
   it("preserves every existing status normalization", () => {
@@ -50,8 +68,8 @@ describe("Homepage Charger Status Distribution component", () => {
     const nested = [{ name: "Mowasalat", chargers: [{ status: "Operational" }, { status: "Warning" }] }];
     const { context, target } = runtime([], nested);
     context.renderChargerStatusChart();
-    expect(target.innerHTML).toContain('aria-label="All Sites: Active 1, Maintenance 1, Faulted 0"');
-    expect(target.innerHTML).toContain('aria-label="Mowasalat: Active 1, Maintenance 1, Faulted 0"');
+    expect(target.innerHTML).toContain('aria-label="All Sites: Active 1, Maintenance 1, Faulted 0, Inactive 0"');
+    expect(target.innerHTML).toContain('aria-label="Mowasalat: Active 1, Maintenance 1, Faulted 0, Inactive 0"');
 
     const empty = runtime();
     empty.context.renderChargerStatusChart();

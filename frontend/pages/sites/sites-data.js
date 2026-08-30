@@ -8,7 +8,7 @@ async function loadOperationalData() {
 
   try {
     const [sitesResponse, activeChargersResponse, maintenanceChargersResponse, faultedChargersResponse, siteVisitsResponse, faultsResponse, dtcResponse, documentsResponse, weeklyReportsResponse, troubleshootingResponse, contactsResponse] = await Promise.all([
-      window.QatarOpsApi.Sites.list({ status: "active", limit: 100 }),
+      window.QatarOpsApi.Sites.list({ status: "all", limit: 100 }),
       window.QatarOpsApi.Chargers.list({ status: "active", limit: 100 }),
       window.QatarOpsApi.Chargers.list({ status: "maintenance", limit: 100 }),
       window.QatarOpsApi.Chargers.list({ status: "faulted", limit: 100 }),

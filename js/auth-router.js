@@ -63,9 +63,11 @@ function applyAuthenticatedUser(user) {
   state.users = [normalizedUser];
   document.getElementById("current-user").textContent = state.currentUser;
   updateRequestsNavigation();
+  startPlatformHealthMonitoring();
 }
 
 function clearAuthenticatedUser() {
+  stopPlatformHealthMonitoring();
   state.authenticated = false;
   state.authUser = null;
   state.currentUser = "";

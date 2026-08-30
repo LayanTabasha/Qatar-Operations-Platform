@@ -99,8 +99,8 @@ describe("Homepage Global Search component", () => {
   it("loads before the orchestrator and keeps its renderCounts call", () => {
     const sources = Array.from(read("index.html").matchAll(/<script\s+src="([^"]+)"/g), (match) => match[1]);
     const componentIndex = sources.indexOf("frontend/pages/homepage/global-search.js?v=20260818-global-search-v1");
-    expect(componentIndex).toBeGreaterThan(sources.indexOf("js/state.js?v=20260820-state-ownership-v1"));
-    expect(componentIndex).toBeGreaterThan(sources.indexOf("js/auth-router.js?v=20260820-auth-router-ownership-v1"));
+    expect(componentIndex).toBeGreaterThan(sources.indexOf("js/state.js?v=20260825-fault-visit-links-v2"));
+    expect(componentIndex).toBeGreaterThan(sources.indexOf("js/auth-router.js?v=20260830-platform-health-alert-v1"));
     expect(componentIndex).toBeGreaterThan(sources.indexOf("frontend/shared/utils/display-utils.js?v=20260818-display-utils-v2"));
     expect(sources.indexOf("frontend/pages/homepage/home-page.js?v=20260818-homepage-kpi-orchestrator-v1")).toBeGreaterThan(componentIndex);
     expect(read(homepagePath)).toContain("renderGlobalSearchResults(globalSearch.value)");

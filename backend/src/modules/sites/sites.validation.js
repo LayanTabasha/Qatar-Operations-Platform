@@ -28,7 +28,7 @@ export const archiveReasonSchema = z
   .strict();
 
 export const listSitesQuerySchema = z.object({
-  status: z.literal("active").default("active"),
+  status: z.enum(["active", "inactive", "maintenance", "all"]).default("all"),
   search: z.string().trim().max(200).optional(),
   sort: z.enum(["name", "created_at", "updated_at"]).default("name"),
   order: z.enum(["asc", "desc"]).default("asc"),
@@ -57,6 +57,6 @@ export const updateSiteSchema = createSiteSchema.partial().superRefine((value, c
 
 export const updateSiteStatusSchema = z
   .object({
-    status: z.literal("active"),
+    status: z.enum(["active", "inactive", "maintenance"]),
   })
   .strict();

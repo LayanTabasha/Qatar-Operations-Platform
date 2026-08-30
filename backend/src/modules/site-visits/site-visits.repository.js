@@ -1,4 +1,4 @@
-import { query, withTransaction } from "../../config/database.js";
+import { query } from "../../config/database.js";
 import { insertActivityLog } from "../activity-logs/activity-logs.repository.js";
 
 const siteVisitSelect = `
@@ -19,23 +19,30 @@ const siteVisitSelect = `
     site_visits.follow_up_required,
     site_visits.report_file_path,
     site_visits.created_by,
-    created_by_user.full_name AS recorded_by_name,
+    COALESCE(created_by_user.full_name, 'Deleted user') AS recorded_by_name,
     site_visits.created_at,
     site_visits.updated_by,
-    updated_by_user.full_name AS last_modified_by_name,
+    COALESCE(updated_by_user.full_name, 'Deleted user') AS last_modified_by_name,
     site_visits.updated_at,
     COALESCE((SELECT jsonb_agg(jsonb_build_object(
       'id', a.id, 'original_filename', a.original_filename, 'mime_type', a.mime_type, 'file_extension', a.file_extension,
-      'file_size_bytes', a.file_size_bytes, 'uploaded_by_name', attachment_user.full_name, 'created_at', a.created_at,
+      'file_size_bytes', a.file_size_bytes, 'uploaded_by_name', COALESCE(attachment_user.full_name, 'Deleted user'), 'created_at', a.created_at,
       'updated_at', a.updated_at, 'preview_url', '/api/v1/attachments/' || a.id || '/preview',
       'download_url', '/api/v1/attachments/' || a.id || '/download'
     ) ORDER BY a.created_at)
-    FROM operational_attachments a JOIN users attachment_user ON attachment_user.id = a.uploaded_by
-    WHERE a.site_visit_id = site_visits.id), '[]'::jsonb) AS attachments
+    FROM operational_attachments a LEFT JOIN users attachment_user ON attachment_user.id = a.uploaded_by
+    WHERE a.site_visit_id = site_visits.id), '[]'::jsonb) AS attachments,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object(
+      'id', fsv.id, 'fault_id', faults.id, 'fault_reference', faults.fault_reference,
+      'title', faults.title, 'progress_update', fsv.progress_update,
+      'status_after_visit', fsv.status_after_visit, 'current_status', faults.status
+    ) ORDER BY faults.fault_reference, faults.created_at)
+    FROM fault_site_visits fsv JOIN faults ON faults.id=fsv.fault_id
+    WHERE fsv.site_visit_id=site_visits.id AND faults.archived_at IS NULL), '[]'::jsonb) AS related_faults
   FROM site_visits
   JOIN sites ON sites.id = site_visits.site_id
   LEFT JOIN chargers ON chargers.id = site_visits.charger_id
-  JOIN users created_by_user ON created_by_user.id = site_visits.created_by
+  LEFT JOIN users created_by_user ON created_by_user.id = site_visits.created_by
   LEFT JOIN users updated_by_user ON updated_by_user.id = site_visits.updated_by
 `;
 
@@ -68,8 +75,8 @@ export async function listSiteVisits({ site_id, charger_id, limit = 100 } = {}) 
   return result.rows;
 }
 
-export async function findSiteVisitById(id) {
-  const result = await query(
+export async function findSiteVisitById(id, client = { query }) {
+  const result = await client.query(
     `
       ${siteVisitSelect}
       WHERE site_visits.id = $1
@@ -81,8 +88,8 @@ export async function findSiteVisitById(id) {
   return result.rows[0] || null;
 }
 
-export async function insertSiteVisit(visit) {
-  const result = await query(
+export async function insertSiteVisit(visit, client = { query }) {
+  const result = await client.query(
     `
       INSERT INTO site_visits (
         site_id,
@@ -121,37 +128,35 @@ export async function insertSiteVisit(visit) {
     ],
   );
 
-  return findSiteVisitById(result.rows[0].id);
+  return findSiteVisitById(result.rows[0].id, client);
 }
 
-export async function updateSiteVisitById(id, updates, audit = {}) {
+export async function updateSiteVisitById(id, updates, audit = {}, client = { query }) {
   const entries = Object.entries(updates);
   const setClauses = entries.map(([column], index) => `${column} = $${index + 2}`);
   const values = [id, ...entries.map(([, value]) => value ?? null)];
-  const result = await withTransaction(async (client) => {
-    const changed = await client.query(`
+  const changed = await client.query(`
       UPDATE site_visits
       SET ${setClauses.join(", ")}
       WHERE id = $1
       RETURNING id
     `,
     values);
-    if (!changed.rows[0]) return changed;
-    const record = await client.query("SELECT id,site_id,charger_id,purpose FROM site_visits WHERE id=$1", [id]);
-    await insertActivityLog(client, { userId: updates.updated_by, action: "site_visit_updated", entityType: "site_visit", entityId: id,
-      description: `Updated site visit ${record.rows[0].purpose}`, context: { site_id: record.rows[0].site_id, charger_id: record.rows[0].charger_id }, ...audit });
-    return changed;
-  });
-
-  return result.rows[0] ? findSiteVisitById(result.rows[0].id) : null;
+  if (!changed.rows[0]) return null;
+  const record = await client.query("SELECT id,site_id,charger_id,purpose FROM site_visits WHERE id=$1", [id]);
+  await insertActivityLog(client, { userId: updates.updated_by, action: "site_visit_updated", entityType: "site_visit", entityId: id,
+    description: `Updated site visit ${record.rows[0].purpose}`, context: { site_id: record.rows[0].site_id, charger_id: record.rows[0].charger_id }, ...audit });
+  return findSiteVisitById(changed.rows[0].id, client);
 }
 
-export async function deleteSiteVisitById(id, actor, record, audit = {}) {
-  return withTransaction(async (client) => {
-    const result = await client.query("DELETE FROM site_visits WHERE id=$1 RETURNING id", [id]);
-    if (!result.rows[0]) return false;
-    await insertActivityLog(client, { userId: actor, action: "site_visit_deleted", entityType: "site_visit", entityId: id,
-      description: `Deleted site visit ${record.purpose}`, context: { site_id: record.site_id, site_name: record.site_name, charger_id: record.charger_id, charger_name: record.charger_name }, ...audit });
-    return true;
-  });
+export async function findLinkedFaultIds(id, client = { query }) {
+  return (await client.query("SELECT fault_id FROM fault_site_visits WHERE site_visit_id=$1", [id])).rows.map((row) => row.fault_id);
+}
+
+export async function deleteSiteVisitById(id, actor, record, audit = {}, client = { query }) {
+  const result = await client.query("DELETE FROM site_visits WHERE id=$1 RETURNING id", [id]);
+  if (!result.rows[0]) return false;
+  await insertActivityLog(client, { userId: actor, action: "site_visit_deleted", entityType: "site_visit", entityId: id,
+    description: `Deleted site visit ${record.purpose}`, context: { site_id: record.site_id, site_name: record.site_name, charger_id: record.charger_id, charger_name: record.charger_name }, ...audit });
+  return true;
 }

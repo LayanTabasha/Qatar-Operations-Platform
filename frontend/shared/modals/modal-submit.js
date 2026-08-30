@@ -32,6 +32,16 @@ async function handleModalSubmit(event) {
   }, 350);
 }
 
+async function persistFaultFormVisitLinks(fault) {
+  for (const link of pendingFaultVisitLinks.values()) {
+    if (!link.dirty) continue;
+    const visit = state.visits.find((item) => item.id === link.site_visit_id);
+    if (!visit?.id || visit.siteId !== fault.site_id) throw new Error("A selected Site Visit does not belong to the Fault site.");
+    const otherLinks = (visit.relatedFaults || []).filter((item) => item.fault_id !== fault.id).map((item) => ({ fault_id: item.fault_id, progress_update: item.progress_update || null, status_after_visit: item.status_after_visit }));
+    await window.QatarOpsApi.SiteVisits.update(visit.id, { related_faults: [...otherLinks, { fault_id: fault.id, progress_update: link.progress_update || null, status_after_visit: link.status_after_visit }] });
+  }
+}
+
 function validateVisitTimes() {
   const error = document.getElementById("modal-error");
   if (error) error.textContent = "";
@@ -44,8 +54,8 @@ function validateVisitTimes() {
     if (error) error.textContent = "Visit Date, Time In, and Engineer / Technician are required.";
     return false;
   }
-  if (!timeOut && status !== "Ongoing") {
-    if (error) error.textContent = "Time Out is required unless the visit status is Ongoing.";
+  if (!timeOut && status !== "Scheduled") {
+    if (error) error.textContent = "Time Out is required for completed visits.";
     return false;
   }
   if (timeIn && timeOut && timeOut < timeIn) {
@@ -66,7 +76,10 @@ function backendCodeFromName(name, fallback = "RECORD") {
 }
 
 function backendSiteStatus(status) {
-  return String(status || "").toLowerCase() === "archived" ? "archived" : "active";
+  const normalized = String(status || "").trim().toLowerCase().replace(/\s+/g, "_");
+  if (normalized === "under_maintenance" || normalized === "maintenance") return "maintenance";
+  if (normalized === "inactive") return "inactive";
+  return "active";
 }
 
 function backendChargerStatus(status) {
@@ -137,8 +150,10 @@ async function simulateUpdate(type, mode = "edit") {
       const response = existing?.id
         ? await window.QatarOpsApi.Sites.update(existing.id, payload)
         : await window.QatarOpsApi.Sites.create(payload);
-      if (backendSiteStatus(status) !== (response.site?.status || "active")) {
-        await window.QatarOpsApi.Sites.updateStatus(response.site.id, backendSiteStatus(status));
+      const requestedStatus = backendSiteStatus(status);
+      if (requestedStatus !== (response.site?.status || "active")) {
+        const statusResponse = await window.QatarOpsApi.Sites.updateStatus(response.site.id, requestedStatus);
+        response.site = statusResponse.site || response.site;
       }
       if (pendingSiteImageFile) {
         try {
@@ -149,15 +164,17 @@ async function simulateUpdate(type, mode = "edit") {
           throw new Error(`Site details were saved, but the image upload failed: ${userFriendlyApiError(uploadError)}`);
         }
       }
-      state.currentSiteName = response.site?.name || name;
+      const savedSiteName = response.site?.name || name;
+      state.currentSiteName = savedSiteName;
       await loadOperationalData();
       if (state.currentSiteName) openSite(state.currentSiteName);
-      activity = { actionType: existing ? "site_updated" : "site_added", entityType: "site", entityId: state.currentSiteName, description: `${state.currentSiteName} site ${existing ? "information updated" : "added"}`, siteName: state.currentSiteName };
+      activity = { actionType: existing ? "site_updated" : "site_added", entityType: "site", entityId: savedSiteName, description: `${savedSiteName} site ${existing ? "information updated" : "added"}`, siteName: savedSiteName };
     } catch (error) {
       throw new Error(userFriendlyApiError(error));
     }
   }
   if (type === "contact") {
+    if (!isAdmin()) throw new Error("Access denied. This action requires administrator permission.");
     const assignedSiteName = document.getElementById("assigned-site")?.value || "";
     const site = assignedSiteName ? getSite(assignedSiteName) : null;
     if (assignedSiteName && !site?.id) throw new Error("Choose a valid assigned site.");
@@ -304,6 +321,10 @@ async function simulateUpdate(type, mode = "edit") {
     const hasTechnicalCode = document.getElementById("has-technical-code")?.value === "Yes";
     const catalogueItem = hasTechnicalCode ? selectedFaultCatalogueItem("fault-code") : null;
     const status = document.getElementById("fault-status")?.value || "Open";
+    const confirmedCause = document.getElementById("confirmed-cause")?.value.trim() || "";
+    const resolutionActionTaken = document.getElementById("resolution-action-taken")?.value.trim() || "";
+    if (status === "Resolved" && !confirmedCause) throw new Error("Confirmed Cause is required when resolving a fault.");
+    if (status === "Resolved" && !resolutionActionTaken) throw new Error("Resolution / Action Taken is required when resolving a fault.");
     const reportedDate = document.getElementById("date-reported")?.value || new Date().toISOString().slice(0, 10);
     const reportedTime = document.getElementById("time-reported")?.value || new Date().toTimeString().slice(0, 5);
     const existing = mode !== "create" ? state.faults.find((item) => item.id === state.currentFaultId) : null;
@@ -317,20 +338,31 @@ async function simulateUpdate(type, mode = "edit") {
       title: document.getElementById("fault-title")?.value.trim() || "Manual fault",
       description: document.getElementById("description")?.value.trim() || null,
       technician_observation: hasTechnicalCode ? document.getElementById("catalogue-description")?.value.trim() || null : null,
-      possible_causes: hasTechnicalCode ? document.getElementById("possible-causes")?.value.trim() || null : null,
-      recommended_actions: hasTechnicalCode ? document.getElementById("recommended-actions")?.value.trim() || null : null,
+      possible_causes: document.getElementById("possible-causes")?.value.trim() || null,
+      recommended_actions: document.getElementById("recommended-actions")?.value.trim() || null,
       category: document.getElementById("fault-category")?.value || "Other",
       technical_category: hasTechnicalCode ? document.getElementById("technical-category")?.value.trim() || null : null,
       severity: backendValue(document.getElementById("severity")?.value || "medium"), priority: backendValue(document.getElementById("priority")?.value || "medium"),
       status: backendValue(status), charger_status: document.getElementById("current-charger-status")?.value || null,
       reported_by_name: document.getElementById("reported-by")?.value.trim() || state.currentUser || null,
-      comments: document.getElementById("comments")?.value.trim() || null, resolution_notes: document.getElementById("comments")?.value.trim() || null,
+      comments: document.getElementById("comments")?.value.trim() || null, confirmed_cause: confirmedCause || null,
+      resolution_action_taken: resolutionActionTaken || null, resolution_notes: document.getElementById("resolution-notes")?.value.trim() || null,
       requires_site_visit: document.getElementById("site-visit-required")?.value === "Yes", reported_at: new Date(`${reportedDate}T${reportedTime}`).toISOString(),
     };
     const response = existing ? await window.QatarOpsApi.Faults.update(existing.id, payload) : await window.QatarOpsApi.Faults.create(payload);
     const fault = normalizeFaultRecord(response.fault);
+    if (!existing && state.pendingFaultVisitId) {
+      const sourceVisit = state.visits.find((item) => item.id === state.pendingFaultVisitId);
+      if (sourceVisit) {
+        const priorLinks = (sourceVisit.relatedFaults || []).map((link) => ({ fault_id: link.fault_id, progress_update: link.progress_update || null, status_after_visit: link.status_after_visit }));
+        await window.QatarOpsApi.SiteVisits.update(sourceVisit.id, { related_faults: [...priorLinks, { fault_id: fault.id, progress_update: "Fault identified during this visit.", status_after_visit: payload.status }] });
+      }
+      state.pendingFaultVisitId = "";
+    }
     try { await persistOperationalFiles("faults", fault.id, type, existing?.attachmentRecords || []); }
     catch (error) { await loadOperationalData(); throw new Error(`The fault was saved, but its photo upload failed. Reopen the fault to retry. ${error.message}`); }
+    try { await persistFaultFormVisitLinks(fault); }
+    catch (error) { await loadOperationalData(); throw new Error(`The fault was saved, but one or more Site Visits could not be linked. Reopen Edit Fault to retry. ${error.message}`); }
     state.currentFaultId = fault.id;
     await loadOperationalData();
     activity = {
@@ -361,6 +393,7 @@ async function simulateUpdate(type, mode = "edit") {
       status: backendSiteVisitStatus(document.getElementById("visit-status")?.value || "Completed"),
       observations: document.getElementById("findings")?.value.trim() || document.getElementById("notes")?.value.trim() || null,
       actions_taken: document.getElementById("work-completed")?.value.trim() || null,
+      related_faults: selectedRelatedFaults(),
     };
     const existing = mode !== "create" ? state.visits.find((item) => item.id === state.currentVisitId) : null;
     const response = existing?.id

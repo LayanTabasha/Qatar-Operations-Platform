@@ -49,8 +49,13 @@ const siteSummarySelect = `
 `;
 
 export async function listSites({ status, search, sort, order, limit }) {
-  const values = [status];
-  const filters = ["sites.status = $1"];
+  const values = [];
+  const filters = ["sites.status <> 'archived'"];
+
+  if (status !== "all") {
+    values.push(status);
+    filters.push(`sites.status = $${values.length}`);
+  }
 
   if (search) {
     values.push(`%${search}%`);
@@ -183,9 +188,9 @@ export async function findSiteById(id) {
   return result.rows[0] || null;
 }
 
-export async function findActiveSiteById(id) {
+export async function findOperationalSiteById(id) {
   const result = await query(
-    `${siteSummarySelect} WHERE sites.id = $1 AND sites.status = 'active' LIMIT 1`,
+    `${siteSummarySelect} WHERE sites.id = $1 AND sites.status <> 'archived' LIMIT 1`,
     [id],
   );
   return result.rows[0] || null;
@@ -231,7 +236,7 @@ export async function updateSiteStatusById(id, status) {
     `
       UPDATE sites
       SET status = $2
-      WHERE id = $1
+      WHERE id = $1 AND status <> 'archived'
       RETURNING id
     `,
     [id, status],

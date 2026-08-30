@@ -125,7 +125,7 @@ function renderFaultTrendSites(siteSeries, selectedSiteValue) {
       <span class="fault-trend-site-name"><i style="background:${color}"></i><b>${safeDetailValue(site.name)}</b><strong>${total}</strong></span>
       ${faultTrendSparkline(series.values, color, site.name)}
     </button>`;
-  }).join("") : chartEmpty("No active sites are available.");
+  }).join("") : chartEmpty("No operational sites are available.");
 }
 
 function renderFaultTrendLine(series, color, siteSelected) {

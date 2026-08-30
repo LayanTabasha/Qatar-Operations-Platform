@@ -1,3 +1,39 @@
+let requestFaultOptions = [];
+let selectedRequestFaultId = "";
+
+function requestFaultVisitMarkup(fault) {
+  const visits = fault?.related_site_visits || [];
+  return `<div class="request-linked-visits"><div><h4>Linked Site Visits</h4><small>From the selected Fault</small></div>${visits.length ? visits.map((visit) => `<article><div><strong>${requestText(formatMediumDate(visit.visit_date))}${visit.time_in || visit.time_out ? ` • ${requestText(visit.time_in || "—")}–${requestText(visit.time_out || "—")}` : ""}</strong><span>${requestText(visit.purpose || visit.visit_type || "Site Visit")}</span><small>${requestText(requestLabel(visit.status || visit.visit_status || visit.status_after_visit || ""))}${visit.engineer ? ` • ${requestText(visit.engineer)}` : ""}</small></div><button class="secondary-button" data-visit-detail="${requestText(visit.site_visit_id || visit.id)}" type="button">View Visit</button></article>`).join("") : `<p class="request-muted">No Site Visits linked to this Fault yet.</p>`}</div>`;
+}
+
+function renderRequestFaultSelection() {
+  const target = document.getElementById("request-fault-selection");
+  if (!target) return;
+  const fault = requestFaultOptions.find((item) => item.id === selectedRequestFaultId);
+  target.innerHTML = fault ? `<article class="request-selected-fault"><header><div><strong>${requestText(fault.fault_reference)} • ${requestText(fault.title)}</strong><small>${requestText(fault.site_name)}${fault.charger_name ? ` • ${requestText(fault.charger_name)}` : ""}</small></div><span class="request-pill status-${requestText(fault.status)}">${requestText(requestLabel(fault.status))}</span></header><div class="request-fault-actions"><button class="secondary-button" data-fault-detail="${requestText(fault.id)}" type="button">View Fault</button><button class="secondary-button" id="remove-request-fault" type="button">× Remove</button></div></article>${requestFaultVisitMarkup(fault)}` : `<p class="request-muted">No related Fault selected.</p>`;
+}
+
+function filterRequestFaultCards() {
+  const query = document.getElementById("request-fault-search")?.value.trim().toLowerCase() || "";
+  document.querySelectorAll("[data-request-fault-card]").forEach((card) => { card.classList.toggle("hidden", Boolean(query) && !card.dataset.requestFaultSearch.includes(query)); });
+}
+
+function renderRequestFaultPicker() {
+  const picker = document.getElementById("request-fault-picker");
+  if (!picker) return;
+  const siteId = document.getElementById("request-site")?.value || "";
+  const chargerId = document.getElementById("request-charger")?.value || "";
+  const faults = requestFaultOptions.filter((fault) => !siteId || fault.site_id === siteId).sort((a, b) => Number(b.charger_id === chargerId) - Number(a.charger_id === chargerId));
+  picker.innerHTML = `<label><span class="sr-only">Search Faults</span><input id="request-fault-search" type="search" placeholder="Search Fault ID, title, status, site or charger" /></label><div class="request-fault-picker-list">${faults.length ? faults.map((fault) => { const search = [fault.fault_reference, fault.title, fault.status, fault.site_name, fault.charger_name].join(" ").toLowerCase(); return `<button class="request-fault-card${fault.id === selectedRequestFaultId ? " is-selected" : ""}" data-request-fault-card="${requestText(fault.id)}" data-request-fault-search="${requestText(search)}" type="button"><span><strong>${requestText(fault.fault_reference)}</strong><em>${requestText(requestLabel(fault.status))}</em></span><b>${requestText(fault.title)}</b><small>${requestText(fault.site_name)}${fault.charger_name ? ` • ${requestText(fault.charger_name)}` : ""}</small>${fault.description ? `<p>${requestText(fault.description.slice(0, 140))}</p>` : ""}</button>`; }).join("") : `<p class="request-muted">No active Faults are available for the selected Site.</p>`}</div>`;
+}
+
+async function initializeRequestFaultSelector(item = {}) {
+  selectedRequestFaultId = item.fault_id || "";
+  const response = await window.QatarOpsApi.Faults.list({ limit: 500 });
+  requestFaultOptions = response.faults || [];
+  renderRequestFaultSelection();
+}
+
 function requestFormFields(item = {}, hqMode = false) {
   const siteId = item.site_id || "";
   if (hqMode) return `<div class="request-readonly full">${requestDetailFacts(item, true)}</div>
@@ -13,7 +49,8 @@ function requestFormFields(item = {}, hqMode = false) {
     <label><span>Charger</span><select id="request-charger"${siteId ? "" : " disabled"}><option value="">No charger</option>${chargerOptions(siteId, item.charger_id)}</select></label>
     <label><span>Assigned To HQ</span><select id="request-assigned"><option value="">Unassigned</option>${hqUserOptions(item.assigned_to)}</select></label>
     <label><span>Due Date</span><input id="request-due-date" type="date" value="${requestText(item.due_date || "")}" /></label>
-    <label class="full"><span>Request Attachments</span><input id="request-files" type="file" multiple /></label>`;
+    <label class="full"><span>Request Attachments</span><input id="request-files" type="file" multiple /></label>
+    <section class="request-fault-section full"><div class="request-fault-heading"><div><h3>Related Fault</h3><p>Attach the fault related to this request. Any Site Visits linked to that Fault will appear automatically.</p></div><button class="secondary-button" id="select-request-fault" type="button">+ Select Fault</button></div><div id="request-fault-selection"></div><div id="request-fault-picker" class="request-fault-picker hidden"></div></section>`;
 }
 
 function openRequestModal(item = null) {
@@ -26,6 +63,7 @@ function openRequestModal(item = null) {
   document.getElementById("modal-eyebrow").textContent = "Operations Requests";
   form.innerHTML = `<div class="modal-error" id="modal-error" aria-live="polite"></div>${requestFormFields(item || {})}<div class="modal-actions"><button class="secondary-button" id="cancel-modal" type="button">Cancel</button><button class="primary-button" type="submit">${item ? "Save Changes" : "Create Request"}</button></div>`;
   document.getElementById("modal-backdrop").classList.remove("hidden");
+  initializeRequestFaultSelector(item || {}).catch((error) => { const target = document.getElementById("request-fault-selection"); if (target) target.innerHTML = `<p class="modal-error">${requestText(error.message)}</p>`; });
 }
 
 async function uploadRequestFiles(requestId) {
@@ -46,6 +84,9 @@ async function submitRequestForm(form) {
       closeModal();
       await loadRequestsPageFresh();
       return;
+    } else if (form.dataset.requestMode === "status-edit") {
+      const status = document.getElementById("request-status").value;
+      request = (await window.QatarOpsApi.Requests.update(form.dataset.requestId, { status })).request;
     } else if (form.dataset.requestMode === "hq-edit") {
       const status = document.getElementById("request-status").value;
       const hqResponse = document.getElementById("request-hq-response").value.trim();
@@ -58,14 +99,14 @@ async function submitRequestForm(form) {
       const payload = { title, description, category: document.getElementById("request-category").value || null,
         priority: document.getElementById("request-priority").value, site_id: document.getElementById("request-site").value || null,
         charger_id: document.getElementById("request-charger").value || null, assigned_to: document.getElementById("request-assigned").value || null,
-        due_date: document.getElementById("request-due-date").value || null };
+        due_date: document.getElementById("request-due-date").value || null, fault_id: selectedRequestFaultId || null };
       request = form.dataset.requestMode === "admin-edit"
         ? (await window.QatarOpsApi.Requests.update(form.dataset.requestId, payload)).request
         : (await window.QatarOpsApi.Requests.create(payload)).request;
     }
-    await uploadRequestFiles(request.id);
+    if (form.dataset.requestMode !== "status-edit") await uploadRequestFiles(request.id);
     await loadRequestsPageFresh();
-    if (form.dataset.requestMode === "hq-edit") await openRequestDetails(request.id);
+    if (["hq-edit", "status-edit"].includes(form.dataset.requestMode)) await openRequestDetails(request.id);
     else closeModal();
   } catch (error) {
     if (errorBox) errorBox.textContent = error.message || "The request could not be saved.";

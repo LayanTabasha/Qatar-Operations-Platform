@@ -159,6 +159,19 @@ document.addEventListener("click", (event) => {
   if (visitDetailButton) openSiteVisitDetail(visitDetailButton.dataset.visitDetail);
   const faultDetailButton = event.target.closest("[data-fault-detail]");
   if (faultDetailButton) openFaultDetail(faultDetailButton.dataset.faultDetail);
+  const selectFaultVisitsButton = event.target.closest("#select-fault-site-visits");
+  if (selectFaultVisitsButton) openFaultSiteVisitPicker().catch((error) => window.alert(error.message || "Site Visits could not be loaded."));
+  if (event.target.closest("#apply-fault-site-visit-picker")) document.getElementById("fault-site-visit-picker")?.classList.add("hidden");
+  if (event.target.closest("#cancel-fault-site-visit-picker")) cancelFaultSiteVisitPicker();
+  const createFaultFromVisit = event.target.closest("#create-fault-from-visit");
+  if (createFaultFromVisit) {
+    const visit = state.visits.find((item) => item.id === state.currentVisitId);
+    if (!visit) window.alert("Save the Site Visit first, then use this option to create and link a fault.");
+    else {
+      state.pendingFaultVisitId = visit.id;
+      openModal("fault", "create", { siteId: visit.siteId, chargerId: visit.chargerId, lockSite: true, lockLocation: Boolean(visit.chargerId) });
+    }
+  }
   const dtcSelectButton = event.target.closest("[data-dtc-select]");
   if (dtcSelectButton) selectFaultCatalogueRecord(dtcSelectButton.dataset.dtcSelect);
   const removeSiteVisitReportButton = event.target.closest("[data-site-visit-report-remove]");
@@ -174,7 +187,9 @@ document.addEventListener("click", (event) => {
     }).catch((error) => alert(error.message || "The report could not be removed."));
   }
   const contactDeleteButton = event.target.closest("[data-contact-delete]");
-  if (contactDeleteButton && window.confirm("Delete this contact?")) {
+  if (contactDeleteButton && !isAdmin()) {
+    alert("Access denied. This action requires administrator permission.");
+  } else if (contactDeleteButton && window.confirm("Delete this contact?")) {
     window.QatarOpsApi.Contacts.remove(contactDeleteButton.dataset.contactDelete).then(async () => {
       await loadOperationalData();
       renderContactsPage();
@@ -234,12 +249,56 @@ document.getElementById("modal-form").addEventListener("submit", (event) => {
 });
 document.getElementById("modal-form").addEventListener("change", (event) => {
   if (event.target.id === "upload-site-image") handleSiteImageSelection();
-  if (event.target.id === "site" || event.target.id === "related-site") refreshChargerSelect();
+  if (event.target.id === "site" || event.target.id === "related-site") {
+    refreshChargerSelect();
+    if (event.currentTarget.dataset.type === "siteVisit") document.getElementById("related-faults-editor")?.replaceWith(document.createRange().createContextualFragment(relatedFaultsEditorMarkup()));
+    if (event.currentTarget.dataset.type === "fault") clearFaultVisitSelections();
+  }
   if (event.target.id === "fault-code") renderFaultCodeDetails("fault-code");
   if (event.target.id === "has-technical-code") toggleFaultTechnicalDetails();
+  if (event.target.id === "fault-status") toggleFaultResolutionDetails();
+  if (event.target.matches("[data-fault-form-visit]")) {
+    const visitId = event.target.dataset.faultFormVisit;
+    const fields = document.querySelector(`[data-fault-form-visit-fields="${visitId}"]`);
+    fields?.classList.toggle("hidden", !event.target.checked);
+    document.querySelector(`[data-fault-visit-card="${visitId}"]`)?.classList.toggle("is-selected", event.target.checked);
+    if (event.target.checked) pendingFaultVisitLinks.set(visitId, { site_visit_id: visitId, progress_update: "", status_after_visit: "open", existing: false, dirty: true });
+    else pendingFaultVisitLinks.delete(visitId);
+    renderFaultRelatedVisitsSummary();
+    updateFaultVisitPickerSelectionState();
+  }
+  if (event.target.matches("[data-related-fault]")) {
+    const faultId = event.target.dataset.relatedFault;
+    document.querySelector(`[data-related-fault-fields="${faultId}"]`)?.classList.toggle("hidden", !event.target.checked);
+    document.querySelector(`[data-related-fault-card="${faultId}"]`)?.classList.toggle("is-selected", event.target.checked);
+  }
+  if (event.target.matches("[data-fault-form-status]")) {
+    const link = pendingFaultVisitLinks.get(event.target.dataset.faultFormStatus);
+    if (link) { link.status_after_visit = event.target.value; link.dirty = true; renderFaultRelatedVisitsSummary(); }
+  }
 });
 document.getElementById("modal-form").addEventListener("input", (event) => {
   if (event.target.id === "dtc-catalogue-search") queueFaultCatalogueSearch(event.target.value);
+  if (event.target.id === "related-fault-search") {
+    const term = event.target.value.trim().toLowerCase();
+    document.querySelectorAll("[data-related-fault-row]").forEach((row) => row.classList.toggle("hidden", !row.dataset.search.includes(term)));
+  }
+  if (event.target.id === "fault-visit-search") {
+    const term = event.target.value.trim().toLowerCase();
+    let visible = 0;
+    document.querySelectorAll("[data-fault-visit-search]").forEach((card) => {
+      const matches = !term || card.dataset.faultVisitSearch.includes(term);
+      card.classList.toggle("hidden", !matches);
+      if (matches) visible += 1;
+    });
+    document.getElementById("fault-visit-search-empty")?.classList.toggle("hidden", visible > 0);
+  }
+  if (event.target.matches("[data-fault-form-progress]")) {
+    const link = pendingFaultVisitLinks.get(event.target.dataset.faultFormProgress); if (link) { link.progress_update = event.target.value; link.dirty = true; }
+  }
+  if (event.target.matches("[data-fault-form-status]")) {
+    const link = pendingFaultVisitLinks.get(event.target.dataset.faultFormStatus); if (link) { link.status_after_visit = event.target.value; link.dirty = true; renderFaultRelatedVisitsSummary(); }
+  }
 });
 document.addEventListener("change", async (event) => {
   const faultStatus = event.target.closest("[data-fault-status]");
@@ -286,7 +345,7 @@ document.getElementById("settings-panel").addEventListener("submit", (event) => 
 document.getElementById("settings-panel").addEventListener("click", (event) => {
   if (event.target.closest("#platform-health-refresh, #platform-health-retry")) loadPlatformHealth();
 });
-["fault-trend-site", "fault-trend-range", "visit-activity-mode"].forEach((id) => {
+["fault-trend-site", "fault-trend-range"].forEach((id) => {
   document.getElementById(id)?.addEventListener("change", renderDashboardCharts);
 });
 document.getElementById("fault-trend-site-list")?.addEventListener("click", (event) => {

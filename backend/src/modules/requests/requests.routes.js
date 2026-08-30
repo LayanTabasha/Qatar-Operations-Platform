@@ -8,5 +8,5 @@ requestsRouter.use(authenticate);
 requestsRouter.get("/", authorizeRoles(...ROLE_GROUPS.requestRead), listRequestRecords);
 requestsRouter.get("/:id", authorizeRoles(...ROLE_GROUPS.requestRead), getRequestRecord);
 requestsRouter.post("/", authorizeRoles("admin"), createRequestRecord);
-requestsRouter.patch("/:id", authorizeRoles("admin", ...ROLE_GROUPS.requestProcess), updateRequestRecord);
+requestsRouter.patch("/:id", authorizeRoles(...ROLE_GROUPS.requestStatusEdit), updateRequestRecord);
 requestsRouter.delete("/:id", authorizeRoles("admin"), deleteRequestRecord);

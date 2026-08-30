@@ -41,7 +41,7 @@ export async function planBrowserFaultImport(value, db = { query }) {
   for (const item of checked.valid) {
     const { record, index } = item;
     const relation = await db.query(`SELECT s.id AS site_id, c.id AS charger_id FROM sites s JOIN chargers c ON c.site_id=s.id
-      WHERE lower(s.name)=lower($1) AND lower(c.name)=lower($2) AND s.status='active' AND c.status <> 'archived' LIMIT 1`, [record.siteName, record.chargerName]);
+      WHERE lower(s.name)=lower($1) AND lower(c.name)=lower($2) AND s.status <> 'archived' AND c.status <> 'archived' LIMIT 1`, [record.siteName, record.chargerName]);
     if (!relation.rows[0]) { skipped.push({ index, reason: "Active site/charger name pair was not found" }); continue; }
     const duplicate = await db.query(`SELECT id, fault_reference FROM faults WHERE archived_at IS NULL AND
       (($1::text IS NOT NULL AND fault_reference=$1) OR (site_id=$2 AND charger_id=$3 AND title=$4 AND reported_at=$5::timestamptz)) LIMIT 1`,

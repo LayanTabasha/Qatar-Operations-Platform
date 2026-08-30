@@ -21,7 +21,7 @@ async function validateContentRelationship(type, input, current = {}) {
   if (type === "weekly-reports") return;
   const siteId = input.site_id !== undefined ? input.site_id : current.site_id;
   const chargerId = input.charger_id !== undefined ? input.charger_id : current.charger_id;
-  if (!(await chargerBelongsToSite(chargerId, siteId))) throw new ApiError(400, "INVALID_CONTENT_RELATIONSHIP", "The selected charger does not belong to the selected active site");
+  if (!(await chargerBelongsToSite(chargerId, siteId))) throw new ApiError(400, "INVALID_CONTENT_RELATIONSHIP", "The selected charger does not belong to the selected operational site");
 }
 
 export function contentRecordsRouter(type) {

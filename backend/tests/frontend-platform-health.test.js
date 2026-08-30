@@ -16,11 +16,17 @@ describe("Platform Health frontend", () => {
   });
 
   it("uses the shared API client and correct endpoint", () => {
-    expect(api).toContain('return apiRequest("/health/platform", { method: "GET" })');
+    expect(api).toContain('return apiRequest(`/health/platform?_=${Date.now()}`, { method: "GET", cache: "no-store" })');
     expect(settings).toContain("window.QatarOpsApi.PlatformHealth.platform()");
   });
 
   it("renders loading, retry, refresh, and required statuses", () => {
     ["Loading platform status", "platform-health-retry", "Refresh Status", "Operational", "Degraded", "Unavailable", "Not configured", "Retrieved"].forEach((text) => expect(settings).toContain(text));
+  });
+
+  it("renders core health without obsolete uptime and migration cards", () => {
+    expect(settings).toContain('healthInfoItem("Core Platform"');
+    expect(settings).not.toContain('healthInfoItem("Application Uptime"');
+    expect(settings).not.toContain('healthInfoItem("Latest Database Migration"');
   });
 });

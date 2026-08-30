@@ -54,9 +54,23 @@ describe("Contacts optional Site API", () => {
     expect(repository.listContacts).toHaveBeenCalledWith(expect.objectContaining({ search: "engineer", site_id: siteId }));
   });
 
-  it("preserves Contacts permissions", async () => {
-    await request(app).get("/api/v1/contacts").set("Cookie", cookie("viewer")).expect(200);
-    await request(app).post("/api/v1/contacts").set("Cookie", cookie("viewer")).send({ contact_name: "No", site_id: null }).expect(403);
-    await request(app).post("/api/v1/contacts").set("Cookie", cookie("operations_staff")).send({ contact_name: "Yes", site_id: null }).expect(201);
+  it.each(["admin", "hq_user", "operations_staff", "viewer"])("allows %s to list and view Contacts", async (role) => {
+    await request(app).get("/api/v1/contacts").set("Cookie", cookie(role)).expect(200);
+    await request(app).get(`/api/v1/contacts/${contactId}`).set("Cookie", cookie(role)).expect(200);
+  });
+
+  it("allows Admin to create, edit, and delete Contacts", async () => {
+    await request(app).post("/api/v1/contacts").set("Cookie", cookie("admin")).send({ contact_name: "Admin Contact", site_id: null }).expect(201);
+    await request(app).patch(`/api/v1/contacts/${contactId}`).set("Cookie", cookie("admin")).send({ contact_name: "Updated Contact" }).expect(200);
+    await request(app).delete(`/api/v1/contacts/${contactId}`).set("Cookie", cookie("admin")).expect(200);
+  });
+
+  it.each(["hq_user", "operations_staff", "viewer"])("rejects direct Contact writes by %s", async (role) => {
+    await request(app).post("/api/v1/contacts").set("Cookie", cookie(role)).send({ contact_name: "Denied", site_id: null }).expect(403);
+    await request(app).patch(`/api/v1/contacts/${contactId}`).set("Cookie", cookie(role)).send({ contact_name: "Denied" }).expect(403);
+    await request(app).delete(`/api/v1/contacts/${contactId}`).set("Cookie", cookie(role)).expect(403);
+    expect(repository.insertContact).not.toHaveBeenCalled();
+    expect(repository.updateContactById).not.toHaveBeenCalled();
+    expect(repository.deactivateContactById).not.toHaveBeenCalled();
   });
 });
